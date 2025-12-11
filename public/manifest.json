@@ -1,0 +1,17 @@
+{
+  "name": "Bruttus Delivery",
+  "short_name": "Bruttus",
+  "description": "Hambúrgueres artesanais com entrega rápida",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#ff4500",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

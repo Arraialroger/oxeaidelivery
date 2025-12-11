@@ -1,0 +1,209 @@
+import { useState, useEffect } from 'react';
+import { X, Minus, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { useProductOptions } from '@/hooks/useProductOptions';
+import { useCart } from '@/contexts/CartContext';
+import { cn } from '@/lib/utils';
+import type { Product, SelectedOption } from '@/types';
+
+interface ProductModalProps {
+  product: Product | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
+  const [quantity, setQuantity] = useState(1);
+  const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
+  const [note, setNote] = useState('');
+  const { data: options = [] } = useProductOptions(product?.id ?? null);
+  const { addItem } = useCart();
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuantity(1);
+      setSelectedOptions([]);
+      setNote('');
+    }
+  }, [isOpen, product?.id]);
+
+  if (!isOpen || !product) return null;
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(price);
+  };
+
+  const groupedOptions = options.reduce((acc, option) => {
+    const key = option.group_name || option.type;
+    if (!acc[key]) {
+      acc[key] = { type: option.type, items: [] };
+    }
+    acc[key].items.push(option);
+    return acc;
+  }, {} as Record<string, { type: string; items: typeof options }>);
+
+  const handleOptionToggle = (option: typeof options[0], groupType: string) => {
+    const selected: SelectedOption = {
+      id: option.id,
+      name: option.name,
+      price: option.price || 0,
+      type: option.type,
+      groupName: option.group_name,
+    };
+
+    if (groupType === 'mandatory') {
+      // Single selection for mandatory
+      setSelectedOptions((prev) => {
+        const filtered = prev.filter(
+          (o) => o.groupName !== option.group_name || o.type !== 'mandatory'
+        );
+        return [...filtered, selected];
+      });
+    } else {
+      // Toggle for addon/removal
+      setSelectedOptions((prev) => {
+        const exists = prev.find((o) => o.id === option.id);
+        if (exists) {
+          return prev.filter((o) => o.id !== option.id);
+        }
+        return [...prev, selected];
+      });
+    }
+  };
+
+  const isOptionSelected = (optionId: string) => {
+    return selectedOptions.some((o) => o.id === optionId);
+  };
+
+  const optionsTotal = selectedOptions.reduce((sum, opt) => sum + opt.price, 0);
+  const totalPrice = (product.price + optionsTotal) * quantity;
+
+  const handleAddToCart = () => {
+    addItem(product, quantity, selectedOptions, note);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      
+      <div className="relative w-full max-w-lg max-h-[90vh] bg-card rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col">
+        {/* Header Image */}
+        {product.image_url && (
+          <div className="relative h-48 flex-shrink-0">
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+          </div>
+        )}
+
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <h2 className="text-xl font-bold text-foreground">{product.name}</h2>
+          {product.description && (
+            <p className="text-muted-foreground mt-1">{product.description}</p>
+          )}
+          <p className="text-primary font-bold text-lg mt-2">
+            {formatPrice(product.price)}
+          </p>
+
+          {/* Options */}
+          {Object.entries(groupedOptions).map(([groupName, group]) => (
+            <div key={groupName} className="mt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="font-semibold text-foreground capitalize">
+                  {groupName === 'mandatory' ? 'Escolha obrigatória' : 
+                   groupName === 'addon' ? 'Adicionais' :
+                   groupName === 'removal' ? 'Remover ingredientes' : groupName}
+                </h3>
+                {group.type === 'mandatory' && (
+                  <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                    Obrigatório
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                {group.items.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => handleOptionToggle(option, group.type)}
+                    className={cn(
+                      'flex items-center justify-between p-3 rounded-lg border transition-colors',
+                      isOptionSelected(option.id)
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    <span className="text-foreground">{option.name}</span>
+                    {option.price && option.price > 0 ? (
+                      <span className="text-primary font-medium">
+                        +{formatPrice(option.price)}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Note */}
+          <div className="mt-6">
+            <h3 className="font-semibold text-foreground mb-2">Observações</h3>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ex: Sem cebola, molho à parte..."
+              className="bg-secondary border-border"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 p-4 border-t border-border bg-card safe-bottom">
+          <div className="flex items-center gap-4">
+            {/* Quantity */}
+            <div className="flex items-center gap-3 bg-secondary rounded-full p-1">
+              <button
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                className="w-8 h-8 rounded-full bg-card flex items-center justify-center"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="w-6 text-center font-medium">{quantity}</span>
+              <button
+                onClick={() => setQuantity((q) => q + 1)}
+                className="w-8 h-8 rounded-full bg-card flex items-center justify-center"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Add Button */}
+            <Button
+              onClick={handleAddToCart}
+              className="flex-1 h-12 text-base font-semibold"
+            >
+              Adicionar {formatPrice(totalPrice)}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
