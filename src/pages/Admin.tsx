@@ -9,7 +9,7 @@ import { ProductList } from '@/components/admin/ProductList';
 import { CategoryForm } from '@/components/admin/CategoryForm';
 import { CategoryList } from '@/components/admin/CategoryList';
 import { ConfigForm } from '@/components/admin/ConfigForm';
-import { ArrowLeft, Plus, Package, Layers, Settings, LogOut } from 'lucide-react';
+import { ArrowLeft, Plus, Package, Layers, Settings, LogOut, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -55,9 +55,17 @@ export default function Admin() {
               </Link>
               <h1 className="text-xl font-bold">Admin</h1>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleSignOut}>
-              <LogOut className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Link to="/admin/customers">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Users className="w-4 h-4" />
+                  <span className="hidden sm:inline">CRM</span>
+                </Button>
+              </Link>
+              <Button variant="ghost" size="icon" onClick={handleSignOut}>
+                <LogOut className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>

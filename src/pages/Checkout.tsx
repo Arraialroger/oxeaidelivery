@@ -10,6 +10,7 @@ import { useConfig } from '@/hooks/useConfig';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { classifyCustomerType } from '@/lib/customerClassification';
 
 type PaymentMethod = 'pix' | 'card' | 'cash';
 
@@ -67,15 +68,26 @@ export default function Checkout() {
         customerId = existingCustomer.id;
         console.log('[CHECKOUT] Cliente existente encontrado:', customerId);
       } else {
+        // CRITICAL: Classify customer type with SAFE try-catch
+        // This NEVER blocks checkout - if it fails, defaults to 'tourist'
+        let customerType: 'local' | 'tourist' = 'tourist';
+        try {
+          customerType = classifyCustomerType(phone);
+          console.log('[CHECKOUT] Cliente classificado como:', customerType);
+        } catch (classifyError) {
+          console.warn('[CHECKOUT] Erro na classificação, usando tourist:', classifyError);
+          customerType = 'tourist';
+        }
+
         const { data: newCustomer, error: customerError } = await supabase
           .from('customers')
-          .insert({ phone, name })
+          .insert({ phone, name, customer_type: customerType })
           .select()
           .single();
 
         if (customerError) throw customerError;
         customerId = newCustomer.id;
-        console.log('[CHECKOUT] Novo cliente criado:', customerId);
+        console.log('[CHECKOUT] Novo cliente criado:', customerId, 'Tipo:', customerType);
       }
 
       // 2. Create address
