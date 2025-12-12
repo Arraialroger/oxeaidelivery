@@ -1,5 +1,6 @@
 import { MapPin } from 'lucide-react';
 import { useConfig } from '@/hooks/useConfig';
+import logoImage from '@/assets/logo-bruttus.png';
 
 export function Header() {
   const { data: config } = useConfig();
@@ -7,11 +8,13 @@ export function Header() {
   return (
     <header className="bg-card border-b border-border">
       <div className="flex items-center justify-between p-4">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">
-            🍔 Bruttus Delivery
-          </h1>
-          <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <img 
+            src={logoImage} 
+            alt="Bruttus Burger & Costela" 
+            className="h-12 w-auto"
+          />
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <MapPin className="w-3.5 h-3.5" />
             <span>Entrega em toda região</span>
           </div>
