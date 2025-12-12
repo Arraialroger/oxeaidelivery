@@ -5,6 +5,7 @@ import { CategoryTabs } from '@/components/menu/CategoryTabs';
 import { ProductList } from '@/components/menu/ProductList';
 import { ProductModal } from '@/components/menu/ProductModal';
 import { CartDrawer } from '@/components/cart/CartDrawer';
+import { FeaturedSection } from '@/components/menu/FeaturedSection';
 import { useCategories } from '@/hooks/useCategories';
 import { useProducts } from '@/hooks/useProducts';
 import type { Product } from '@/types';
@@ -16,6 +17,9 @@ export default function Menu() {
 
   const { data: categories = [] } = useCategories();
   const { data: products = [], isLoading } = useProducts(activeCategory);
+  
+  // Get all products for featured section (without category filter)
+  const { data: allProducts = [] } = useProducts(null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,6 +30,14 @@ export default function Menu() {
         activeCategory={activeCategory}
         onSelect={setActiveCategory}
       />
+
+      {/* Featured Section - Only show when no category is selected */}
+      {!activeCategory && (
+        <FeaturedSection
+          products={allProducts}
+          onProductClick={setSelectedProduct}
+        />
+      )}
 
       <ProductList
         products={products}
