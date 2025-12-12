@@ -1,7 +1,7 @@
 {
-  "name": "Bruttus Delivery",
+  "name": "Bruttus Delivery - Burger & Costela",
   "short_name": "Bruttus",
-  "description": "Hambúrgueres artesanais com entrega rápida",
+  "description": "Hambúrgueres artesanais e costela defumada com entrega rápida",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",
@@ -9,9 +9,16 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64",
-      "type": "image/x-icon"
+      "src": "/logo-bruttus.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-bruttus.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
