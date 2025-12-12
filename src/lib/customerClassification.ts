@@ -6,22 +6,26 @@
  */
 export function classifyCustomerType(phone: string): 'local' | 'tourist' {
   try {
-    // Normalize phone: remove all non-digits
-    const digits = phone.replace(/\D/g, '');
+    // Safety check for null/undefined
+    if (!phone) {
+      console.warn('[CustomerClassification] Phone is empty, defaulting to tourist');
+      return 'tourist';
+    }
+
+    // 1. Sanitize: Remove ALL non-numeric characters (spaces, parenthesis, dashes, plus sign)
+    const cleanPhone = phone.toString().replace(/\D/g, '');
     
-    // Check for DDD 73 in various formats:
-    // - Starts with 73 (e.g., "73999999999")
-    // - Starts with 5573 (e.g., "+5573999999999")
-    // - Starts with 073 (e.g., "073999999999")
-    
-    if (
-      digits.startsWith('73') ||
-      digits.startsWith('5573') ||
-      digits.startsWith('073')
-    ) {
+    console.log('[CustomerClassification] Original phone:', phone);
+    console.log('[CustomerClassification] Clean phone:', cleanPhone);
+
+    // 2. Logic: Check for Area Code 73 (with or without Country Code 55)
+    // Check if it starts exactly with "73" OR "5573"
+    if (cleanPhone.startsWith('73') || cleanPhone.startsWith('5573')) {
+      console.log('[CustomerClassification] Matched DDD 73 -> local');
       return 'local';
     }
     
+    console.log('[CustomerClassification] No match -> tourist');
     return 'tourist';
   } catch (error) {
     // SAFETY: If classification fails for any reason, default to tourist
