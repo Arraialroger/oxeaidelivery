@@ -11,7 +11,7 @@ export function Header() {
           <img alt="Bruttus Burger & Costela" className="h-12 w-auto" src="/lovable-uploads/c7e9b2b7-56cd-46dc-b95f-7619e9d8463a.png" />
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <MapPin className="w-3.5 h-3.5" />
-            <span>Entrega em toda região</span>
+            <span>Entrega apenas em Arraial D'ajuda      </span>
           </div>
         </div>
 
