@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      boxShadow: {
+        'glow': '0 0 20px hsl(var(--primary) / 0.15)',
+        'glow-md': '0 0 30px hsl(var(--primary) / 0.2)',
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
