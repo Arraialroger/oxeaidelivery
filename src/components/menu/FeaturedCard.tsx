@@ -17,16 +17,16 @@ export function FeaturedCard({ product, onClick }: FeaturedCardProps) {
   return (
     <button
       onClick={onClick}
-      className="relative flex flex-col w-[200px] bg-card rounded-2xl border-2 border-primary/30 hover:border-primary transition-all overflow-hidden group shadow-lg hover:shadow-primary/20"
+      className="relative flex flex-col w-[200px] rounded-2xl border border-primary/20 hover:border-primary/50 transition-all overflow-hidden group backdrop-blur-md bg-card/60 shadow-lg hover:shadow-glow"
     >
       {/* Badge */}
-      <div className="absolute top-2 left-2 z-10 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+      <div className="absolute top-2 left-2 z-10 bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
         <Flame className="w-3 h-3" />
         Popular
       </div>
 
       {/* Image */}
-      <div className="relative w-full h-32 overflow-hidden bg-muted">
+      <div className="relative w-full h-32 overflow-hidden">
         {product.image_url ? (
           <img
             src={product.image_url}
@@ -38,7 +38,7 @@ export function FeaturedCard({ product, onClick }: FeaturedCardProps) {
             <Flame className="w-10 h-10 text-primary/40" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-card/90 via-card/40 to-transparent" />
       </div>
 
       {/* Content */}
