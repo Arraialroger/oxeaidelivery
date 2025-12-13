@@ -78,4 +78,5 @@ export interface Config {
   delivery_fee: number | null;
   restaurant_open: boolean | null;
   kds_enabled: boolean | null;
+  hero_banner_url: string | null;
 }

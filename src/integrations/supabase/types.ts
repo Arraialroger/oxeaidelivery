@@ -88,18 +88,21 @@ export type Database = {
       config: {
         Row: {
           delivery_fee: number | null
+          hero_banner_url: string | null
           id: number
           kds_enabled: boolean | null
           restaurant_open: boolean | null
         }
         Insert: {
           delivery_fee?: number | null
+          hero_banner_url?: string | null
           id: number
           kds_enabled?: boolean | null
           restaurant_open?: boolean | null
         }
         Update: {
           delivery_fee?: number | null
+          hero_banner_url?: string | null
           id?: number
           kds_enabled?: boolean | null
           restaurant_open?: boolean | null

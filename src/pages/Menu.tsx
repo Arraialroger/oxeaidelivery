@@ -6,6 +6,7 @@ import { ProductList } from '@/components/menu/ProductList';
 import { ProductModal } from '@/components/menu/ProductModal';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { FeaturedSection } from '@/components/menu/FeaturedSection';
+import { HeroBanner } from '@/components/menu/HeroBanner';
 import { useCategories } from '@/hooks/useCategories';
 import { useProducts } from '@/hooks/useProducts';
 import type { Product } from '@/types';
@@ -24,6 +25,9 @@ export default function Menu() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      
+      {/* Hero Banner - Dynamic from Admin */}
+      <HeroBanner />
       
       <CategoryTabs
         categories={categories}
