@@ -215,7 +215,7 @@ export function useUpdateConfig() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (config: { delivery_fee?: number; restaurant_open?: boolean; kds_enabled?: boolean }) => {
+    mutationFn: async (config: { delivery_fee?: number; restaurant_open?: boolean; kds_enabled?: boolean; hero_banner_url?: string | null }) => {
       const { data, error } = await supabase
         .from('config')
         .update(config)
