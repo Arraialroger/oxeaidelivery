@@ -61,8 +61,15 @@ export function FeaturedSection({ products, onProductClick }: FeaturedSectionPro
         className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 snap-x snap-mandatory"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {featuredProducts.map((product) => (
-          <div key={product.id} className="snap-start flex-shrink-0">
+        {featuredProducts.map((product, index) => (
+          <div 
+            key={product.id} 
+            className="snap-start flex-shrink-0 animate-fade-in opacity-0"
+            style={{ 
+              animationDelay: `${index * 100}ms`,
+              animationFillMode: 'forwards'
+            }}
+          >
             <FeaturedCard
               product={product}
               onClick={() => onProductClick(product)}
