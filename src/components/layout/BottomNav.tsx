@@ -27,10 +27,10 @@ export function BottomNav({ onCartClick }: BottomNavProps) {
           onClick={onCartClick}
           className="relative flex flex-col items-center gap-1 px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
         >
-          <div className="relative">
+          <div className={`relative ${totalItems > 0 ? 'animate-pulse' : ''}`}>
             <ShoppingBag className="w-5 h-5" />
             {totalItems > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center px-1">
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center px-1 animate-bounce">
                 {totalItems}
               </span>
             )}
