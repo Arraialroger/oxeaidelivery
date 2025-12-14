@@ -41,7 +41,7 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
         
         <div className="flex items-center justify-between mt-2">
           <span className="text-primary font-bold">{formatPrice(product.price)}</span>
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center transition-transform duration-150 group-active:scale-75 hover:scale-110">
             <Plus className="w-5 h-5 text-primary-foreground" />
           </div>
         </div>
