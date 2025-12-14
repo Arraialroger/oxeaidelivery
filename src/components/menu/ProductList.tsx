@@ -36,12 +36,20 @@ export function ProductList({ products, isLoading, onProductClick }: ProductList
 
   return (
     <div className="flex flex-col gap-3 p-4 pb-24">
-      {products.map((product) => (
-        <ProductCard
+      {products.map((product, index) => (
+        <div
           key={product.id}
-          product={product}
-          onClick={() => onProductClick(product)}
-        />
+          className="animate-fade-in opacity-0"
+          style={{ 
+            animationDelay: `${index * 50}ms`,
+            animationFillMode: 'forwards'
+          }}
+        >
+          <ProductCard
+            product={product}
+            onClick={() => onProductClick(product)}
+          />
+        </div>
       ))}
     </div>
   );
