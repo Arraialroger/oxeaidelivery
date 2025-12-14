@@ -17,7 +17,7 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
   return (
     <button
       onClick={onClick}
-      className="flex gap-3 p-4 bg-card rounded-xl border border-border hover:border-primary/50 transition-all w-full text-left group"
+      className="flex gap-3 p-4 rounded-xl border border-border/50 hover:border-primary/40 transition-all w-full text-left group backdrop-blur-md bg-card/60 hover:shadow-glow"
     >
       {product.image_url && (
         <div className="flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-muted">
