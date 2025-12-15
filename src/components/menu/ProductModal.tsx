@@ -55,11 +55,11 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       groupName: option.group_name,
     };
 
-    if (groupType === 'mandatory') {
-      // Single selection for mandatory
+    if (groupType === 'mandatory' || groupType === 'swap') {
+      // Single selection for mandatory and swap
       setSelectedOptions((prev) => {
         const filtered = prev.filter(
-          (o) => o.groupName !== option.group_name || o.type !== 'mandatory'
+          (o) => o.groupName !== option.group_name || (o.type !== 'mandatory' && o.type !== 'swap')
         );
         return [...filtered, selected];
       });
@@ -129,11 +129,17 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                 <h3 className="font-semibold text-foreground capitalize">
                   {groupName === 'mandatory' ? 'Escolha obrigatória' : 
                    groupName === 'addon' ? 'Adicionais' :
-                   groupName === 'removal' ? 'Remover ingredientes' : groupName}
+                   groupName === 'removal' ? 'Remover ingredientes' :
+                   groupName === 'swap' ? 'Trocar por' : groupName}
                 </h3>
                 {group.type === 'mandatory' && (
                   <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
                     Obrigatório
+                  </span>
+                )}
+                {group.type === 'swap' && (
+                  <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">
+                    Escolha 1
                   </span>
                 )}
               </div>

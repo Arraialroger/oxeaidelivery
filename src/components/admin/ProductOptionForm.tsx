@@ -17,6 +17,7 @@ const optionTypes = [
   { value: 'mandatory', label: 'Obrigatório' },
   { value: 'addon', label: 'Adicional' },
   { value: 'removal', label: 'Remoção' },
+  { value: 'swap', label: 'Troca' },
 ];
 
 export function ProductOptionForm({ productId, option, onSuccess }: ProductOptionFormProps) {

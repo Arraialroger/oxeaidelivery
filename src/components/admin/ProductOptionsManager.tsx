@@ -14,10 +14,11 @@ interface ProductOptionsManagerProps {
   product: Product;
 }
 
-const typeLabels: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
+const typeLabels: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   mandatory: { label: 'Obrigatório', variant: 'default' },
   addon: { label: 'Adicional', variant: 'secondary' },
   removal: { label: 'Remoção', variant: 'destructive' },
+  swap: { label: 'Troca', variant: 'outline' },
 };
 
 export function ProductOptionsManager({ product }: ProductOptionsManagerProps) {
