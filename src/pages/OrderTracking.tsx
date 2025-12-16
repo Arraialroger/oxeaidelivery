@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-
+import { PWAInstallModal } from '@/components/pwa';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
 interface OrderData {
@@ -69,10 +70,23 @@ const statusSteps = [
 
 export default function OrderTracking() {
   const { orderId } = useParams<{ orderId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderData | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPWAModal, setShowPWAModal] = useState(false);
+  
+  const { canShowInstallUI, promptInstall, dismissInstall } = usePWAInstall();
+  
+  // Show PWA modal after order (when coming from checkout with ?new=true)
+  useEffect(() => {
+    const isNewOrder = searchParams.get('new') === 'true';
+    if (isNewOrder && canShowInstallUI && !loading) {
+      const timer = setTimeout(() => setShowPWAModal(true), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, canShowInstallUI, loading]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -365,6 +379,17 @@ export default function OrderTracking() {
           </p>
         </div>
       </div>
+
+      {/* PWA Install Modal - After Order */}
+      <PWAInstallModal
+        isOpen={showPWAModal}
+        onClose={() => {
+          setShowPWAModal(false);
+          dismissInstall();
+        }}
+        onInstall={promptInstall}
+        variant="after-order"
+      />
     </div>
   );
 }
