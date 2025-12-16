@@ -155,12 +155,23 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </div>
             </div>
 
-            <Button
-              onClick={handleCheckout}
-              className="w-full h-12 text-base font-semibold"
-            >
-              Finalizar Pedido
-            </Button>
+            {!config?.restaurant_open ? (
+              <div className="text-center">
+                <p className="text-destructive font-medium mb-2">
+                  Restaurante fechado no momento
+                </p>
+                <Button disabled className="w-full h-12 text-base font-semibold opacity-50">
+                  Finalizar Pedido
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={handleCheckout}
+                className="w-full h-12 text-base font-semibold"
+              >
+                Finalizar Pedido
+              </Button>
+            )}
           </div>
         )}
       </div>
