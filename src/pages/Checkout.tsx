@@ -168,7 +168,7 @@ export default function Checkout() {
       clearCart();
 
       // 🔍 LOG CRÍTICO: URL de navegação
-      const targetUrl = `/order/${order.id}`;
+      const targetUrl = `/order/${order.id}?new=true`;
       console.log('[CHECKOUT] ==========================================');
       console.log('[CHECKOUT] NAVEGANDO PARA:', targetUrl);
       console.log('[CHECKOUT] ==========================================');
