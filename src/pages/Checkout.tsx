@@ -198,6 +198,28 @@ export default function Checkout() {
     return null;
   }
 
+  // Block checkout if restaurant is closed
+  if (!config?.restaurant_open) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">🔒</span>
+          </div>
+          <h1 className="text-xl font-bold text-foreground mb-2">
+            Restaurante Fechado
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            No momento não estamos aceitando pedidos. Volte mais tarde!
+          </p>
+          <Button onClick={() => navigate('/')}>
+            Voltar ao Cardápio
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
