@@ -29,6 +29,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
     image_url: product?.image_url || '',
     category_id: product?.category_id || '',
     is_active: product?.is_active ?? true,
+    is_combo: product?.is_combo ?? false,
   });
 
   const isEditing = !!product;
@@ -47,6 +48,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
           image_url: formData.image_url || null,
           category_id: formData.category_id || null,
           is_active: formData.is_active,
+          is_combo: formData.is_combo,
         });
       } else {
         await createProduct.mutateAsync({
@@ -56,6 +58,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
           image_url: formData.image_url || null,
           category_id: formData.category_id || null,
           is_active: formData.is_active,
+          is_combo: formData.is_combo,
         });
       }
 
@@ -72,6 +75,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
           image_url: '',
           category_id: '',
           is_active: true,
+          is_combo: false,
         });
       }
 
@@ -154,13 +158,23 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         />
       </div>
 
-      <div className="flex items-center gap-2">
-        <Switch
-          id="is_active"
-          checked={formData.is_active}
-          onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-        />
-        <Label htmlFor="is_active">Produto ativo</Label>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="is_active"
+            checked={formData.is_active}
+            onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+          />
+          <Label htmlFor="is_active">Produto ativo</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="is_combo"
+            checked={formData.is_combo}
+            onCheckedChange={(checked) => setFormData({ ...formData, is_combo: checked })}
+          />
+          <Label htmlFor="is_combo">É combo</Label>
+        </div>
       </div>
 
       <Button type="submit" className="w-full" disabled={mutation.isPending}>

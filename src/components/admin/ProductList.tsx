@@ -8,8 +8,10 @@ import { useDeleteProduct, useDuplicateProduct, useReorderProducts } from '@/hoo
 import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from './ProductForm';
 import { ProductOptionsManager } from './ProductOptionsManager';
+import { ComboSlotsManager } from './ComboSlotsManager';
+import { Badge } from '@/components/ui/badge';
 import type { Product } from '@/types';
-import { Edit, Trash2, Loader2, Settings2, Copy, GripVertical } from 'lucide-react';
+import { Edit, Trash2, Loader2, Settings2, Copy, GripVertical, Package } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -88,7 +90,15 @@ function SortableProduct({
                 />
               )}
               <div className="flex-1 min-w-0">
-                <h4 className="font-medium truncate">{product.name}</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium truncate">{product.name}</h4>
+                  {product.is_combo && (
+                    <Badge variant="secondary" className="text-xs gap-1">
+                      <Package className="w-3 h-3" />
+                      Combo
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   R$ {product.price.toFixed(2)}
                   {!product.is_active && (
@@ -131,7 +141,11 @@ function SortableProduct({
           </CardContent>
         </Card>
         <CollapsibleContent className="mt-2">
-          <ProductOptionsManager product={product} />
+          {product.is_combo ? (
+            <ComboSlotsManager combo={product} />
+          ) : (
+            <ProductOptionsManager product={product} />
+          )}
         </CollapsibleContent>
       </div>
     </Collapsible>
