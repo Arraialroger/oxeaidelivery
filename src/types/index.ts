@@ -12,6 +12,7 @@ export interface Product {
   image_url: string | null;
   category_id: string | null;
   is_active: boolean | null;
+  is_combo: boolean | null;
 }
 
 export interface ProductOption {
@@ -21,6 +22,25 @@ export interface ProductOption {
   type: string; // 'mandatory' | 'addon' | 'removal'
   group_name: string | null;
   price: number | null;
+}
+
+export interface ComboSlot {
+  id: string;
+  combo_id: string;
+  slot_label: string;
+  category_id: string | null;
+  quantity: number | null;
+  slot_order: number | null;
+  created_at: string | null;
+}
+
+export interface ComboSlotProduct {
+  id: string;
+  slot_id: string;
+  product_id: string;
+  price_difference: number | null;
+  is_default: boolean | null;
+  created_at: string | null;
 }
 
 export interface CartItem {
