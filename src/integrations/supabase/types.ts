@@ -85,6 +85,93 @@ export type Database = {
         }
         Relationships: []
       }
+      combo_slot_products: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          price_difference: number | null
+          product_id: string
+          slot_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          price_difference?: number | null
+          product_id: string
+          slot_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          price_difference?: number | null
+          product_id?: string
+          slot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combo_slot_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_slot_products_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "combo_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      combo_slots: {
+        Row: {
+          category_id: string | null
+          combo_id: string
+          created_at: string | null
+          id: string
+          quantity: number | null
+          slot_label: string
+          slot_order: number | null
+        }
+        Insert: {
+          category_id?: string | null
+          combo_id: string
+          created_at?: string | null
+          id?: string
+          quantity?: number | null
+          slot_label: string
+          slot_order?: number | null
+        }
+        Update: {
+          category_id?: string | null
+          combo_id?: string
+          created_at?: string | null
+          id?: string
+          quantity?: number | null
+          slot_label?: string
+          slot_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combo_slots_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_slots_combo_id_fkey"
+            columns: ["combo_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config: {
         Row: {
           delivery_fee: number | null
@@ -341,6 +428,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_active: boolean | null
+          is_combo: boolean | null
           name: string
           order_index: number | null
           price: number
@@ -351,6 +439,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean | null
+          is_combo?: boolean | null
           name: string
           order_index?: number | null
           price: number
@@ -361,6 +450,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean | null
+          is_combo?: boolean | null
           name?: string
           order_index?: number | null
           price?: number
