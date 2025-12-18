@@ -26,7 +26,7 @@ export function ComboSlotsManager({ combo }: ComboSlotsManagerProps) {
   const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);
   const [newSlot, setNewSlot] = useState({
     label: '',
-    category_id: '',
+    category_id: 'all',
     quantity: '1',
   });
 
@@ -36,12 +36,12 @@ export function ComboSlotsManager({ combo }: ComboSlotsManagerProps) {
     await createSlot.mutateAsync({
       combo_id: combo.id,
       slot_label: newSlot.label,
-      category_id: newSlot.category_id || null,
+      category_id: newSlot.category_id === 'all' ? null : (newSlot.category_id || null),
       quantity: parseInt(newSlot.quantity) || 1,
       slot_order: (slots?.length || 0),
     });
 
-    setNewSlot({ label: '', category_id: '', quantity: '1' });
+    setNewSlot({ label: '', category_id: 'all', quantity: '1' });
   };
 
   if (isLoading) {
@@ -134,7 +134,7 @@ export function ComboSlotsManager({ combo }: ComboSlotsManagerProps) {
                 <SelectValue placeholder="Categoria (opcional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas categorias</SelectItem>
+                <SelectItem value="all">Todas categorias</SelectItem>
                 {categories?.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {cat.name}
