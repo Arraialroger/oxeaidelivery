@@ -395,13 +395,37 @@ export default function Checkout() {
             {/* Order Summary */}
             <div className="mt-6 p-4 bg-secondary rounded-xl">
               <h3 className="font-semibold mb-3">Resumo do Pedido</h3>
-              <div className="flex flex-col gap-1 text-sm">
+              <div className="flex flex-col gap-2 text-sm">
                 {items.map((item) => (
-                  <div key={item.id} className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {item.quantity}x {item.product.name}
-                    </span>
-                    <span>{formatPrice(item.totalPrice)}</span>
+                  <div key={item.id} className="border-b border-border pb-2 last:border-0 last:pb-0">
+                    <div className="flex justify-between">
+                      <span className="text-foreground font-medium">
+                        {item.quantity}x {item.product.name}
+                      </span>
+                      <span className="text-foreground">{formatPrice(item.totalPrice)}</span>
+                    </div>
+                    {/* Combo selections */}
+                    {item.selectedOptions.some(o => o.type === 'combo-selection') && (
+                      <div className="mt-1 ml-4">
+                        {item.selectedOptions
+                          .filter(o => o.type === 'combo-selection')
+                          .map((o, idx) => (
+                            <p key={idx} className="text-xs text-muted-foreground">
+                              • {o.name}
+                              {o.price > 0 && <span className="text-primary"> (+{formatPrice(o.price)})</span>}
+                            </p>
+                          ))}
+                      </div>
+                    )}
+                    {/* Regular options */}
+                    {item.selectedOptions.some(o => o.type !== 'combo-selection') && (
+                      <p className="text-xs text-muted-foreground mt-1 ml-4">
+                        {item.selectedOptions.filter(o => o.type !== 'combo-selection').map(o => o.name).join(', ')}
+                      </p>
+                    )}
+                    {item.note && (
+                      <p className="text-xs text-muted-foreground italic mt-1 ml-4">"{item.note}"</p>
+                    )}
                   </div>
                 ))}
               </div>
