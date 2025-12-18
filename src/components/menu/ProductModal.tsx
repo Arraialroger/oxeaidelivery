@@ -6,6 +6,7 @@ import { useProductOptions } from '@/hooks/useProductOptions';
 import { useCart } from '@/contexts/CartContext';
 import { cn } from '@/lib/utils';
 import type { Product, SelectedOption } from '@/types';
+import { ComboModal } from './ComboModal';
 
 interface ProductModalProps {
   product: Product | null;
@@ -29,6 +30,11 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   }, [isOpen, product?.id]);
 
   if (!isOpen || !product) return null;
+
+  // Render ComboModal for combo products
+  if (product.is_combo) {
+    return <ComboModal product={product} isOpen={isOpen} onClose={onClose} />;
+  }
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
