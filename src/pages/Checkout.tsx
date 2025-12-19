@@ -151,7 +151,9 @@ export default function Checkout() {
         if (item.selectedOptions.length > 0) {
           const optionsToInsert = item.selectedOptions.map((opt) => ({
             order_item_id: orderItem.id,
-            option_name: opt.name,
+            option_name: opt.type === 'combo-selection' && opt.groupName 
+              ? `[${opt.groupName}] ${opt.name}` 
+              : opt.name,
             option_price: opt.price,
           }));
 
