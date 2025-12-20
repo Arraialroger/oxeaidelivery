@@ -89,13 +89,20 @@ const printOrderReceipt = (order: OrderWithDetails) => {
 
       <div class="section">
         <div class="section-title">ITENS:</div>
-        ${order.items.map(item => `
+        ${order.items.map(item => {
+          const comboOptions = item.options.filter(o => o.option_name.includes(':'));
+          const normalOptions = item.options.filter(o => !o.option_name.includes(':'));
+          return `
           <div class="item">
             <div class="item-name">${item.quantity}x ${item.product?.name}</div>
-            ${item.options.length > 0 ? `<div class="item-options">→ ${item.options.map(o => o.option_name).join(', ')}</div>` : ''}
+            ${comboOptions.length > 0 ? comboOptions.map(o => {
+              const [slot, product] = o.option_name.split(':');
+              return `<div class="item-options" style="margin-left: 10px;">• ${slot.trim()}: <strong>${product.trim()}</strong></div>`;
+            }).join('') : ''}
+            ${normalOptions.length > 0 ? `<div class="item-options">+ ${normalOptions.map(o => o.option_name).join(', ')}</div>` : ''}
             ${item.note ? `<div class="item-note">📝 ${item.note}</div>` : ''}
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
 
       <div class="total">TOTAL: R$ ${order.total.toFixed(2)}</div>
@@ -564,11 +571,25 @@ export default function Kitchen() {
                                   {item.product?.name}
                                 </p>
                                 {item.options.length > 0 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {item.options
-                                      .map((o) => o.option_name)
-                                      .join(', ')}
-                                  </p>
+                                  <div className="mt-1 space-y-0.5">
+                                    {/* Seleções de combo - exibir em lista vertical */}
+                                    {item.options.filter(o => o.option_name.includes(':')).map((o, idx) => {
+                                      const [slotName, productName] = o.option_name.split(':');
+                                      return (
+                                        <div key={idx} className="text-xs pl-2 border-l-2 border-primary/40">
+                                          <span className="text-muted-foreground">{slotName.trim()}:</span>
+                                          <span className="text-foreground font-medium ml-1">{productName.trim()}</span>
+                                        </div>
+                                      );
+                                    })}
+                                    
+                                    {/* Opções normais - exibir em linha */}
+                                    {item.options.filter(o => !o.option_name.includes(':')).length > 0 && (
+                                      <p className="text-xs text-muted-foreground">
+                                        + {item.options.filter(o => !o.option_name.includes(':')).map(o => o.option_name).join(', ')}
+                                      </p>
+                                    )}
+                                  </div>
                                 )}
                                 {item.note && (
                                   <p className="text-xs text-primary mt-1">
