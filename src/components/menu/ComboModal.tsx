@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useComboSlots, useComboSlotProducts } from '@/hooks/useComboSlots';
 import { useCart } from '@/contexts/CartContext';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 import type { Product, SelectedOption } from '@/types';
 
 interface ComboModalProps {
@@ -126,6 +127,7 @@ export function ComboModal({ product, isOpen, onClose }: ComboModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState<Record<string, SlotSelection>>({});
   const [note, setNote] = useState('');
+  const [defaultsLoaded, setDefaultsLoaded] = useState(false);
   const { data: slots, isLoading } = useComboSlots(product.id);
   const { addItem } = useCart();
 
@@ -135,8 +137,45 @@ export function ComboModal({ product, isOpen, onClose }: ComboModalProps) {
       setQuantity(1);
       setSelections({});
       setNote('');
+      setDefaultsLoaded(false);
     }
   }, [isOpen, product.id]);
+
+  // Auto-select default products when slots are loaded
+  useEffect(() => {
+    if (!isOpen || !slots || slots.length === 0 || defaultsLoaded) return;
+
+    const loadDefaults = async () => {
+      const defaultSelections: Record<string, SlotSelection> = {};
+
+      for (const slot of slots) {
+        const { data: slotProducts } = await supabase
+          .from('combo_slot_products')
+          .select('*, products(id, name, price, image_url)')
+          .eq('slot_id', slot.id);
+
+        if (slotProducts) {
+          const defaultProduct = slotProducts.find(sp => sp.is_default);
+          if (defaultProduct && defaultProduct.products) {
+            defaultSelections[slot.id] = {
+              slotId: slot.id,
+              slotLabel: slot.slot_label,
+              productId: defaultProduct.product_id,
+              productName: defaultProduct.products.name,
+              priceDifference: defaultProduct.price_difference || 0,
+            };
+          }
+        }
+      }
+
+      if (Object.keys(defaultSelections).length > 0) {
+        setSelections(defaultSelections);
+      }
+      setDefaultsLoaded(true);
+    };
+
+    loadDefaults();
+  }, [isOpen, slots, defaultsLoaded]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
