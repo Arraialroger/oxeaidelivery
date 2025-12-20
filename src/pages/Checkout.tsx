@@ -14,6 +14,31 @@ import { classifyCustomerType } from '@/lib/customerClassification';
 
 type PaymentMethod = 'pix' | 'card' | 'cash';
 
+// Format phone to Brazilian format: (XX) XXXXX-XXXX
+const formatPhone = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  const limited = numbers.slice(0, 11);
+  
+  if (limited.length <= 2) {
+    return limited.length > 0 ? `(${limited}` : '';
+  }
+  if (limited.length <= 7) {
+    return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+  }
+  return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+};
+
+// Get only digits from formatted phone
+const getPhoneDigits = (value: string): string => {
+  return value.replace(/\D/g, '');
+};
+
+// Validate Brazilian phone (10 or 11 digits)
+const isValidPhone = (value: string): boolean => {
+  const digits = getPhoneDigits(value);
+  return digits.length >= 10 && digits.length <= 11;
+};
+
 export default function Checkout() {
   const navigate = useNavigate();
   const { items, subtotal, clearCart } = useCart();
@@ -26,6 +51,7 @@ export default function Checkout() {
   // Step 1: Customer Info
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   // Step 2: Address
   const [street, setStreet] = useState('');
@@ -48,6 +74,22 @@ export default function Checkout() {
     }).format(price);
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value);
+    setPhone(formatted);
+    
+    // Clear error when typing
+    if (phoneError) {
+      setPhoneError('');
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    if (phone && !isValidPhone(phone)) {
+      setPhoneError('Digite um número de telefone válido');
+    }
+  };
+
   const handleSubmitOrder = async () => {
     console.log('[CHECKOUT] ==========================================');
     console.log('[CHECKOUT] Iniciando handleSubmitOrder');
@@ -55,11 +97,14 @@ export default function Checkout() {
     setIsSubmitting(true);
 
     try {
+      // Get only digits for storage
+      const phoneDigits = getPhoneDigits(phone);
+      
       // 1. Check if customer exists by phone
       const { data: existingCustomer } = await supabase
         .from('customers')
         .select('id')
-        .eq('phone', phone)
+        .eq('phone', phoneDigits)
         .maybeSingle();
 
       let customerId: string;
@@ -81,7 +126,7 @@ export default function Checkout() {
 
         const { data: newCustomer, error: customerError } = await supabase
           .from('customers')
-          .insert({ phone, name, customer_type: customerType })
+          .insert({ phone: phoneDigits, name, customer_type: customerType })
           .select()
           .single();
 
@@ -269,11 +314,17 @@ export default function Checkout() {
               <Label htmlFor="phone">WhatsApp</Label>
               <Input
                 id="phone"
+                type="tel"
+                inputMode="numeric"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={handlePhoneChange}
+                onBlur={handlePhoneBlur}
                 placeholder="(00) 00000-0000"
-                className="mt-1"
+                className={cn("mt-1", phoneError && "border-destructive")}
               />
+              {phoneError && (
+                <p className="text-xs text-destructive mt-1">{phoneError}</p>
+              )}
             </div>
           </div>
         )}
@@ -454,7 +505,7 @@ export default function Checkout() {
           <Button
             onClick={() => setStep((s) => s + 1)}
             disabled={
-              (step === 1 && (!name || !phone)) ||
+              (step === 1 && (!name || !phone || !isValidPhone(phone))) ||
               (step === 2 && (!street || !number || !neighborhood || !reference))
             }
             className="w-full h-12 text-base font-semibold"
