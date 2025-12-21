@@ -54,10 +54,8 @@ export default function Menu() {
         onSelect={setActiveCategory}
       />
 
-      {/* PWA Install Button - Fixed */}
-      <div className="px-4 py-2">
-        <PWAInstallButton className="w-full" />
-      </div>
+      {/* PWA Install Button - Only shows when installable */}
+      <PWAInstallButton className="w-full mx-4 my-2" />
 
       {/* Featured Section - Only show when no category is selected */}
       {!activeCategory && (
