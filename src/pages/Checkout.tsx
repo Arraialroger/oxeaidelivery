@@ -39,6 +39,30 @@ const isValidPhone = (value: string): boolean => {
   return digits.length >= 10 && digits.length <= 11;
 };
 
+// Format currency to Brazilian format: R$ X,XX
+const formatCurrency = (value: string): string => {
+  // Remove all non-numeric characters
+  const numbers = value.replace(/\D/g, '');
+  
+  if (!numbers) return '';
+  
+  // Convert to number (in cents) and format
+  const cents = parseInt(numbers, 10);
+  const reais = cents / 100;
+  
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(reais);
+};
+
+// Get numeric value from formatted currency
+const getCurrencyValue = (value: string): number => {
+  const numbers = value.replace(/\D/g, '');
+  if (!numbers) return 0;
+  return parseInt(numbers, 10) / 100;
+};
+
 export default function Checkout() {
   const navigate = useNavigate();
   const { items, subtotal, clearCart } = useCart();
@@ -434,12 +458,18 @@ export default function Checkout() {
                 <Label htmlFor="change">Troco para quanto?</Label>
                 <Input
                   id="change"
-                  type="number"
+                  type="tel"
+                  inputMode="numeric"
                   value={changeAmount}
-                  onChange={(e) => setChangeAmount(e.target.value)}
-                  placeholder="Ex: 100"
+                  onChange={(e) => setChangeAmount(formatCurrency(e.target.value))}
+                  placeholder="R$ 0,00"
                   className="mt-1"
                 />
+                {changeAmount && getCurrencyValue(changeAmount) > 0 && getCurrencyValue(changeAmount) < total && (
+                  <p className="text-xs text-destructive mt-1">
+                    O valor deve ser maior que o total ({formatPrice(total)})
+                  </p>
+                )}
               </div>
             )}
 
