@@ -99,7 +99,7 @@ const printOrderReceipt = (order: OrderWithDetails) => {
               const [slot, product] = o.option_name.split(':');
               return `<div class="item-options" style="margin-left: 10px;">• ${slot.trim()}: <strong>${product.trim()}</strong></div>`;
             }).join('') : ''}
-            ${normalOptions.length > 0 ? `<div class="item-options">+ ${normalOptions.map(o => o.option_name).join(', ')}</div>` : ''}
+            ${normalOptions.length > 0 ? normalOptions.map(o => `<div class="item-options" style="margin-left: 10px;">+ ${o.option_name}${o.option_price > 0 ? ` (+R$ ${o.option_price.toFixed(2)})` : ''}</div>`).join('') : ''}
             ${item.note ? `<div class="item-note">📝 ${item.note}</div>` : ''}
           </div>
         `}).join('')}
@@ -583,12 +583,15 @@ export default function Kitchen() {
                                       );
                                     })}
                                     
-                                    {/* Opções normais - exibir em linha */}
-                                    {item.options.filter(o => !o.option_name.includes(':')).length > 0 && (
-                                      <p className="text-xs text-muted-foreground">
-                                        + {item.options.filter(o => !o.option_name.includes(':')).map(o => o.option_name).join(', ')}
-                                      </p>
-                                    )}
+                                    {/* Opções normais - exibir linha por linha */}
+                                    {item.options.filter(o => !o.option_name.includes(':')).map((o, idx) => (
+                                      <div key={idx} className="text-xs pl-2 border-l-2 border-muted-foreground/40">
+                                        <span className="text-muted-foreground">+ {o.option_name}</span>
+                                        {o.option_price > 0 && (
+                                          <span className="text-primary ml-1">(+R$ {o.option_price.toFixed(2)})</span>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
                                 )}
                                 {item.note && (
