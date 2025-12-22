@@ -545,7 +545,10 @@ export default function Checkout() {
         ) : (
           <Button
             onClick={handleSubmitOrder}
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting || 
+              (paymentMethod === 'cash' && changeAmount && getCurrencyValue(changeAmount) > 0 && getCurrencyValue(changeAmount) < total)
+            }
             className="w-full h-12 text-base font-semibold"
           >
             {isSubmitting ? 'Enviando...' : `Enviar Pedido ${formatPrice(total)}`}
