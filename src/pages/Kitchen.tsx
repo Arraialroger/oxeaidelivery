@@ -99,7 +99,12 @@ const printOrderReceipt = (order: OrderWithDetails) => {
               const [slot, product] = o.option_name.split(':');
               return `<div class="item-options" style="margin-left: 10px;">• ${slot.trim()}: <strong>${product.trim()}</strong></div>`;
             }).join('') : ''}
-            ${normalOptions.length > 0 ? normalOptions.map(o => `<div class="item-options" style="margin-left: 10px;">+ ${o.option_name}${o.option_price > 0 ? ` (+R$ ${o.option_price.toFixed(2)})` : ''}</div>`).join('') : ''}
+            ${normalOptions.length > 0 ? normalOptions.map(o => {
+              const isRemoval = o.option_name.toUpperCase().startsWith('SEM ');
+              const isAddon = o.option_price > 0;
+              const icon = isRemoval ? '❌' : isAddon ? '➕' : '🔄';
+              return `<div class="item-options" style="margin-left: 10px;">${icon} ${o.option_name}${o.option_price > 0 ? ` (+R$ ${o.option_price.toFixed(2)})` : ''}</div>`;
+            }).join('') : ''}
             ${item.note ? `<div class="item-note">📝 ${item.note}</div>` : ''}
           </div>
         `}).join('')}
@@ -583,15 +588,27 @@ export default function Kitchen() {
                                       );
                                     })}
                                     
-                                    {/* Opções normais - exibir linha por linha */}
-                                    {item.options.filter(o => !o.option_name.includes(':')).map((o, idx) => (
-                                      <div key={idx} className="text-xs pl-2 border-l-2 border-muted-foreground/40">
-                                        <span className="text-muted-foreground">+ {o.option_name}</span>
-                                        {o.option_price > 0 && (
-                                          <span className="text-primary ml-1">(+R$ {o.option_price.toFixed(2)})</span>
-                                        )}
-                                      </div>
-                                    ))}
+                                    {/* Opções normais - exibir linha por linha com ícones */}
+                                    {item.options.filter(o => !o.option_name.includes(':')).map((o, idx) => {
+                                      const isRemoval = o.option_name.toUpperCase().startsWith('SEM ');
+                                      const isAddon = o.option_price > 0;
+                                      
+                                      return (
+                                        <div key={idx} className="text-xs pl-2 border-l-2 border-muted-foreground/40 flex items-center gap-1">
+                                          {isRemoval ? (
+                                            <span className="text-destructive">❌</span>
+                                          ) : isAddon ? (
+                                            <span className="text-green-500">➕</span>
+                                          ) : (
+                                            <span className="text-blue-500">🔄</span>
+                                          )}
+                                          <span className="text-muted-foreground">{o.option_name}</span>
+                                          {o.option_price > 0 && (
+                                            <span className="text-primary">(+R$ {o.option_price.toFixed(2)})</span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 {item.note && (

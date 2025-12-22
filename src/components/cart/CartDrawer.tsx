@@ -1,4 +1,4 @@
-import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import { X, Minus, Plus, Trash2, ShoppingBag, CircleMinus, CirclePlus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
 import { useConfig } from '@/hooks/useConfig';
@@ -98,21 +98,33 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </div>
                     )}
 
-                    {/* Regular options - exibir linha por linha */}
+                    {/* Regular options - exibir linha por linha com ícones */}
                     {item.selectedOptions.some(o => o.type !== 'combo-selection') && (
                       <div className="mt-1 space-y-0.5">
                         {item.selectedOptions
                           .filter(o => o.type !== 'combo-selection')
-                          .map((o, idx) => (
-                            <p key={idx} className="text-xs text-muted-foreground">
-                              + {o.name}
-                              {o.price > 0 && (
-                                <span className="text-primary ml-1">
-                                  (+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(o.price)})
-                                </span>
-                              )}
-                            </p>
-                          ))}
+                          .map((o, idx) => {
+                            const isRemoval = o.type === 'removal' || o.name.toUpperCase().startsWith('SEM ');
+                            const isAddon = o.type === 'addon' || o.price > 0;
+                            
+                            return (
+                              <p key={idx} className="text-xs text-muted-foreground flex items-center gap-1">
+                                {isRemoval ? (
+                                  <CircleMinus className="w-3 h-3 text-destructive flex-shrink-0" />
+                                ) : isAddon ? (
+                                  <CirclePlus className="w-3 h-3 text-green-500 flex-shrink-0" />
+                                ) : (
+                                  <RefreshCw className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                                )}
+                                <span>{o.name}</span>
+                                {o.price > 0 && (
+                                  <span className="text-primary">
+                                    (+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(o.price)})
+                                  </span>
+                                )}
+                              </p>
+                            );
+                          })}
                       </div>
                     )}
 
