@@ -98,11 +98,22 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </div>
                     )}
 
-                    {/* Regular options */}
+                    {/* Regular options - exibir linha por linha */}
                     {item.selectedOptions.some(o => o.type !== 'combo-selection') && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {item.selectedOptions.filter(o => o.type !== 'combo-selection').map((o) => o.name).join(', ')}
-                      </p>
+                      <div className="mt-1 space-y-0.5">
+                        {item.selectedOptions
+                          .filter(o => o.type !== 'combo-selection')
+                          .map((o, idx) => (
+                            <p key={idx} className="text-xs text-muted-foreground">
+                              + {o.name}
+                              {o.price > 0 && (
+                                <span className="text-primary ml-1">
+                                  (+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(o.price)})
+                                </span>
+                              )}
+                            </p>
+                          ))}
+                      </div>
                     )}
 
                     {item.note && (
