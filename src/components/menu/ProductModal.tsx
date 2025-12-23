@@ -46,11 +46,23 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const groupedOptions = options.reduce((acc, option) => {
     const key = option.group_name || option.type;
     if (!acc[key]) {
-      acc[key] = { type: option.type, items: [] };
+      acc[key] = { type: option.type, items: [], groupName: key };
     }
     acc[key].items.push(option);
     return acc;
-  }, {} as Record<string, { type: string; items: typeof options }>);
+  }, {} as Record<string, { type: string; items: typeof options; groupName: string }>);
+
+  // Verificar grupos obrigatórios e quais estão faltando
+  const mandatoryGroups = Object.entries(groupedOptions)
+    .filter(([_, group]) => group.type === 'mandatory');
+  
+  const missingMandatoryGroups = mandatoryGroups.filter(([groupName]) => 
+    !selectedOptions.some(o => 
+      (o.groupName === groupName || o.groupName === undefined) && o.type === 'mandatory'
+    )
+  );
+
+  const canAddToCart = missingMandatoryGroups.length === 0;
 
   const handleOptionToggle = (option: typeof options[0], groupType: string) => {
     const selected: SelectedOption = {
@@ -89,6 +101,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const totalPrice = (product.price + optionsTotal) * quantity;
 
   const handleAddToCart = () => {
+    if (!canAddToCart) return;
     addItem(product, quantity, selectedOptions, note);
     onClose();
   };
@@ -209,9 +222,13 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
             {/* Add Button */}
             <Button
               onClick={handleAddToCart}
+              disabled={!canAddToCart}
               className="flex-1 h-12 text-base font-semibold"
             >
-              Adicionar {formatPrice(totalPrice)}
+              {!canAddToCart 
+                ? `Selecione: ${missingMandatoryGroups.map(([name]) => name).join(', ')}`
+                : `Adicionar ${formatPrice(totalPrice)}`
+              }
             </Button>
           </div>
         </div>
