@@ -255,27 +255,6 @@ export default function Kitchen() {
     }
   }, [authLoading, isAdmin, navigate]);
 
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Show redirect message if not admin
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Redirecionando...</p>
-        </div>
-      </div>
-    );
-  }
-
   const openCancelDialog = (orderId: string) => {
     setCancelOrderId(orderId);
     setCancelReason('');
@@ -426,6 +405,27 @@ export default function Kitchen() {
       supabase.removeChannel(channel);
     };
   }, [fetchOrders, fetchHistoryOrders, historyOpen]);
+
+  // Show loading while checking auth (moved after all hooks)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show redirect message if not admin
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Redirecionando...</p>
+        </div>
+      </div>
+    );
+  }
 
   const updateStatus = async (
     orderId: string,
