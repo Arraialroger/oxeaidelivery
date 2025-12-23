@@ -18,6 +18,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
   const [note, setNote] = useState('');
+  const [isShaking, setIsShaking] = useState(false);
   const { data: options = [] } = useProductOptions(product?.id ?? null);
   const { addItem } = useCart();
 
@@ -26,6 +27,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       setQuantity(1);
       setSelectedOptions([]);
       setNote('');
+      setIsShaking(false);
     }
   }, [isOpen, product?.id]);
 
@@ -101,7 +103,11 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const totalPrice = (product.price + optionsTotal) * quantity;
 
   const handleAddToCart = () => {
-    if (!canAddToCart) return;
+    if (!canAddToCart) {
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      return;
+    }
     addItem(product, quantity, selectedOptions, note);
     onClose();
   };
@@ -222,8 +228,11 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
             {/* Add Button */}
             <Button
               onClick={handleAddToCart}
-              disabled={!canAddToCart}
-              className="flex-1 h-12 text-base font-semibold"
+              className={cn(
+                "flex-1 h-12 text-base font-semibold",
+                isShaking && "animate-shake",
+                !canAddToCart && "bg-muted text-muted-foreground hover:bg-muted"
+              )}
             >
               {!canAddToCart 
                 ? `Selecione: ${missingMandatoryGroups.map(([name]) => name).join(', ')}`
