@@ -1,3 +1,4 @@
 export { PWAInstallBanner } from './PWAInstallBanner';
-export { PWAInstallModal } from './PWAInstallModal';
 export { PWAInstallButton } from './PWAInstallButton';
+export { PWAInstallModal } from './PWAInstallModal';
+export { IOSInstallInstructions } from './IOSInstallInstructions';

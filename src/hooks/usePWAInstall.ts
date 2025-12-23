@@ -16,6 +16,11 @@ export function usePWAInstall() {
   const [visitCount, setVisitCount] = useState(1);
   const [isDismissed, setIsDismissed] = useState(false);
 
+  // Detectar iOS
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  const isSafari = typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+  const isIOSSafari = isIOS && isSafari;
+
   useEffect(() => {
     // Check if already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
@@ -99,6 +104,10 @@ export function usePWAInstall() {
 
   const shouldShowSecondVisitPrompt = visitCount >= 2 && isInstallable && !isInstalled && !isDismissed;
   const canShowInstallUI = isInstallable && !isInstalled;
+  
+  // Para iOS, mostrar UI de instalação manual se não estiver instalado
+  const canShowIOSInstallUI = isIOSSafari && !isInstalled && !isDismissed;
+  const shouldShowIOSPrompt = visitCount >= 2 && canShowIOSInstallUI;
 
   return {
     isInstallable,
@@ -109,5 +118,10 @@ export function usePWAInstall() {
     dismissInstall,
     shouldShowSecondVisitPrompt,
     canShowInstallUI,
+    // iOS specific
+    isIOS,
+    isIOSSafari,
+    canShowIOSInstallUI,
+    shouldShowIOSPrompt,
   };
 }

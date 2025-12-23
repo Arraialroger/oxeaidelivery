@@ -23,15 +23,15 @@ export default function Menu() {
   const { data: products = [], isLoading } = useProducts(activeCategory);
   const { data: allProducts = [] } = useProducts(null);
   
-  const { shouldShowSecondVisitPrompt, promptInstall, dismissInstall } = usePWAInstall();
+  const { shouldShowSecondVisitPrompt, shouldShowIOSPrompt, promptInstall, dismissInstall, isIOSSafari } = usePWAInstall();
 
-  // Show modal on 2nd visit
+  // Show modal on 2nd visit (Android/Chrome or iOS/Safari)
   useEffect(() => {
-    if (shouldShowSecondVisitPrompt) {
+    if (shouldShowSecondVisitPrompt || shouldShowIOSPrompt) {
       const timer = setTimeout(() => setShowPWAModal(true), 2000);
       return () => clearTimeout(timer);
     }
-  }, [shouldShowSecondVisitPrompt]);
+  }, [shouldShowSecondVisitPrompt, shouldShowIOSPrompt]);
 
   const handlePWAModalClose = () => {
     setShowPWAModal(false);
@@ -90,6 +90,7 @@ export default function Menu() {
         onClose={handlePWAModalClose}
         onInstall={promptInstall}
         variant="second-visit"
+        isIOSSafari={isIOSSafari}
       />
     </div>
   );

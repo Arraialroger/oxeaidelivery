@@ -379,14 +379,20 @@ export default function Kitchen() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        () => fetchOrders()
+        () => {
+          fetchOrders();
+          // Também atualiza histórico se estiver aberto
+          if (historyOpen) {
+            fetchHistoryOrders();
+          }
+        }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, fetchHistoryOrders, historyOpen]);
 
   const updateStatus = async (
     orderId: string,
