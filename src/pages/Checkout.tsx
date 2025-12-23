@@ -248,13 +248,25 @@ export default function Checkout() {
       });
 
       navigate(targetUrl);
-    } catch (error) {
+    } catch (error: any) {
       console.error('[CHECKOUT] ==========================================');
       console.error('[CHECKOUT] ERRO NO CHECKOUT:', error);
+      console.error('[CHECKOUT] Error message:', error?.message);
+      console.error('[CHECKOUT] Error code:', error?.code);
+      console.error('[CHECKOUT] Error details:', error?.details);
+      console.error('[CHECKOUT] Error hint:', error?.hint);
+      console.error('[CHECKOUT] Full error object:', JSON.stringify(error, null, 2));
       console.error('[CHECKOUT] ==========================================');
+      
+      // Build detailed error message for debugging
+      const errorMessage = error?.message || 'Erro desconhecido';
+      const errorCode = error?.code ? ` [${error.code}]` : '';
+      const errorHint = error?.hint ? ` - ${error.hint}` : '';
+      const errorDetails = error?.details ? ` (${error.details})` : '';
+      
       toast({
         title: 'Erro ao enviar pedido',
-        description: 'Tente novamente.',
+        description: `${errorMessage}${errorCode}${errorHint}${errorDetails}`,
         variant: 'destructive',
       });
     } finally {
