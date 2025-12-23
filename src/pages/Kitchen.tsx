@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Clock, ChefHat, Check, Truck, RefreshCw, CreditCard, Banknote, QrCode, Volume2, VolumeX, Printer, X, History, XCircle, Search, CalendarIcon, TrendingUp, ShoppingBag, DollarSign, Download, FileText, PieChartIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Clock, ChefHat, Check, Truck, RefreshCw, CreditCard, Banknote, QrCode, Volume2, VolumeX, Printer, X, History, XCircle, Search, CalendarIcon, TrendingUp, ShoppingBag, DollarSign, Download, FileText, PieChartIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '@/hooks/useAuth';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
@@ -225,6 +227,9 @@ const playNotificationSound = () => {
 };
 
 export default function Kitchen() {
+  const navigate = useNavigate();
+  const { isAdmin, loading: authLoading } = useAuth();
+  
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [historyOrders, setHistoryOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -242,6 +247,27 @@ export default function Kitchen() {
   const previousOrderIdsRef = useRef<Set<string>>(new Set());
   const isInitialLoadRef = useRef(true);
   const { toast } = useToast();
+
+  // Redirect non-admin users to login
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      navigate('/admin/login');
+    }
+  }, [authLoading, isAdmin, navigate]);
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Don't render if not admin
+  if (!isAdmin) {
+    return null;
+  }
 
   const openCancelDialog = (orderId: string) => {
     setCancelOrderId(orderId);

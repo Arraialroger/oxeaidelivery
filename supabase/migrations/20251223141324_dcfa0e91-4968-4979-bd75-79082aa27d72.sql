@@ -1,0 +1,18 @@
+-- ============================================
+-- HABILITAR RLS EM TODAS AS TABELAS
+-- ============================================
+
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_item_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.addresses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.kds_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sms_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.combo_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.combo_slot_products ENABLE ROW LEVEL SECURITY;
