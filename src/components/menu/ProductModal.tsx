@@ -19,6 +19,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
   const [note, setNote] = useState('');
   const [isShaking, setIsShaking] = useState(false);
+  const [highlightMissing, setHighlightMissing] = useState(false);
   const { data: options = [] } = useProductOptions(product?.id ?? null);
   const { addItem } = useCart();
 
@@ -28,6 +29,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       setSelectedOptions([]);
       setNote('');
       setIsShaking(false);
+      setHighlightMissing(false);
     }
   }, [isOpen, product?.id]);
 
@@ -58,13 +60,24 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const mandatoryGroups = Object.entries(groupedOptions)
     .filter(([_, group]) => group.type === 'mandatory');
   
-  const missingMandatoryGroups = mandatoryGroups.filter(([groupName]) => 
-    !selectedOptions.some(o => 
-      (o.groupName === groupName || o.groupName === undefined) && o.type === 'mandatory'
-    )
-  );
+  // Corrigido: verificar se há alguma opção selecionada do tipo mandatory para cada grupo
+  const missingMandatoryGroups = mandatoryGroups.filter(([groupName]) => {
+    // Verifica se existe alguma opção selecionada que pertence a este grupo
+    const hasSelectedInGroup = selectedOptions.some(selected => {
+      // A opção pode ter groupName igual ao groupName do grupo OU
+      // se groupName for undefined, verifica se é do tipo mandatory
+      return selected.groupName === groupName || 
+             (selected.groupName === undefined && selected.type === 'mandatory' && groupName === 'mandatory');
+    });
+    return !hasSelectedInGroup;
+  });
 
   const canAddToCart = missingMandatoryGroups.length === 0;
+
+  // Verifica se um grupo específico está faltando
+  const isGroupMissing = (groupName: string) => {
+    return missingMandatoryGroups.some(([name]) => name === groupName);
+  };
 
   const handleOptionToggle = (option: typeof options[0], groupType: string) => {
     const selected: SelectedOption = {
@@ -72,14 +85,14 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       name: option.name,
       price: option.price || 0,
       type: option.type,
-      groupName: option.group_name,
+      groupName: option.group_name || groupType,
     };
 
     if (groupType === 'mandatory' || groupType === 'swap') {
-      // Single selection for mandatory and swap
+      // Single selection for mandatory and swap - filtra pelo groupName correto
       setSelectedOptions((prev) => {
         const filtered = prev.filter(
-          (o) => o.groupName !== option.group_name || (o.type !== 'mandatory' && o.type !== 'swap')
+          (o) => o.groupName !== selected.groupName
         );
         return [...filtered, selected];
       });
@@ -93,6 +106,11 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
         return [...prev, selected];
       });
     }
+    
+    // Remove highlight quando seleciona algo
+    if (highlightMissing) {
+      setHighlightMissing(false);
+    }
   };
 
   const isOptionSelected = (optionId: string) => {
@@ -105,6 +123,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const handleAddToCart = () => {
     if (!canAddToCart) {
       setIsShaking(true);
+      setHighlightMissing(true);
       setTimeout(() => setIsShaking(false), 500);
       return;
     }
@@ -148,18 +167,34 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
           </p>
 
           {/* Options */}
-          {Object.entries(groupedOptions).map(([groupName, group]) => (
-            <div key={groupName} className="mt-6">
+          {Object.entries(groupedOptions).map(([groupName, group]) => {
+            const isMissing = highlightMissing && isGroupMissing(groupName);
+            return (
+            <div 
+              key={groupName} 
+              className={cn(
+                "mt-6 p-3 -mx-3 rounded-lg transition-all",
+                isMissing && "bg-destructive/10 border-2 border-destructive animate-pulse"
+              )}
+            >
               <div className="flex items-center gap-2 mb-3">
-                <h3 className="font-semibold text-foreground capitalize">
+                <h3 className={cn(
+                  "font-semibold capitalize",
+                  isMissing ? "text-destructive" : "text-foreground"
+                )}>
                   {groupName === 'mandatory' ? 'Escolha obrigatória' : 
                    groupName === 'addon' ? 'Adicionais' :
                    groupName === 'removal' ? 'Remover ingredientes' :
                    groupName === 'swap' ? 'Trocar por' : groupName}
                 </h3>
                 {group.type === 'mandatory' && (
-                  <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
-                    Obrigatório
+                  <span className={cn(
+                    "text-xs px-2 py-0.5 rounded-full",
+                    isMissing 
+                      ? "bg-destructive/20 text-destructive font-semibold" 
+                      : "bg-primary/20 text-primary"
+                  )}>
+                    {isMissing ? "⚠️ Selecione" : "Obrigatório"}
                   </span>
                 )}
                 {group.type === 'swap' && (
@@ -178,7 +213,9 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                       'flex items-center justify-between p-3 rounded-lg border transition-colors',
                       isOptionSelected(option.id)
                         ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50'
+                        : isMissing 
+                          ? 'border-destructive/50 hover:border-destructive bg-card'
+                          : 'border-border hover:border-primary/50'
                     )}
                   >
                     <span className="text-foreground">{option.name}</span>
@@ -191,7 +228,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                 ))}
               </div>
             </div>
-          ))}
+          );})}
 
           {/* Note */}
           <div className="mt-6">
