@@ -248,59 +248,7 @@ export default function Kitchen() {
   const isInitialLoadRef = useRef(true);
   const { toast } = useToast();
 
-  // Protect route - redirect if not admin
-  useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      navigate('/admin/login');
-    }
-  }, [authLoading, isAdmin, navigate]);
-
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Don't render if not admin
-  if (!isAdmin) {
-    return null;
-  }
-
-  const openCancelDialog = (orderId: string) => {
-    setCancelOrderId(orderId);
-    setCancelReason('');
-    setCancelDialogOpen(true);
-  };
-
-  const cancelOrder = async () => {
-    if (!cancelOrderId || !cancelReason.trim()) {
-      toast({ title: 'Informe o motivo do cancelamento', variant: 'destructive' });
-      return;
-    }
-    
-    setCancelling(true);
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: 'cancelled', cancellation_reason: cancelReason.trim() })
-      .eq('id', cancelOrderId);
-
-    setCancelling(false);
-    
-    if (error) {
-      toast({ title: 'Erro ao cancelar pedido', variant: 'destructive' });
-      return;
-    }
-
-    toast({ title: 'Pedido cancelado' });
-    setCancelDialogOpen(false);
-    setCancelOrderId(null);
-    setCancelReason('');
-    fetchOrders();
-  };
-
+  // useCallback hooks - MUST be before any early returns
   const fetchOrders = useCallback(async () => {
     const { data, error } = await supabase
       .from('orders')
@@ -390,6 +338,13 @@ export default function Kitchen() {
     setHistoryOrders((data as OrderWithDetails[]) || []);
   }, []);
 
+  // useEffect hooks - MUST be before any early returns
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      navigate('/admin/login');
+    }
+  }, [authLoading, isAdmin, navigate]);
+
   useEffect(() => {
     if (historyOpen) {
       fetchHistoryOrders();
@@ -419,6 +374,52 @@ export default function Kitchen() {
       supabase.removeChannel(channel);
     };
   }, [fetchOrders, fetchHistoryOrders, historyOpen]);
+
+  // Early returns - AFTER all hooks
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
+  // Regular functions (not hooks) - can be after early returns
+  const openCancelDialog = (orderId: string) => {
+    setCancelOrderId(orderId);
+    setCancelReason('');
+    setCancelDialogOpen(true);
+  };
+
+  const cancelOrder = async () => {
+    if (!cancelOrderId || !cancelReason.trim()) {
+      toast({ title: 'Informe o motivo do cancelamento', variant: 'destructive' });
+      return;
+    }
+    
+    setCancelling(true);
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: 'cancelled', cancellation_reason: cancelReason.trim() })
+      .eq('id', cancelOrderId);
+
+    setCancelling(false);
+    
+    if (error) {
+      toast({ title: 'Erro ao cancelar pedido', variant: 'destructive' });
+      return;
+    }
+
+    toast({ title: 'Pedido cancelado' });
+    setCancelDialogOpen(false);
+    setCancelOrderId(null);
+    setCancelReason('');
+    fetchOrders();
+  };
 
   const updateStatus = async (
     orderId: string,
