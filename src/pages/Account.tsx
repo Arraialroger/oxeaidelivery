@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Package, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import BottomNav from '@/components/layout/BottomNav';
+import { BottomNav } from '@/components/layout/BottomNav';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ export default function Account() {
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [searchPhone, setSearchPhone] = useState<string | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   const { data: orders, isLoading, error } = useCustomerOrders(searchPhone);
 
@@ -217,6 +218,9 @@ export default function Account() {
           </div>
         )}
       </main>
+
+      <BottomNav onCartClick={() => setIsCartOpen(true)} />
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </div>
   );
 }
