@@ -124,42 +124,32 @@ export default function Checkout() {
       // Get only digits for storage
       const phoneDigits = getPhoneDigits(phone);
       
-      // 1. Check if customer exists by phone
-      const { data: existingCustomer } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('phone', phoneDigits)
-        .maybeSingle();
-
-      let customerId: string;
-
-      if (existingCustomer) {
-        customerId = existingCustomer.id;
-        console.log('[CHECKOUT] Cliente existente encontrado:', customerId);
-      } else {
-        // CRITICAL: Classify customer type with SAFE try-catch
-        // This NEVER blocks checkout - if it fails, defaults to 'tourist'
-        let customerType: 'local' | 'tourist' = 'tourist';
-        try {
-          customerType = classifyCustomerType(phone);
-          console.log('[CHECKOUT] Cliente classificado como:', customerType);
-        } catch (classifyError) {
-          console.warn('[CHECKOUT] Erro na classificação, usando tourist:', classifyError);
-          customerType = 'tourist';
-        }
-
-        const { data: newCustomer, error: customerError } = await supabase
-          .from('customers')
-          .insert({ phone: phoneDigits, name, customer_type: customerType })
-          .select()
-          .single();
-
-        if (customerError) throw customerError;
-        customerId = newCustomer.id;
-        console.log('[CHECKOUT] Novo cliente criado:', customerId, 'Tipo:', customerType);
+      // 1. Get or create customer using RPC (bypasses RLS with SECURITY DEFINER)
+      // CRITICAL: Classify customer type with SAFE try-catch
+      // This NEVER blocks checkout - if it fails, defaults to 'tourist'
+      let customerType: 'local' | 'tourist' = 'tourist';
+      try {
+        customerType = classifyCustomerType(phone);
+        console.log('[CHECKOUT] Cliente classificado como:', customerType);
+      } catch (classifyError) {
+        console.warn('[CHECKOUT] Erro na classificação, usando tourist:', classifyError);
+        customerType = 'tourist';
       }
 
-      // 2. Create address
+      const { data: customerId, error: customerError } = await supabase
+        .rpc('get_or_create_customer', {
+          p_phone: phoneDigits,
+          p_name: name || null,
+          p_customer_type: customerType
+        });
+
+      if (customerError) {
+        console.error('[CHECKOUT] Erro ao criar/buscar cliente:', customerError);
+        throw customerError;
+      }
+      console.log('[CHECKOUT] Cliente ID obtido via RPC:', customerId);
+
+      // 2. Create address (INSERT allowed by RLS, SELECT will work with new public policy)
       const { data: address, error: addressError } = await supabase
         .from('addresses')
         .insert({
@@ -173,7 +163,10 @@ export default function Checkout() {
         .select()
         .single();
 
-      if (addressError) throw addressError;
+      if (addressError) {
+        console.error('[CHECKOUT] Erro ao criar endereço:', addressError);
+        throw addressError;
+      }
       console.log('[CHECKOUT] Endereço criado:', address.id);
 
       // 3. Create order
