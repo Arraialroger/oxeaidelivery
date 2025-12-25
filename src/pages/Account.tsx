@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Package, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import BottomNav from '@/components/layout/BottomNav';
+import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
