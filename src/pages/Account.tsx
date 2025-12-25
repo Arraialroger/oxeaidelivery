@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Package, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Search, Package, Clock, CheckCircle, XCircle, Loader2, LogOut, User } from 'lucide-react';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomerOrders } from '@/hooks/useCustomerOrders';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const statusConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   pending: { label: 'Pendente', icon: <Clock className="w-4 h-4" />, color: 'text-yellow-500' },
@@ -19,9 +22,45 @@ const statusConfig: Record<string, { label: string; icon: React.ReactNode; color
 
 export default function Account() {
   const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
+  
   const [phone, setPhone] = useState('');
   const [searchPhone, setSearchPhone] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [profilePhone, setProfilePhone] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Fetch profile phone when user is logged in
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) {
+        setProfilePhone(null);
+        return;
+      }
+      
+      setProfileLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('phone')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data?.phone) {
+          setProfilePhone(data.phone);
+          setSearchPhone(data.phone);
+        }
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    
+    fetchProfile();
+  }, [user]);
 
   const { data: orders, isLoading, error } = useCustomerOrders(searchPhone);
 
@@ -32,9 +71,27 @@ export default function Account() {
     }
   };
 
+  const handleLogout = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast.error('Erro ao sair da conta');
+    } else {
+      toast.success('Você saiu da sua conta');
+      setSearchPhone(null);
+      setProfilePhone(null);
+    }
+  };
+
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '');
     return numbers.slice(0, 11);
+  };
+
+  const formatPhoneDisplay = (value: string) => {
+    if (value.length === 11) {
+      return `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
+    }
+    return value;
   };
 
   const formatPrice = (price: number) => {
@@ -54,6 +111,8 @@ export default function Account() {
     }).format(new Date(dateString));
   };
 
+  const isLoadingAny = authLoading || profileLoading;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -72,40 +131,127 @@ export default function Account() {
       </header>
 
       <main className="px-4 py-6 pb-24 space-y-6">
-        {/* Busca por telefone */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Histórico de Pedidos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <Input
-                type="tel"
-                placeholder="Digite seu telefone (DDD + número)"
-                value={phone}
-                onChange={(e) => setPhone(formatPhone(e.target.value))}
-                className="flex-1"
-                maxLength={11}
-              />
-              <Button 
-                type="submit" 
-                disabled={phone.length < 10}
-                className="shrink-0"
-              >
-                <Search className="w-4 h-4 mr-2" />
-                Buscar
-              </Button>
-            </form>
-            <p className="text-xs text-muted-foreground mt-2">
-              Ex: 11999999999 (sem espaços ou traços)
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Loading */}
-        {isLoading && (
+        {/* Loading inicial */}
+        {isLoadingAny && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {!isLoadingAny && (
+          <>
+            {/* Usuário logado */}
+            {user ? (
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <User className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {user.email}
+                        </p>
+                        {profilePhone && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatPhoneDisplay(profilePhone)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleLogout}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <LogOut className="w-4 h-4 mr-1" />
+                      Sair
+                    </Button>
+                  </div>
+                  
+                  {!profilePhone && (
+                    <div className="mt-4 p-3 rounded-md bg-muted/50">
+                      <p className="text-sm text-muted-foreground">
+                        Seu perfil ainda não tem um telefone cadastrado. 
+                        Busque seus pedidos abaixo ou faça um pedido para vincular seu telefone.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              /* Usuário não logado - opção de login */
+              <Card>
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Faça login para uma experiência melhor
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Salve seu histórico e acesse de qualquer lugar
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => navigate('/auth')}
+                    >
+                      Entrar
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Busca por telefone - sempre visível, mas com contexto diferente */}
+            {(!user || !profilePhone) && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Buscar Pedidos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSearch} className="flex gap-2">
+                    <Input
+                      type="tel"
+                      placeholder="Digite seu telefone (DDD + número)"
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhone(e.target.value))}
+                      className="flex-1"
+                      maxLength={11}
+                    />
+                    <Button 
+                      type="submit" 
+                      disabled={phone.length < 10}
+                      className="shrink-0"
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Buscar
+                    </Button>
+                  </form>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Ex: 11999999999 (sem espaços ou traços)
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Histórico de pedidos */}
+            {(searchPhone || profilePhone) && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Histórico de Pedidos</CardTitle>
+                </CardHeader>
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* Loading de pedidos */}
+        {isLoading && !isLoadingAny && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         )}
 
