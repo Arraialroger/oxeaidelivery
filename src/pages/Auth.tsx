@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, ArrowLeft, Mail, Lock, User } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, Lock, User, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const loginSchema = z.object({
@@ -18,6 +19,7 @@ const loginSchema = z.object({
 
 const signupSchema = z.object({
   name: z.string().trim().min(2, { message: 'Nome deve ter pelo menos 2 caracteres' }),
+  phone: z.string().min(10, { message: 'Telefone deve ter pelo menos 10 dígitos' }).max(11, { message: 'Telefone deve ter no máximo 11 dígitos' }),
   email: z.string().trim().email({ message: 'E-mail inválido' }),
   password: z.string().min(6, { message: 'Senha deve ter pelo menos 6 caracteres' }),
   confirmPassword: z.string(),
@@ -25,6 +27,15 @@ const signupSchema = z.object({
   message: 'As senhas não coincidem',
   path: ['confirmPassword'],
 });
+
+// Format phone to Brazilian format (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+const formatPhone = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -41,6 +52,8 @@ export default function Auth() {
   
   // Signup form state
   const [signupName, setSignupName] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
+  const [signupPhoneDigits, setSignupPhoneDigits] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
@@ -81,6 +94,13 @@ export default function Auth() {
     }
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    setSignupPhoneDigits(digits);
+    setSignupPhone(formatPhone(value));
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -88,6 +108,7 @@ export default function Auth() {
     
     const validation = signupSchema.safeParse({
       name: signupName,
+      phone: signupPhoneDigits,
       email: signupEmail,
       password: signupPassword,
       confirmPassword: signupConfirmPassword,
@@ -100,9 +121,9 @@ export default function Auth() {
 
     setIsSubmitting(true);
     const { error: authError } = await signUp(signupEmail, signupPassword);
-    setIsSubmitting(false);
 
     if (authError) {
+      setIsSubmitting(false);
       if (authError.message.includes('User already registered')) {
         setError('Este e-mail já está cadastrado');
       } else if (authError.message.includes('Password should be at least')) {
@@ -110,13 +131,26 @@ export default function Auth() {
       } else {
         setError('Erro ao criar conta. Tente novamente.');
       }
-    } else {
-      setSuccessMessage('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
-      setSignupName('');
-      setSignupEmail('');
-      setSignupPassword('');
-      setSignupConfirmPassword('');
+      return;
     }
+
+    // Update profile with name and phone after successful signup
+    const { data: { user: newUser } } = await supabase.auth.getUser();
+    if (newUser) {
+      await supabase
+        .from('profiles')
+        .update({ name: signupName, phone: signupPhoneDigits })
+        .eq('id', newUser.id);
+    }
+
+    setIsSubmitting(false);
+    setSuccessMessage('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+    setSignupName('');
+    setSignupPhone('');
+    setSignupPhoneDigits('');
+    setSignupEmail('');
+    setSignupPassword('');
+    setSignupConfirmPassword('');
   };
 
   if (loading) {
@@ -249,6 +283,22 @@ export default function Auth() {
                         placeholder="Seu nome"
                         value={signupName}
                         onChange={(e) => setSignupName(e.target.value)}
+                        className="pl-10"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-phone">Telefone</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="signup-phone"
+                        type="tel"
+                        placeholder="(XX) XXXXX-XXXX"
+                        value={signupPhone}
+                        onChange={handlePhoneChange}
                         className="pl-10"
                         disabled={isSubmitting}
                       />
