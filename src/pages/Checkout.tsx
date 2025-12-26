@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, User, MapPin, CreditCard, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useConfig } from '@/hooks/useConfig';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 import { classifyCustomerType } from '@/lib/customerClassification';
 
 type PaymentMethod = 'pix' | 'card' | 'cash';
@@ -68,14 +69,47 @@ export default function Checkout() {
   const { items, subtotal, clearCart } = useCart();
   const { data: config } = useConfig();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   // Step 1: Customer Info
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
+
+  // Pre-fill name and phone from profile for logged-in users
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user || profileLoaded) return;
+      
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, phone')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile) {
+          if (profile.name && !name) {
+            setName(profile.name);
+          }
+          if (profile.phone && !phone) {
+            // Format phone for display
+            setPhone(formatPhone(profile.phone));
+          }
+        }
+      } catch (error) {
+        console.error('[CHECKOUT] Erro ao carregar perfil:', error);
+      } finally {
+        setProfileLoaded(true);
+      }
+    };
+
+    loadProfile();
+  }, [user, profileLoaded]);
 
   // Step 2: Address
   const [street, setStreet] = useState('');
