@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Minus, Plus } from 'lucide-react';
+import { X, Minus, Plus, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useProductOptions } from '@/hooks/useProductOptions';
@@ -7,6 +7,7 @@ import { useCart } from '@/contexts/CartContext';
 import { cn } from '@/lib/utils';
 import type { Product, SelectedOption } from '@/types';
 import { ComboModal } from './ComboModal';
+import { ImageZoomModal } from './ImageZoomModal';
 
 interface ProductModalProps {
   product: Product | null;
@@ -20,6 +21,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const [note, setNote] = useState('');
   const [isShaking, setIsShaking] = useState(false);
   const [highlightMissing, setHighlightMissing] = useState(false);
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
   const { data: options = [] } = useProductOptions(product?.id ?? null);
   const { addItem } = useCart();
 
@@ -30,6 +32,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       setNote('');
       setIsShaking(false);
       setHighlightMissing(false);
+      setIsImageZoomed(false);
     }
   }, [isOpen, product?.id]);
 
@@ -138,14 +141,35 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       <div className="relative w-full max-w-lg max-h-[90vh] bg-card rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col">
         {/* Header Image */}
         {product.image_url && (
-          <div className="relative h-48 flex-shrink-0">
+          <div 
+            className="relative h-48 flex-shrink-0 cursor-zoom-in group"
+            onClick={() => setIsImageZoomed(true)}
+            role="button"
+            aria-label="Clique para ampliar a imagem"
+          >
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform group-hover:scale-[1.02]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+            
+            {/* Indicador de zoom */}
+            <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1.5 rounded-full opacity-80 group-hover:opacity-100 transition-opacity">
+              <ZoomIn className="w-3.5 h-3.5" />
+              <span>Ampliar</span>
+            </div>
           </div>
+        )}
+
+        {/* Modal de imagem ampliada */}
+        {product.image_url && (
+          <ImageZoomModal
+            imageUrl={product.image_url}
+            alt={product.name}
+            isOpen={isImageZoomed}
+            onClose={() => setIsImageZoomed(false)}
+          />
         )}
 
         {/* Close Button */}
