@@ -7,6 +7,7 @@ import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useKdsEvents } from '@/hooks/useKdsEvents';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -229,6 +230,7 @@ const playNotificationSound = () => {
 export default function Kitchen() {
   const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { logStatusChange, logOrderPrinted, logOrderCancelled } = useKdsEvents();
   
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [historyOrders, setHistoryOrders] = useState<OrderWithDetails[]>([]);
@@ -414,6 +416,9 @@ export default function Kitchen() {
       return;
     }
 
+    // Registrar evento KDS - fail-safe
+    logOrderCancelled(cancelOrderId).catch(() => {});
+
     toast({ title: 'Pedido cancelado' });
     setCancelDialogOpen(false);
     setCancelOrderId(null);
@@ -437,6 +442,9 @@ export default function Kitchen() {
       });
       return;
     }
+
+    // Registrar evento KDS - fail-safe
+    logStatusChange(orderId, newStatus).catch(() => {});
 
     toast({ title: `Status atualizado para ${newStatus}` });
     fetchOrders();
@@ -723,7 +731,10 @@ export default function Kitchen() {
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => printOrderReceipt(order)}
+                          onClick={() => {
+                            printOrderReceipt(order);
+                            logOrderPrinted(order.id).catch(() => {});
+                          }}
                           title="Imprimir pedido"
                         >
                           <Printer className="w-4 h-4" />
@@ -1545,7 +1556,12 @@ export default function Kitchen() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => detailsOrder && printOrderReceipt(detailsOrder)}>
+            <Button variant="outline" onClick={() => {
+              if (detailsOrder) {
+                printOrderReceipt(detailsOrder);
+                logOrderPrinted(detailsOrder.id).catch(() => {});
+              }
+            }}>
               <Printer className="w-4 h-4 mr-2" /> Imprimir
             </Button>
             <Button onClick={() => setDetailsOrder(null)}>Fechar</Button>
