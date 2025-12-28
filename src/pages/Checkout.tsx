@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { classifyCustomerType } from '@/lib/customerClassification';
+import { useKdsEvents } from '@/hooks/useKdsEvents';
 
 type PaymentMethod = 'pix' | 'card' | 'cash';
 
@@ -70,6 +71,7 @@ export default function Checkout() {
   const { data: config } = useConfig();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { logOrderReceived } = useKdsEvents();
   
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -273,6 +275,9 @@ export default function Checkout() {
         title: 'Pedido enviado!',
         description: `Pedido #${order.id.slice(0, 8)} foi recebido.`,
       });
+
+      // Registrar evento KDS - fail-safe (não bloqueia navegação)
+      logOrderReceived(order.id).catch(() => {});
 
       navigate(targetUrl);
     } catch (error) {
