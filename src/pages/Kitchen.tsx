@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, ChefHat, Check, Truck, RefreshCw, CreditCard, Banknote, QrCode, Volume2, VolumeX, Printer, X, History, XCircle, Search, CalendarIcon, TrendingUp, ShoppingBag, DollarSign, Download, FileText, PieChartIcon, Loader2 } from 'lucide-react';
+import { Clock, ChefHat, Check, Truck, RefreshCw, CreditCard, Banknote, QrCode, Volume2, VolumeX, Printer, X, History, XCircle, Search, CalendarIcon, TrendingUp, ShoppingBag, DollarSign, Download, FileText, PieChartIcon, Loader2, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -34,6 +34,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { KdsPerformanceReport } from '@/components/kitchen/KdsPerformanceReport';
 
 // Print order receipt using iframe for reliable browser print dialog
 const printOrderReceipt = (order: OrderWithDetails) => {
@@ -540,7 +541,20 @@ export default function Kitchen() {
         </div>
       </div>
 
-      {loading ? (
+      <Tabs defaultValue="orders" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="orders" className="gap-2">
+            <ChefHat className="w-4 h-4" />
+            Pedidos
+          </TabsTrigger>
+          <TabsTrigger value="report" className="gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Relatório de Performance
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="orders">
+          {loading ? (
         <div className="text-center py-12 text-muted-foreground">
           Carregando...
         </div>
@@ -1411,6 +1425,12 @@ export default function Kitchen() {
           )}
         </CollapsibleContent>
       </Collapsible>
+        </TabsContent>
+
+        <TabsContent value="report">
+          <KdsPerformanceReport />
+        </TabsContent>
+      </Tabs>
 
       {/* Cancel Order Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
