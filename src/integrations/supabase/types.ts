@@ -486,6 +486,44 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string | null
+          endpoint: string
+          expires_at: string | null
+          id: string
+          order_id: string | null
+          p256dh: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string | null
+          endpoint: string
+          expires_at?: string | null
+          id?: string
+          order_id?: string | null
+          p256dh: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string | null
+          endpoint?: string
+          expires_at?: string | null
+          id?: string
+          order_id?: string | null
+          p256dh?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_codes: {
         Row: {
           code: string

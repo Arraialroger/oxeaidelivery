@@ -443,6 +443,11 @@ export default function Kitchen() {
     // Registrar evento KDS - fail-safe
     logOrderCancelled(cancelOrderId).catch(() => {});
 
+    // Enviar push notification de cancelamento - fail-safe
+    supabase.functions.invoke('send-push-notification', {
+      body: { orderId: cancelOrderId, status: 'cancelled' }
+    }).catch(() => {});
+
     toast({ title: 'Pedido cancelado' });
     setCancelDialogOpen(false);
     setCancelOrderId(null);
@@ -469,6 +474,11 @@ export default function Kitchen() {
 
     // Registrar evento KDS - fail-safe
     logStatusChange(orderId, newStatus).catch(() => {});
+
+    // Enviar push notification - fail-safe
+    supabase.functions.invoke('send-push-notification', {
+      body: { orderId, status: newStatus }
+    }).catch(() => {});
 
     toast({ title: `Status atualizado para ${newStatus}` });
     fetchOrders();
