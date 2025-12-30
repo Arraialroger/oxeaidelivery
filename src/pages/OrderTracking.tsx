@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle } from 'lucide-react';
+import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { PWAInstallModal } from '@/components/pwa';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
 interface OrderData {
@@ -76,8 +80,10 @@ export default function OrderTracking() {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPWAModal, setShowPWAModal] = useState(false);
+  const { toast } = useToast();
   
   const { canShowInstallUI, promptInstall, dismissInstall } = usePWAInstall();
+  const { isSupported: pushSupported, permission, isSubscribed, isLoading: pushLoading, subscribe, error: pushError } = usePushNotifications(orderId);
   
   // Show PWA modal after order (when coming from checkout with ?new=true)
   useEffect(() => {
@@ -190,6 +196,26 @@ export default function OrderTracking() {
   }, [orderId]);
 
   const isCancelled = order?.status === 'cancelled';
+  const isOrderFinished = order?.status === 'delivered' || order?.status === 'cancelled';
+  
+  // Mostrar botão de push se: suportado, não inscrito, permissão não negada, pedido não finalizado
+  const canShowPushButton = pushSupported && !isSubscribed && permission !== 'denied' && !isOrderFinished;
+  
+  const handleEnablePush = async () => {
+    const success = await subscribe();
+    if (success) {
+      toast({
+        title: '🔔 Notificações ativadas!',
+        description: 'Você será notificado quando o status do pedido mudar.',
+      });
+    } else if (pushError) {
+      toast({
+        title: 'Não foi possível ativar',
+        description: pushError,
+        variant: 'destructive',
+      });
+    }
+  };
   
   const getCurrentStepIndex = () => {
     if (!order || isCancelled) return -1;
@@ -235,6 +261,42 @@ export default function OrderTracking() {
       </header>
 
       <div className="p-4 space-y-6">
+        {/* Push Notifications Banner */}
+        {canShowPushButton && (
+          <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Bell className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">Receba atualizações</p>
+                <p className="text-xs text-muted-foreground">Seja notificado quando o status mudar</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleEnablePush}
+                disabled={pushLoading}
+                className="flex items-center gap-1.5"
+              >
+                {pushLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <BellRing className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Ativar</span>
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        {/* Notification enabled confirmation */}
+        {isSubscribed && !isOrderFinished && (
+          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 flex items-center gap-2">
+            <BellRing className="w-4 h-4 text-green-500" />
+            <span className="text-sm text-green-600">Notificações ativadas para este pedido</span>
+          </div>
+        )}
+        
         {/* Cancelled Status */}
         {isCancelled && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6">
