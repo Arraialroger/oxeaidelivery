@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, ChefHat, Check, Truck, RefreshCw, CreditCard, Banknote, QrCode, Volume2, VolumeX, Printer, X, History, XCircle, Search, CalendarIcon, TrendingUp, ShoppingBag, DollarSign, Download, FileText, PieChartIcon, Loader2, BarChart3 } from 'lucide-react';
+import { Clock, ChefHat, Check, Truck, RefreshCw, CreditCard, Banknote, QrCode, Volume2, VolumeX, Printer, X, History, XCircle, Search, CalendarIcon, TrendingUp, ShoppingBag, DollarSign, Download, FileText, PieChartIcon, Loader2, BarChart3, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -193,6 +193,29 @@ interface OrderWithDetails {
     options: { option_name: string; option_price: number }[];
   }[];
 }
+
+// Format phone number into WhatsApp link
+const formatWhatsAppLink = (phone: string | undefined) => {
+  if (!phone) return null;
+  // Remove non-numeric characters
+  const cleanPhone = phone.replace(/\D/g, '');
+  // Add Brazil country code if not present
+  const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  return `https://wa.me/${fullPhone}`;
+};
+
+// Format phone for display
+const formatPhoneDisplay = (phone: string | undefined) => {
+  if (!phone) return null;
+  const clean = phone.replace(/\D/g, '');
+  if (clean.length === 11) {
+    return `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7)}`;
+  }
+  if (clean.length === 10) {
+    return `(${clean.slice(0, 2)}) ${clean.slice(2, 6)}-${clean.slice(6)}`;
+  }
+  return phone;
+};
 
 // Notification sound using Web Audio API
 const playNotificationSound = () => {
@@ -608,6 +631,18 @@ export default function Kitchen() {
                           <p className="font-semibold">
                             {order.customer?.name || 'Cliente'}
                           </p>
+                          {order.customer?.phone && (
+                            <a
+                              href={formatWhatsAppLink(order.customer.phone) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700 hover:underline mt-0.5"
+                            >
+                              <MessageCircle className="w-3 h-3" />
+                              {formatPhoneDisplay(order.customer.phone)}
+                            </a>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 text-primary text-sm">
                           <Clock className="w-4 h-4" />
@@ -1372,11 +1407,23 @@ export default function Kitchen() {
                         )}
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <div>
+                        <div>
                             <span className="font-mono text-sm text-muted-foreground">
                               #{order.id.slice(0, 8)}
                             </span>
                             <p className="font-semibold">{order.customer?.name || 'Cliente'}</p>
+                            {order.customer?.phone && (
+                              <a
+                                href={formatWhatsAppLink(order.customer.phone) || '#'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700 hover:underline"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                                {formatPhoneDisplay(order.customer.phone)}
+                              </a>
+                            )}
                           </div>
                           <div className="text-right">
                             <Badge
@@ -1491,7 +1538,19 @@ export default function Kitchen() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1">Cliente</p>
                 <p className="font-semibold">{detailsOrder.customer?.name || 'Não informado'}</p>
-                <p className="text-sm text-muted-foreground">{detailsOrder.customer?.phone}</p>
+                {detailsOrder.customer?.phone ? (
+                  <a
+                    href={formatWhatsAppLink(detailsOrder.customer.phone) || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700 hover:underline"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    {formatPhoneDisplay(detailsOrder.customer.phone)}
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Telefone não informado</p>
+                )}
               </div>
 
               {/* Address */}
