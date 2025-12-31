@@ -30,36 +30,243 @@ const statusMessages: Record<string, { title: string; body: string }> = {
   },
 };
 
-// Importar web-push via esm.sh
+// Web Push implementation using Web Crypto API (Deno compatible)
+async function generateVAPIDAuthHeader(
+  audience: string,
+  subject: string,
+  privateKeyJWK: JsonWebKey,
+  expiration: number
+): Promise<string> {
+  // Import private key
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    privateKeyJWK,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+
+  // Create JWT header and payload
+  const header = { typ: "JWT", alg: "ES256" };
+  const payload = {
+    aud: audience,
+    exp: expiration,
+    sub: subject,
+  };
+
+  const encoder = new TextEncoder();
+  const headerB64 = btoa(JSON.stringify(header)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+
+  // Sign the token
+  const signature = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    privateKey,
+    encoder.encode(unsignedToken)
+  );
+
+  // Convert signature from DER to raw format expected by JWT
+  const signatureArray = new Uint8Array(signature);
+  const signatureB64 = btoa(String.fromCharCode(...signatureArray))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  return `${unsignedToken}.${signatureB64}`;
+}
+
+async function encryptPayload(
+  payload: string,
+  p256dh: string,
+  auth: string
+): Promise<{ ciphertext: Uint8Array; salt: Uint8Array; localPublicKey: Uint8Array }> {
+  // Decode subscription keys
+  const p256dhKey = Uint8Array.from(atob(p256dh.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  const authSecret = Uint8Array.from(atob(auth.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+
+  // Generate local key pair for ECDH
+  const localKeyPair = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveBits"]
+  );
+
+  // Import subscriber's public key
+  const subscriberPublicKey = await crypto.subtle.importKey(
+    "raw",
+    p256dhKey,
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    []
+  );
+
+  // Derive shared secret
+  const sharedSecret = await crypto.subtle.deriveBits(
+    { name: "ECDH", public: subscriberPublicKey },
+    localKeyPair.privateKey,
+    256
+  );
+
+  // Export local public key
+  const localPublicKeyRaw = await crypto.subtle.exportKey("raw", localKeyPair.publicKey);
+  const localPublicKey = new Uint8Array(localPublicKeyRaw);
+
+  // Generate salt
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+
+  // Derive encryption key using HKDF
+  const encoder = new TextEncoder();
+  
+  // PRK = HKDF-Extract(auth_secret, ecdh_secret)
+  const prkKey = await crypto.subtle.importKey(
+    "raw",
+    authSecret,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const prk = await crypto.subtle.sign("HMAC", prkKey, new Uint8Array(sharedSecret));
+
+  // Create info for key derivation
+  const keyInfo = new Uint8Array([
+    ...encoder.encode("Content-Encoding: aes128gcm\0"),
+  ]);
+  
+  const nonceInfo = new Uint8Array([
+    ...encoder.encode("Content-Encoding: nonce\0"),
+  ]);
+
+  // Derive content encryption key
+  const cekPrkKey = await crypto.subtle.importKey(
+    "raw",
+    new Uint8Array(prk),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  const cekInfo = new Uint8Array([...salt, ...keyInfo, 1]);
+  const cekFull = await crypto.subtle.sign("HMAC", cekPrkKey, cekInfo);
+  const cek = new Uint8Array(cekFull).slice(0, 16);
+
+  // Derive nonce
+  const nonceInfoFull = new Uint8Array([...salt, ...nonceInfo, 1]);
+  const nonceFull = await crypto.subtle.sign("HMAC", cekPrkKey, nonceInfoFull);
+  const nonce = new Uint8Array(nonceFull).slice(0, 12);
+
+  // Encrypt payload
+  const payloadBytes = encoder.encode(payload);
+  const paddedPayload = new Uint8Array(payloadBytes.length + 2);
+  paddedPayload.set(payloadBytes);
+  paddedPayload[payloadBytes.length] = 2; // Padding delimiter
+
+  const encryptionKey = await crypto.subtle.importKey(
+    "raw",
+    cek,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt"]
+  );
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce },
+    encryptionKey,
+    paddedPayload
+  );
+
+  return {
+    ciphertext: new Uint8Array(encrypted),
+    salt,
+    localPublicKey,
+  };
+}
+
 async function sendWebPush(
   subscription: { endpoint: string; p256dh: string; auth: string },
-  payload: string,
-  vapidDetails: { subject: string; publicKey: string; privateKey: string }
+  payload: { title: string; body: string; orderId: string; url: string },
+  vapidDetails: { subject: string; privateKeyJWK: JsonWebKey; publicKey: string }
 ): Promise<{ success: boolean; statusCode?: number }> {
   try {
-    // Use esm.sh to import web-push as a dynamic import
-    const webpush = await import("https://esm.sh/web-push@3.6.7?target=deno");
+    console.log('[send-push] Preparing push notification...');
     
-    webpush.setVapidDetails(
+    const payloadString = JSON.stringify(payload);
+    
+    // Get audience from endpoint
+    const endpointUrl = new URL(subscription.endpoint);
+    const audience = `${endpointUrl.protocol}//${endpointUrl.host}`;
+    
+    // Generate VAPID authorization
+    const expiration = Math.floor(Date.now() / 1000) + 12 * 60 * 60; // 12 hours
+    const jwt = await generateVAPIDAuthHeader(
+      audience,
       vapidDetails.subject,
-      vapidDetails.publicKey,
-      vapidDetails.privateKey
+      vapidDetails.privateKeyJWK,
+      expiration
     );
 
-    const pushSubscription = {
-      endpoint: subscription.endpoint,
-      keys: {
-        p256dh: subscription.p256dh,
-        auth: subscription.auth,
-      },
+    // Encrypt payload
+    const { ciphertext, salt, localPublicKey } = await encryptPayload(
+      payloadString,
+      subscription.p256dh,
+      subscription.auth
+    );
+
+    // Build request body with aes128gcm format
+    const recordSize = 4096;
+    const body = new Uint8Array(
+      salt.length + 4 + 1 + localPublicKey.length + ciphertext.length
+    );
+    
+    let offset = 0;
+    body.set(salt, offset);
+    offset += salt.length;
+    
+    // Record size (4 bytes, big endian)
+    body[offset++] = (recordSize >> 24) & 0xff;
+    body[offset++] = (recordSize >> 16) & 0xff;
+    body[offset++] = (recordSize >> 8) & 0xff;
+    body[offset++] = recordSize & 0xff;
+    
+    // Key length
+    body[offset++] = localPublicKey.length;
+    
+    // Local public key
+    body.set(localPublicKey, offset);
+    offset += localPublicKey.length;
+    
+    // Ciphertext
+    body.set(ciphertext, offset);
+
+    const headers: Record<string, string> = {
+      "Authorization": `vapid t=${jwt},k=${vapidDetails.publicKey}`,
+      "Content-Type": "application/octet-stream",
+      "Content-Encoding": "aes128gcm",
+      "TTL": "3600",
+      "Urgency": "high",
     };
 
-    await webpush.sendNotification(pushSubscription, payload);
+    console.log('[send-push] Sending to:', subscription.endpoint.slice(0, 60) + '...');
+
+    const response = await fetch(subscription.endpoint, {
+      method: "POST",
+      headers,
+      body,
+    });
+
+    console.log('[send-push] Response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[send-push] Push service error:', response.status, errorText);
+      return { success: false, statusCode: response.status };
+    }
+
     return { success: true };
   } catch (error: unknown) {
-    const err = error as { statusCode?: number; message?: string };
-    console.error('[send-push] Web push error:', err.message);
-    return { success: false, statusCode: err.statusCode };
+    const err = error as Error;
+    console.error('[send-push] Error:', err.message);
+    return { success: false };
   }
 }
 
@@ -82,14 +289,27 @@ serve(async (req) => {
     console.log(`[send-push] Processing push for order ${orderId}, status: ${status}`);
 
     // Configurar VAPID
+    const vapidPrivateKeyRaw = Deno.env.get('VAPID_PRIVATE_KEY');
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
-    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
     const vapidSubject = Deno.env.get('VAPID_SUBJECT');
 
-    if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) {
+    if (!vapidPrivateKeyRaw || !vapidPublicKey || !vapidSubject) {
       console.error('[send-push] VAPID keys not configured');
       return new Response(
         JSON.stringify({ error: 'VAPID keys not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse VAPID private key from JWK format
+    let privateKeyJWK: JsonWebKey;
+    try {
+      privateKeyJWK = JSON.parse(vapidPrivateKeyRaw);
+      console.log('[send-push] VAPID private key parsed successfully');
+    } catch (e) {
+      console.error('[send-push] Failed to parse VAPID_PRIVATE_KEY as JSON. Make sure it is in JWK format.');
+      return new Response(
+        JSON.stringify({ error: 'VAPID_PRIVATE_KEY must be in JWK format' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -129,12 +349,12 @@ serve(async (req) => {
     const title = customTitle || message.title;
     const body = customBody || message.body;
 
-    const pushPayload = JSON.stringify({
+    const pushPayload = {
       title,
       body,
       orderId,
       url: `/order/${orderId}`,
-    });
+    };
 
     let sentCount = 0;
     const failedSubscriptions: string[] = [];
@@ -144,7 +364,7 @@ serve(async (req) => {
       const result = await sendWebPush(
         { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
         pushPayload,
-        { subject: vapidSubject, publicKey: vapidPublicKey, privateKey: vapidPrivateKey }
+        { subject: vapidSubject, privateKeyJWK, publicKey: vapidPublicKey }
       );
 
       if (result.success) {
