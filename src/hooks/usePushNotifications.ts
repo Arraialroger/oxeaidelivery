@@ -100,25 +100,47 @@ export function usePushNotifications(orderId: string | undefined): UsePushNotifi
       // Registrar service worker se necessário
       const registration = await navigator.serviceWorker.ready;
 
-      // Limpar subscriptions antigas do browser e banco
-      const existingSubscription = await registration.pushManager.getSubscription();
-      if (existingSubscription) {
-        // Remover do banco de dados
-        await supabase
-          .from("push_subscriptions")
-          .delete()
-          .eq("endpoint", existingSubscription.endpoint);
-        
-        // Cancelar subscription no browser
-        await existingSubscription.unsubscribe();
+      // SEMPRE limpar subscription antiga primeiro (resolver erro de applicationServerKey)
+      try {
+        const existingSubscription = await registration.pushManager.getSubscription();
+        if (existingSubscription) {
+          console.log("[Push] Removendo subscription antiga...");
+          
+          // Remover do banco de dados
+          await supabase
+            .from("push_subscriptions")
+            .delete()
+            .eq("endpoint", existingSubscription.endpoint);
+          
+          // Cancelar subscription no browser
+          await existingSubscription.unsubscribe();
+          
+          // Delay para garantir que o browser processou
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (cleanupError) {
+        console.warn("[Push] Erro ao limpar subscription antiga:", cleanupError);
+        // Continuar mesmo se falhar
       }
 
       // Criar nova subscription com as chaves atuais
       const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
-      });
+      let subscription: PushSubscription;
+      
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
+        });
+      } catch (subscribeError: any) {
+        // Se der erro de chave diferente, orientar o usuário
+        if (subscribeError?.message?.includes('applicationServerKey')) {
+          throw new Error(
+            "Por favor, limpe os dados do site nas configurações do navegador e tente novamente"
+          );
+        }
+        throw subscribeError;
+      }
 
       const subscriptionJson = subscription.toJSON();
 
