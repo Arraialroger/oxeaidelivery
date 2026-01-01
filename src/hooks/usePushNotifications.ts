@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // Chave pública VAPID para o cliente
-const VAPID_PUBLIC_KEY = "BPTZju7BAedHGMOdlwboJpx_U0IF2smYYINurxK0PDavNqUi-6H6M60_tHxQWcdb63OqRyOMsabjCP_BqSm6FAc";
+const VAPID_PUBLIC_KEY = "BEvwlTn5NnhuNDHOT-XfBjVwBxAQDXkeC__FufAlVQYQUfnNQKZrNzHQ6EwHpMQ0QxR0aJYwmTl5QPruIJICORs";
 
 interface UsePushNotificationsResult {
   isSupported: boolean;
