@@ -100,7 +100,20 @@ export function usePushNotifications(orderId: string | undefined): UsePushNotifi
       // Registrar service worker se necessário
       const registration = await navigator.serviceWorker.ready;
 
-      // Criar subscription
+      // Limpar subscriptions antigas do browser e banco
+      const existingSubscription = await registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        // Remover do banco de dados
+        await supabase
+          .from("push_subscriptions")
+          .delete()
+          .eq("endpoint", existingSubscription.endpoint);
+        
+        // Cancelar subscription no browser
+        await existingSubscription.unsubscribe();
+      }
+
+      // Criar nova subscription com as chaves atuais
       const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
