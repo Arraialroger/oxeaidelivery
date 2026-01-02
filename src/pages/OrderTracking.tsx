@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2 } from 'lucide-react';
+import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2, FlaskConical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { PWAInstallModal } from '@/components/pwa';
@@ -80,10 +80,43 @@ export default function OrderTracking() {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPWAModal, setShowPWAModal] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [pushTestResults, setPushTestResults] = useState<string[]>([]);
   const { toast } = useToast();
   
   const { canShowInstallUI, promptInstall, dismissInstall } = usePWAInstall();
   const { isSupported: pushSupported, permission, isSubscribed, isLoading: pushLoading, subscribe, error: pushError } = usePushNotifications(orderId);
+  
+  // Listener para mensagens do Service Worker (diagnóstico)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleSWMessage = (event: MessageEvent) => {
+      console.log('[OrderTracking] Received SW message:', event.data);
+      
+      if (event.data?.type === 'PUSH_RECEIVED') {
+        const timestamp = new Date(event.data.timestamp).toLocaleTimeString('pt-BR');
+        const hasData = event.data.hasData;
+        
+        toast({
+          title: '🎯 Push chegou ao Service Worker!',
+          description: `Às ${timestamp} - Payload: ${hasData ? 'SIM' : 'NÃO'}`,
+        });
+        
+        setPushTestResults(prev => [
+          ...prev,
+          `[${timestamp}] Push recebido - Payload: ${hasData ? 'SIM' : 'NÃO'}`
+        ]);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+    };
+  }, [toast]);
   
   // Show PWA modal after order (when coming from checkout with ?new=true)
   useEffect(() => {
@@ -216,6 +249,77 @@ export default function OrderTracking() {
       });
     }
   };
+
+  // Funções de teste de push (diagnóstico)
+  const testPushWithPayload = async () => {
+    if (!orderId) return;
+    setTestingPush(true);
+    console.log('[Test] Sending push WITH payload...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('send-push-notification', {
+        body: { 
+          orderId, 
+          status: 'test',
+          customTitle: '🧪 Teste COM payload',
+          customBody: 'Se você vê isso, o payload criptografado funcionou!',
+          noPayload: false
+        }
+      });
+      
+      console.log('[Test] Result:', data, error);
+      
+      if (error) {
+        toast({ title: 'Erro no teste', description: error.message, variant: 'destructive' });
+        setPushTestResults(prev => [...prev, `[ERRO] Com payload: ${error.message}`]);
+      } else {
+        toast({ 
+          title: 'Teste enviado (com payload)', 
+          description: `Enviado: ${data?.sent}/${data?.total}` 
+        });
+        setPushTestResults(prev => [...prev, `[OK] Enviado com payload: ${data?.sent}/${data?.total}`]);
+      }
+    } catch (err: any) {
+      console.error('[Test] Error:', err);
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } finally {
+      setTestingPush(false);
+    }
+  };
+
+  const testPushNoPayload = async () => {
+    if (!orderId) return;
+    setTestingPush(true);
+    console.log('[Test] Sending push WITHOUT payload...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('send-push-notification', {
+        body: { 
+          orderId, 
+          status: 'test',
+          noPayload: true
+        }
+      });
+      
+      console.log('[Test] Result (no payload):', data, error);
+      
+      if (error) {
+        toast({ title: 'Erro no teste', description: error.message, variant: 'destructive' });
+        setPushTestResults(prev => [...prev, `[ERRO] Sem payload: ${error.message}`]);
+      } else {
+        toast({ 
+          title: 'Teste enviado (sem payload)', 
+          description: `Enviado: ${data?.sent}/${data?.total} - Verifique se recebeu notificação genérica` 
+        });
+        setPushTestResults(prev => [...prev, `[OK] Enviado sem payload: ${data?.sent}/${data?.total}`]);
+      }
+    } catch (err: any) {
+      console.error('[Test] Error:', err);
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } finally {
+      setTestingPush(false);
+    }
+  };
   
   const getCurrentStepIndex = () => {
     if (!order || isCancelled) return -1;
@@ -251,16 +355,74 @@ export default function OrderTracking() {
           <button onClick={() => navigate('/')}>
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-lg font-bold">Acompanhar Pedido</h1>
             <p className="text-sm text-muted-foreground">
               #{order.id.slice(0, 8).toUpperCase()}
             </p>
           </div>
+          {/* Debug toggle */}
+          {isSubscribed && (
+            <button 
+              onClick={() => setShowDebugPanel(!showDebugPanel)}
+              className={cn(
+                "p-2 rounded-full transition-colors",
+                showDebugPanel ? "bg-primary/20 text-primary" : "text-muted-foreground"
+              )}
+            >
+              <FlaskConical className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </header>
 
       <div className="p-4 space-y-4">
+        {/* Debug Panel (somente para subscribed) */}
+        {showDebugPanel && isSubscribed && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FlaskConical className="w-5 h-5 text-yellow-600" />
+              <span className="font-medium text-yellow-700">Diagnóstico Push</span>
+            </div>
+            
+            <div className="flex gap-2 mb-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={testPushWithPayload}
+                disabled={testingPush}
+                className="flex-1 text-xs"
+              >
+                {testingPush ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                Testar COM payload
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={testPushNoPayload}
+                disabled={testingPush}
+                className="flex-1 text-xs"
+              >
+                {testingPush ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                Testar SEM payload
+              </Button>
+            </div>
+            
+            {pushTestResults.length > 0 && (
+              <div className="bg-background/50 rounded-lg p-2 max-h-32 overflow-y-auto">
+                <p className="text-xs font-medium mb-1">Resultados:</p>
+                {pushTestResults.map((result, i) => (
+                  <p key={i} className="text-xs text-muted-foreground font-mono">{result}</p>
+                ))}
+              </div>
+            )}
+            
+            <p className="text-xs text-muted-foreground mt-2">
+              Se "sem payload" funciona mas "com payload" não, o problema é a criptografia.
+            </p>
+          </div>
+        )}
+
         {/* Push Notifications Banner */}
         {canShowPushButton && (
           <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 mt-1">

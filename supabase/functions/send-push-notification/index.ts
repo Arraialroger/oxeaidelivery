@@ -182,13 +182,14 @@ async function encryptPayload(
   };
 }
 
-async function sendWebPush(
+// Envio COM payload (criptografado)
+async function sendWebPushWithPayload(
   subscription: { endpoint: string; p256dh: string; auth: string },
   payload: { title: string; body: string; orderId: string; url: string },
   vapidDetails: { subject: string; privateKeyJWK: JsonWebKey; publicKey: string }
-): Promise<{ success: boolean; statusCode?: number }> {
+): Promise<{ success: boolean; statusCode?: number; error?: string }> {
   try {
-    console.log('[send-push] Preparing push notification...');
+    console.log('[send-push] Preparing push WITH payload...');
     
     const payloadString = JSON.stringify(payload);
     
@@ -246,7 +247,7 @@ async function sendWebPush(
       "Urgency": "high",
     };
 
-    console.log('[send-push] Sending to:', subscription.endpoint.slice(0, 60) + '...');
+    console.log('[send-push] Sending WITH payload to:', subscription.endpoint.slice(0, 60) + '...');
 
     const response = await fetch(subscription.endpoint, {
       method: "POST",
@@ -259,14 +260,66 @@ async function sendWebPush(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[send-push] Push service error:', response.status, errorText);
-      return { success: false, statusCode: response.status };
+      return { success: false, statusCode: response.status, error: errorText };
     }
 
-    return { success: true };
+    return { success: true, statusCode: response.status };
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('[send-push] Error:', err.message);
-    return { success: false };
+    console.error('[send-push] Error with payload:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// Envio SEM payload (apenas notifica, event.data será null)
+async function sendWebPushNoPayload(
+  subscription: { endpoint: string },
+  vapidDetails: { subject: string; privateKeyJWK: JsonWebKey; publicKey: string }
+): Promise<{ success: boolean; statusCode?: number; error?: string }> {
+  try {
+    console.log('[send-push] Preparing push WITHOUT payload (diagnostic mode)...');
+    
+    // Get audience from endpoint
+    const endpointUrl = new URL(subscription.endpoint);
+    const audience = `${endpointUrl.protocol}//${endpointUrl.host}`;
+    
+    // Generate VAPID authorization
+    const expiration = Math.floor(Date.now() / 1000) + 12 * 60 * 60; // 12 hours
+    const jwt = await generateVAPIDAuthHeader(
+      audience,
+      vapidDetails.subject,
+      vapidDetails.privateKeyJWK,
+      expiration
+    );
+
+    const headers: Record<string, string> = {
+      "Authorization": `vapid t=${jwt},k=${vapidDetails.publicKey}`,
+      "Content-Length": "0",
+      "TTL": "3600",
+      "Urgency": "high",
+    };
+
+    console.log('[send-push] Sending WITHOUT payload to:', subscription.endpoint.slice(0, 60) + '...');
+
+    const response = await fetch(subscription.endpoint, {
+      method: "POST",
+      headers,
+      // NO body, NO Content-Encoding
+    });
+
+    console.log('[send-push] Response status (no payload):', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[send-push] Push service error (no payload):', response.status, errorText);
+      return { success: false, statusCode: response.status, error: errorText };
+    }
+
+    return { success: true, statusCode: response.status };
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('[send-push] Error without payload:', err.message);
+    return { success: false, error: err.message };
   }
 }
 
@@ -277,7 +330,7 @@ serve(async (req) => {
   }
 
   try {
-    const { orderId, status, customTitle, customBody } = await req.json();
+    const { orderId, status, customTitle, customBody, noPayload } = await req.json();
 
     if (!orderId) {
       return new Response(
@@ -286,7 +339,8 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[send-push] Processing push for order ${orderId}, status: ${status}`);
+    console.log(`[send-push] ========== NEW REQUEST ==========`);
+    console.log(`[send-push] Order: ${orderId}, Status: ${status}, NoPayload: ${noPayload === true}`);
 
     // Configurar VAPID
     const vapidPrivateKeyRaw = Deno.env.get('VAPID_PRIVATE_KEY');
@@ -358,22 +412,38 @@ serve(async (req) => {
 
     let sentCount = 0;
     const failedSubscriptions: string[] = [];
+    const results: { endpoint: string; success: boolean; statusCode?: number; error?: string; mode: string }[] = [];
 
     // Enviar para cada subscription
     for (const sub of subscriptions) {
-      const result = await sendWebPush(
-        { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
-        pushPayload,
-        { subject: vapidSubject, privateKeyJWK, publicKey: vapidPublicKey }
-      );
+      let result: { success: boolean; statusCode?: number; error?: string };
+      
+      if (noPayload === true) {
+        // Modo diagnóstico: enviar SEM payload
+        result = await sendWebPushNoPayload(
+          { endpoint: sub.endpoint },
+          { subject: vapidSubject, privateKeyJWK, publicKey: vapidPublicKey }
+        );
+        results.push({ ...result, endpoint: sub.endpoint.slice(0, 50), mode: 'noPayload' });
+      } else {
+        // Modo normal: enviar COM payload criptografado
+        result = await sendWebPushWithPayload(
+          { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+          pushPayload,
+          { subject: vapidSubject, privateKeyJWK, publicKey: vapidPublicKey }
+        );
+        results.push({ ...result, endpoint: sub.endpoint.slice(0, 50), mode: 'withPayload' });
+      }
 
       if (result.success) {
         sentCount++;
-        console.log(`[send-push] Successfully sent to ${sub.endpoint.slice(0, 50)}...`);
+        console.log(`[send-push] ✅ Successfully sent to ${sub.endpoint.slice(0, 50)}...`);
       } else if (result.statusCode === 410 || result.statusCode === 404) {
         // Subscription expirada ou inválida - remover
-        console.log(`[send-push] Subscription expired/invalid, marking for removal: ${sub.id}`);
+        console.log(`[send-push] ⚠️ Subscription expired/invalid, marking for removal: ${sub.id}`);
         failedSubscriptions.push(sub.id);
+      } else {
+        console.log(`[send-push] ❌ Failed: ${result.error || result.statusCode}`);
       }
     }
 
@@ -386,8 +456,16 @@ serve(async (req) => {
       console.log(`[send-push] Removed ${failedSubscriptions.length} invalid subscription(s)`);
     }
 
+    console.log(`[send-push] ========== COMPLETE: ${sentCount}/${subscriptions.length} sent ==========`);
+
     return new Response(
-      JSON.stringify({ success: true, sent: sentCount, total: subscriptions.length }),
+      JSON.stringify({ 
+        success: true, 
+        sent: sentCount, 
+        total: subscriptions.length,
+        mode: noPayload ? 'noPayload' : 'withPayload',
+        results 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
