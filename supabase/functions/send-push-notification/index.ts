@@ -76,110 +76,163 @@ async function generateVAPIDAuthHeader(
   return `${unsignedToken}.${signatureB64}`;
 }
 
+// ============= RFC 8291 Helper Functions =============
+
+function base64urlToUint8Array(base64url: string): Uint8Array {
+  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = '='.repeat((4 - base64.length % 4) % 4);
+  const binary = atob(base64 + padding);
+  return Uint8Array.from(binary, c => c.charCodeAt(0));
+}
+
+function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
+  const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const arr of arrays) {
+    result.set(arr, offset);
+    offset += arr.length;
+  }
+  return result;
+}
+
+async function hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw", key.buffer as ArrayBuffer,
+    { name: "HMAC", hash: "SHA-256" },
+    false, ["sign"]
+  );
+  return new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, data.buffer as ArrayBuffer));
+}
+
+// ============= RFC 8291 Web Push Encryption =============
+
 async function encryptPayload(
   payload: string,
   p256dh: string,
   auth: string
 ): Promise<{ ciphertext: Uint8Array; salt: Uint8Array; localPublicKey: Uint8Array }> {
-  // Decode subscription keys
-  const p256dhKey = Uint8Array.from(atob(p256dh.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-  const authSecret = Uint8Array.from(atob(auth.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  const encoder = new TextEncoder();
+  
+  // 1. Decode subscription keys (ua_public and auth_secret)
+  const ua_public = base64urlToUint8Array(p256dh);
+  const auth_secret = base64urlToUint8Array(auth);
 
-  // Generate local key pair for ECDH
-  const localKeyPair = await crypto.subtle.generateKey(
+  console.log('[encrypt] ua_public length:', ua_public.length);
+  console.log('[encrypt] auth_secret length:', auth_secret.length);
+
+  // 2. Generate server key pair (as_private, as_public)
+  const serverKeyPair = await crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
     true,
     ["deriveBits"]
   );
+  const as_public = new Uint8Array(
+    await crypto.subtle.exportKey("raw", serverKeyPair.publicKey)
+  );
 
-  // Import subscriber's public key
-  const subscriberPublicKey = await crypto.subtle.importKey(
-    "raw",
-    p256dhKey,
+  console.log('[encrypt] as_public length:', as_public.length);
+
+  // 3. Import subscriber's public key
+  const subscriberKey = await crypto.subtle.importKey(
+    "raw", ua_public.buffer as ArrayBuffer,
     { name: "ECDH", namedCurve: "P-256" },
-    false,
-    []
+    false, []
   );
 
-  // Derive shared secret
-  const sharedSecret = await crypto.subtle.deriveBits(
-    { name: "ECDH", public: subscriberPublicKey },
-    localKeyPair.privateKey,
-    256
+  // 4. Derive ECDH shared secret
+  const ecdh_secret = new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: "ECDH", public: subscriberKey },
+      serverKeyPair.privateKey,
+      256
+    )
   );
 
-  // Export local public key
-  const localPublicKeyRaw = await crypto.subtle.exportKey("raw", localKeyPair.publicKey);
-  const localPublicKey = new Uint8Array(localPublicKeyRaw);
+  console.log('[encrypt] ecdh_secret length:', ecdh_secret.length);
 
-  // Generate salt
+  // 5. Generate salt (16 random bytes)
   const salt = crypto.getRandomValues(new Uint8Array(16));
 
-  // Derive encryption key using HKDF
-  const encoder = new TextEncoder();
-  
-  // PRK = HKDF-Extract(auth_secret, ecdh_secret)
-  const prkKey = await crypto.subtle.importKey(
-    "raw",
-    authSecret,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const prk = await crypto.subtle.sign("HMAC", prkKey, new Uint8Array(sharedSecret));
+  // ====== RFC 8291 Section 3.4 - Key Derivation ======
 
-  // Create info for key derivation
-  const keyInfo = new Uint8Array([
-    ...encoder.encode("Content-Encoding: aes128gcm\0"),
-  ]);
-  
-  const nonceInfo = new Uint8Array([
-    ...encoder.encode("Content-Encoding: nonce\0"),
+  // 6. PRK_key = HKDF-Extract(salt=auth_secret, IKM=ecdh_secret)
+  //    = HMAC-SHA-256(auth_secret, ecdh_secret)
+  const prk_key = await hmacSha256(auth_secret, ecdh_secret);
+
+  console.log('[encrypt] prk_key length:', prk_key.length);
+
+  // 7. key_info = "WebPush: info" || 0x00 || ua_public || as_public
+  const key_info = concatUint8Arrays([
+    encoder.encode("WebPush: info"),
+    new Uint8Array([0x00]),
+    ua_public,
+    as_public
   ]);
 
-  // Derive content encryption key
-  const cekPrkKey = await crypto.subtle.importKey(
-    "raw",
-    new Uint8Array(prk),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
+  console.log('[encrypt] key_info length:', key_info.length);
+
+  // 8. IKM = HKDF-Expand(PRK_key, key_info, L=32)
+  //    = HMAC-SHA-256(PRK_key, key_info || 0x01)[0..31]
+  const ikm = await hmacSha256(prk_key, concatUint8Arrays([key_info, new Uint8Array([0x01])]));
+
+  console.log('[encrypt] ikm length:', ikm.length);
+
+  // ====== RFC 8188 - Content Encryption ======
+
+  // 9. PRK = HKDF-Extract(salt=salt, IKM=ikm)
+  //    = HMAC-SHA-256(salt, ikm)
+  const prk = await hmacSha256(salt, ikm);
+
+  console.log('[encrypt] prk length:', prk.length);
+
+  // 10. cek_info = "Content-Encoding: aes128gcm" || 0x00
+  const cek_info = encoder.encode("Content-Encoding: aes128gcm\0");
   
-  const cekInfo = new Uint8Array([...salt, ...keyInfo, 1]);
-  const cekFull = await crypto.subtle.sign("HMAC", cekPrkKey, cekInfo);
-  const cek = new Uint8Array(cekFull).slice(0, 16);
+  // 11. CEK = HKDF-Expand(PRK, cek_info, L=16)
+  //     = HMAC-SHA-256(PRK, cek_info || 0x01)[0..15]
+  const cek_full = await hmacSha256(prk, concatUint8Arrays([cek_info, new Uint8Array([0x01])]));
+  const cek = cek_full.slice(0, 16);
 
-  // Derive nonce
-  const nonceInfoFull = new Uint8Array([...salt, ...nonceInfo, 1]);
-  const nonceFull = await crypto.subtle.sign("HMAC", cekPrkKey, nonceInfoFull);
-  const nonce = new Uint8Array(nonceFull).slice(0, 12);
+  console.log('[encrypt] cek length:', cek.length);
 
-  // Encrypt payload
+  // 12. nonce_info = "Content-Encoding: nonce" || 0x00
+  const nonce_info = encoder.encode("Content-Encoding: nonce\0");
+  
+  // 13. NONCE = HKDF-Expand(PRK, nonce_info, L=12)
+  //     = HMAC-SHA-256(PRK, nonce_info || 0x01)[0..11]
+  const nonce_full = await hmacSha256(prk, concatUint8Arrays([nonce_info, new Uint8Array([0x01])]));
+  const nonce = nonce_full.slice(0, 12);
+
+  console.log('[encrypt] nonce length:', nonce.length);
+
+  // 14. Add padding delimiter (0x02) to payload - RFC 8188 Section 2
   const payloadBytes = encoder.encode(payload);
-  const paddedPayload = new Uint8Array(payloadBytes.length + 2);
+  const paddedPayload = new Uint8Array(payloadBytes.length + 1);
   paddedPayload.set(payloadBytes);
-  paddedPayload[payloadBytes.length] = 2; // Padding delimiter
+  paddedPayload[payloadBytes.length] = 0x02; // padding delimiter
 
+  console.log('[encrypt] paddedPayload length:', paddedPayload.length);
+
+  // 15. Encrypt with AES-128-GCM
   const encryptionKey = await crypto.subtle.importKey(
-    "raw",
-    cek,
+    "raw", cek,
     { name: "AES-GCM" },
-    false,
-    ["encrypt"]
+    false, ["encrypt"]
+  );
+  
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: nonce },
+      encryptionKey,
+      paddedPayload
+    )
   );
 
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: nonce },
-    encryptionKey,
-    paddedPayload
-  );
+  console.log('[encrypt] ciphertext length:', ciphertext.length);
+  console.log('[encrypt] Encryption complete!');
 
-  return {
-    ciphertext: new Uint8Array(encrypted),
-    salt,
-    localPublicKey,
-  };
+  return { ciphertext, salt, localPublicKey: as_public };
 }
 
 // Envio COM payload (criptografado)
