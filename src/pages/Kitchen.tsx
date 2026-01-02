@@ -443,10 +443,15 @@ export default function Kitchen() {
     // Registrar evento KDS - fail-safe
     logOrderCancelled(cancelOrderId).catch(() => {});
 
-    // Enviar push notification de cancelamento - fail-safe
-    supabase.functions.invoke('send-push-notification', {
+    // Enviar push notification de cancelamento
+    const { data: pushData, error: pushError } = await supabase.functions.invoke('send-push-notification', {
       body: { orderId: cancelOrderId, status: 'cancelled' }
-    }).catch(() => {});
+    });
+    if (pushError) {
+      console.error('[Kitchen] Push notification error (cancel):', pushError);
+    } else {
+      console.log('[Kitchen] Push notification sent (cancel):', pushData);
+    }
 
     toast({ title: 'Pedido cancelado' });
     setCancelDialogOpen(false);
@@ -475,10 +480,16 @@ export default function Kitchen() {
     // Registrar evento KDS - fail-safe
     logStatusChange(orderId, newStatus).catch(() => {});
 
-    // Enviar push notification - fail-safe
-    supabase.functions.invoke('send-push-notification', {
+    // Enviar push notification
+    const { data: pushData, error: pushError } = await supabase.functions.invoke('send-push-notification', {
       body: { orderId, status: newStatus }
-    }).catch(() => {});
+    });
+    if (pushError) {
+      console.error('[Kitchen] Push notification error:', pushError);
+      toast({ title: 'Aviso: falha ao enviar notificação push', variant: 'destructive' });
+    } else {
+      console.log('[Kitchen] Push notification sent:', pushData);
+    }
 
     toast({ title: `Status atualizado para ${newStatus}` });
     fetchOrders();
