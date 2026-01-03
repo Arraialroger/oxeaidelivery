@@ -1,28 +1,28 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, User, MapPin, CreditCard, Check } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useCart } from '@/contexts/CartContext';
-import { useConfig } from '@/hooks/useConfig';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth';
-import { classifyCustomerType } from '@/lib/customerClassification';
-import { useKdsEvents } from '@/hooks/useKdsEvents';
+import { useState, useEffect } from "react";
+import { ArrowLeft, User, MapPin, CreditCard, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useCart } from "@/contexts/CartContext";
+import { useConfig } from "@/hooks/useConfig";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { classifyCustomerType } from "@/lib/customerClassification";
+import { useKdsEvents } from "@/hooks/useKdsEvents";
 
-type PaymentMethod = 'pix' | 'card' | 'cash';
+type PaymentMethod = "pix" | "card" | "cash";
 
 // Format phone to Brazilian format: (XX) XXXXX-XXXX
 const formatPhone = (value: string): string => {
-  const numbers = value.replace(/\D/g, '');
+  const numbers = value.replace(/\D/g, "");
   const limited = numbers.slice(0, 11);
-  
+
   if (limited.length <= 2) {
-    return limited.length > 0 ? `(${limited}` : '';
+    return limited.length > 0 ? `(${limited}` : "";
   }
   if (limited.length <= 7) {
     return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
@@ -32,7 +32,7 @@ const formatPhone = (value: string): string => {
 
 // Get only digits from formatted phone
 const getPhoneDigits = (value: string): string => {
-  return value.replace(/\D/g, '');
+  return value.replace(/\D/g, "");
 };
 
 // Validate Brazilian phone (10 or 11 digits)
@@ -44,23 +44,23 @@ const isValidPhone = (value: string): boolean => {
 // Format currency to Brazilian format: R$ X,XX
 const formatCurrency = (value: string): string => {
   // Remove all non-numeric characters
-  const numbers = value.replace(/\D/g, '');
-  
-  if (!numbers) return '';
-  
+  const numbers = value.replace(/\D/g, "");
+
+  if (!numbers) return "";
+
   // Convert to number (in cents) and format
   const cents = parseInt(numbers, 10);
   const reais = cents / 100;
-  
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
+
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
   }).format(reais);
 };
 
 // Get numeric value from formatted currency
 const getCurrencyValue = (value: string): number => {
-  const numbers = value.replace(/\D/g, '');
+  const numbers = value.replace(/\D/g, "");
   if (!numbers) return 0;
   return parseInt(numbers, 10) / 100;
 };
@@ -72,27 +72,23 @@ export default function Checkout() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { logOrderReceived } = useKdsEvents();
-  
+
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
   // Step 1: Customer Info
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   // Pre-fill name and phone from profile for logged-in users
   useEffect(() => {
     const loadProfile = async () => {
       if (!user || profileLoaded) return;
-      
+
       try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name, phone')
-          .eq('id', user.id)
-          .maybeSingle();
+        const { data: profile } = await supabase.from("profiles").select("name, phone").eq("id", user.id).maybeSingle();
 
         if (profile) {
           if (profile.name && !name) {
@@ -104,7 +100,7 @@ export default function Checkout() {
           }
         }
       } catch (error) {
-        console.error('[CHECKOUT] Erro ao carregar perfil:', error);
+        console.error("[CHECKOUT] Erro ao carregar perfil:", error);
       } finally {
         setProfileLoaded(true);
       }
@@ -114,80 +110,79 @@ export default function Checkout() {
   }, [user, profileLoaded]);
 
   // Step 2: Address
-  const [street, setStreet] = useState('');
-  const [number, setNumber] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [complement, setComplement] = useState('');
-  const [reference, setReference] = useState('');
+  const [street, setStreet] = useState("");
+  const [number, setNumber] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [complement, setComplement] = useState("");
+  const [reference, setReference] = useState("");
 
   // Step 3: Payment
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
-  const [changeAmount, setChangeAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
+  const [changeAmount, setChangeAmount] = useState("");
 
   const deliveryFee = config?.delivery_fee ?? 0;
   const total = subtotal + deliveryFee;
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(price);
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhone(e.target.value);
     setPhone(formatted);
-    
+
     // Clear error when typing
     if (phoneError) {
-      setPhoneError('');
+      setPhoneError("");
     }
   };
 
   const handlePhoneBlur = () => {
     if (phone && !isValidPhone(phone)) {
-      setPhoneError('Digite um número de telefone válido');
+      setPhoneError("Digite um número de telefone válido");
     }
   };
 
   const handleSubmitOrder = async () => {
-    console.log('[CHECKOUT] ==========================================');
-    console.log('[CHECKOUT] Iniciando handleSubmitOrder');
-    console.log('[CHECKOUT] Items no carrinho:', items.length);
+    console.log("[CHECKOUT] ==========================================");
+    console.log("[CHECKOUT] Iniciando handleSubmitOrder");
+    console.log("[CHECKOUT] Items no carrinho:", items.length);
     setIsSubmitting(true);
 
     try {
       // Get only digits for storage
       const phoneDigits = getPhoneDigits(phone);
-      
+
       // 1. Get or create customer using RPC (bypasses RLS with SECURITY DEFINER)
       // CRITICAL: Classify customer type with SAFE try-catch
       // This NEVER blocks checkout - if it fails, defaults to 'tourist'
-      let customerType: 'local' | 'tourist' = 'tourist';
+      let customerType: "local" | "tourist" = "tourist";
       try {
         customerType = classifyCustomerType(phone);
-        console.log('[CHECKOUT] Cliente classificado como:', customerType);
+        console.log("[CHECKOUT] Cliente classificado como:", customerType);
       } catch (classifyError) {
-        console.warn('[CHECKOUT] Erro na classificação, usando tourist:', classifyError);
-        customerType = 'tourist';
+        console.warn("[CHECKOUT] Erro na classificação, usando tourist:", classifyError);
+        customerType = "tourist";
       }
 
-      const { data: customerId, error: customerError } = await supabase
-        .rpc('get_or_create_customer', {
-          p_phone: phoneDigits,
-          p_name: name || null,
-          p_customer_type: customerType
-        });
+      const { data: customerId, error: customerError } = await supabase.rpc("get_or_create_customer", {
+        p_phone: phoneDigits,
+        p_name: name || null,
+        p_customer_type: customerType,
+      });
 
       if (customerError) {
-        console.error('[CHECKOUT] Erro ao criar/buscar cliente:', customerError);
+        console.error("[CHECKOUT] Erro ao criar/buscar cliente:", customerError);
         throw customerError;
       }
-      console.log('[CHECKOUT] Cliente ID obtido via RPC:', customerId);
+      console.log("[CHECKOUT] Cliente ID obtido via RPC:", customerId);
 
       // 2. Create address (INSERT allowed by RLS, SELECT will work with new public policy)
       const { data: address, error: addressError } = await supabase
-        .from('addresses')
+        .from("addresses")
         .insert({
           customer_id: customerId,
           street,
@@ -200,23 +195,23 @@ export default function Checkout() {
         .single();
 
       if (addressError) {
-        console.error('[CHECKOUT] Erro ao criar endereço:', addressError);
+        console.error("[CHECKOUT] Erro ao criar endereço:", addressError);
         throw addressError;
       }
-      console.log('[CHECKOUT] Endereço criado:', address.id);
+      console.log("[CHECKOUT] Endereço criado:", address.id);
 
       // 3. Create order
       const { data: order, error: orderError } = await supabase
-        .from('orders')
+        .from("orders")
         .insert({
           customer_id: customerId,
           address_id: address.id,
           payment_method: paymentMethod,
-          change: paymentMethod === 'cash' && changeAmount ? changeAmount : null,
+          change: paymentMethod === "cash" && changeAmount ? changeAmount : null,
           subtotal,
           delivery_fee: deliveryFee,
           total,
-          status: 'pending',
+          status: "pending",
         })
         .select()
         .single();
@@ -224,16 +219,16 @@ export default function Checkout() {
       if (orderError) throw orderError;
 
       // 🔍 LOG CRÍTICO: Ver o objeto order completo
-      console.log('[CHECKOUT] ==========================================');
-      console.log('[CHECKOUT] PEDIDO CRIADO COM SUCESSO!');
-      console.log('[CHECKOUT] Objeto order completo:', JSON.stringify(order, null, 2));
-      console.log('[CHECKOUT] order.id:', order.id);
-      console.log('[CHECKOUT] typeof order.id:', typeof order.id);
+      console.log("[CHECKOUT] ==========================================");
+      console.log("[CHECKOUT] PEDIDO CRIADO COM SUCESSO!");
+      console.log("[CHECKOUT] Objeto order completo:", JSON.stringify(order, null, 2));
+      console.log("[CHECKOUT] order.id:", order.id);
+      console.log("[CHECKOUT] typeof order.id:", typeof order.id);
 
       // 4. Create order items
       for (const item of items) {
         const { data: orderItem, error: itemError } = await supabase
-          .from('order_items')
+          .from("order_items")
           .insert({
             order_id: order.id,
             product_id: item.product.id,
@@ -253,26 +248,24 @@ export default function Checkout() {
             option_price: opt.price,
           }));
 
-          const { error: optionsError } = await supabase
-            .from('order_item_options')
-            .insert(optionsToInsert);
+          const { error: optionsError } = await supabase.from("order_item_options").insert(optionsToInsert);
 
           if (optionsError) throw optionsError;
         }
       }
 
-      console.log('[CHECKOUT] Todos os itens criados com sucesso');
+      console.log("[CHECKOUT] Todos os itens criados com sucesso");
 
       clearCart();
 
       // 🔍 LOG CRÍTICO: URL de navegação
       const targetUrl = `/order/${order.id}?new=true`;
-      console.log('[CHECKOUT] ==========================================');
-      console.log('[CHECKOUT] NAVEGANDO PARA:', targetUrl);
-      console.log('[CHECKOUT] ==========================================');
+      console.log("[CHECKOUT] ==========================================");
+      console.log("[CHECKOUT] NAVEGANDO PARA:", targetUrl);
+      console.log("[CHECKOUT] ==========================================");
 
       toast({
-        title: 'Pedido enviado!',
+        title: "Pedido enviado!",
         description: `Pedido #${order.id.slice(0, 8)} foi recebido.`,
       });
 
@@ -281,13 +274,13 @@ export default function Checkout() {
 
       navigate(targetUrl);
     } catch (error) {
-      console.error('[CHECKOUT] ==========================================');
-      console.error('[CHECKOUT] ERRO NO CHECKOUT:', error);
-      console.error('[CHECKOUT] ==========================================');
+      console.error("[CHECKOUT] ==========================================");
+      console.error("[CHECKOUT] ERRO NO CHECKOUT:", error);
+      console.error("[CHECKOUT] ==========================================");
       toast({
-        title: 'Erro ao enviar pedido',
-        description: 'Tente novamente.',
-        variant: 'destructive',
+        title: "Erro ao enviar pedido",
+        description: "Tente novamente.",
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -295,7 +288,7 @@ export default function Checkout() {
   };
 
   if (items.length === 0) {
-    navigate('/');
+    navigate("/");
     return null;
   }
 
@@ -307,15 +300,9 @@ export default function Checkout() {
           <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
             <span className="text-3xl">🔒</span>
           </div>
-          <h1 className="text-xl font-bold text-foreground mb-2">
-            Restaurante Fechado
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            No momento não estamos aceitando pedidos. Volte mais tarde!
-          </p>
-          <Button onClick={() => navigate('/')}>
-            Voltar ao Cardápio
-          </Button>
+          <h1 className="text-xl font-bold text-foreground mb-2">Restaurante Fechado</h1>
+          <p className="text-muted-foreground mb-6">No momento não estamos aceitando pedidos. Volte mais tarde!</p>
+          <Button onClick={() => navigate("/")}>Voltar ao Cardápio</Button>
         </div>
       </div>
     );
@@ -337,10 +324,7 @@ export default function Checkout() {
           {[1, 2, 3].map((s) => (
             <div
               key={s}
-              className={cn(
-                'flex-1 h-1 rounded-full transition-colors',
-                s <= step ? 'bg-primary' : 'bg-secondary'
-              )}
+              className={cn("flex-1 h-1 rounded-full transition-colors", s <= step ? "bg-primary" : "bg-secondary")}
             />
           ))}
         </div>
@@ -378,9 +362,7 @@ export default function Checkout() {
                 placeholder="(00) 00000-0000"
                 className={cn("mt-1", phoneError && "border-destructive")}
               />
-              {phoneError && (
-                <p className="text-xs text-destructive mt-1">{phoneError}</p>
-              )}
+              {phoneError && <p className="text-xs text-destructive mt-1">{phoneError}</p>}
             </div>
           </div>
         )}
@@ -460,32 +442,30 @@ export default function Checkout() {
 
             <div className="flex flex-col gap-2">
               {[
-                { value: 'pix', label: 'Pix', icon: '📱' },
-                { value: 'card', label: 'Cartão na entrega', icon: '💳' },
-                { value: 'cash', label: 'Dinheiro', icon: '💵' },
+                { value: "pix", label: "Pix na entrega", icon: "📱" },
+                { value: "card", label: "Cartão na entrega", icon: "💳" },
+                { value: "cash", label: "Dinheiro na entrega", icon: "💵" },
               ].map((option) => (
                 <button
                   key={option.value}
                   onClick={() => setPaymentMethod(option.value as PaymentMethod)}
                   className={cn(
-                    'flex items-center justify-between p-4 rounded-xl border transition-colors',
+                    "flex items-center justify-between p-4 rounded-xl border transition-colors",
                     paymentMethod === option.value
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-primary/50",
                   )}
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{option.icon}</span>
                     <span className="font-medium">{option.label}</span>
                   </div>
-                  {paymentMethod === option.value && (
-                    <Check className="w-5 h-5 text-primary" />
-                  )}
+                  {paymentMethod === option.value && <Check className="w-5 h-5 text-primary" />}
                 </button>
               ))}
             </div>
 
-            {paymentMethod === 'cash' && (
+            {paymentMethod === "cash" && (
               <div className="mt-4">
                 <Label htmlFor="change">Troco para quanto?</Label>
                 <Input
@@ -518,10 +498,10 @@ export default function Checkout() {
                       <span className="text-foreground">{formatPrice(item.totalPrice)}</span>
                     </div>
                     {/* Combo selections */}
-                    {item.selectedOptions.some(o => o.type === 'combo-selection') && (
+                    {item.selectedOptions.some((o) => o.type === "combo-selection") && (
                       <div className="mt-1 ml-4">
                         {item.selectedOptions
-                          .filter(o => o.type === 'combo-selection')
+                          .filter((o) => o.type === "combo-selection")
                           .map((o, idx) => (
                             <p key={idx} className="text-xs text-muted-foreground">
                               • {o.name}
@@ -531,14 +511,15 @@ export default function Checkout() {
                       </div>
                     )}
                     {/* Regular options */}
-                    {item.selectedOptions.some(o => o.type !== 'combo-selection') && (
+                    {item.selectedOptions.some((o) => o.type !== "combo-selection") && (
                       <p className="text-xs text-muted-foreground mt-1 ml-4">
-                        {item.selectedOptions.filter(o => o.type !== 'combo-selection').map(o => o.name).join(', ')}
+                        {item.selectedOptions
+                          .filter((o) => o.type !== "combo-selection")
+                          .map((o) => o.name)
+                          .join(", ")}
                       </p>
                     )}
-                    {item.note && (
-                      <p className="text-xs text-muted-foreground italic mt-1 ml-4">"{item.note}"</p>
-                    )}
+                    {item.note && <p className="text-xs text-muted-foreground italic mt-1 ml-4">"{item.note}"</p>}
                   </div>
                 ))}
               </div>
@@ -578,12 +559,15 @@ export default function Checkout() {
           <Button
             onClick={handleSubmitOrder}
             disabled={
-              isSubmitting || 
-              (paymentMethod === 'cash' && changeAmount && getCurrencyValue(changeAmount) > 0 && getCurrencyValue(changeAmount) < total)
+              isSubmitting ||
+              (paymentMethod === "cash" &&
+                changeAmount &&
+                getCurrencyValue(changeAmount) > 0 &&
+                getCurrencyValue(changeAmount) < total)
             }
             className="w-full h-12 text-base font-semibold"
           >
-            {isSubmitting ? 'Enviando...' : `Enviar Pedido ${formatPrice(total)}`}
+            {isSubmitting ? "Enviando..." : `Enviar Pedido ${formatPrice(total)}`}
           </Button>
         )}
       </div>
