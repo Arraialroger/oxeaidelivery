@@ -10,6 +10,7 @@ import { useConfig } from "@/hooks/useConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { trackBeginCheckout, trackPurchase } from "@/lib/gtag";
 import { useAuth } from "@/hooks/useAuth";
 import { classifyCustomerType } from "@/lib/customerClassification";
 import { useKdsEvents } from "@/hooks/useKdsEvents";
@@ -119,9 +120,26 @@ export default function Checkout() {
   // Step 3: Payment
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
   const [changeAmount, setChangeAmount] = useState("");
+  const [checkoutTracked, setCheckoutTracked] = useState(false);
 
   const deliveryFee = config?.delivery_fee ?? 0;
   const total = subtotal + deliveryFee;
+
+  // Track begin_checkout event when entering checkout
+  useEffect(() => {
+    if (items.length > 0 && !checkoutTracked) {
+      trackBeginCheckout(
+        items.map((item) => ({
+          id: item.product.id,
+          name: item.product.name,
+          price: item.product.price,
+          quantity: item.quantity,
+        })),
+        subtotal
+      );
+      setCheckoutTracked(true);
+    }
+  }, [items, subtotal, checkoutTracked]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -255,6 +273,19 @@ export default function Checkout() {
       }
 
       console.log("[CHECKOUT] Todos os itens criados com sucesso");
+
+      // Track purchase event
+      trackPurchase(
+        order.id,
+        items.map((item) => ({
+          id: item.product.id,
+          name: item.product.name,
+          price: item.product.price,
+          quantity: item.quantity,
+        })),
+        total,
+        deliveryFee
+      );
 
       clearCart();
 

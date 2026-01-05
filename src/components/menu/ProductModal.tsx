@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useProductOptions } from '@/hooks/useProductOptions';
 import { useCart } from '@/contexts/CartContext';
 import { cn } from '@/lib/utils';
+import { trackViewItem, trackAddToCart } from '@/lib/gtag';
 import type { Product, SelectedOption } from '@/types';
 import { ComboModal } from './ComboModal';
 import { ImageZoomModal } from './ImageZoomModal';
@@ -26,13 +27,21 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const { addItem } = useCart();
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && product) {
       setQuantity(1);
       setSelectedOptions([]);
       setNote('');
       setIsShaking(false);
       setHighlightMissing(false);
       setIsImageZoomed(false);
+      
+      // Track view_item event
+      trackViewItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        category: product.category_id ?? undefined,
+      });
     }
   }, [isOpen, product?.id]);
 
@@ -130,6 +139,16 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       setTimeout(() => setIsShaking(false), 500);
       return;
     }
+    
+    // Track add_to_cart event
+    trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: totalPrice / quantity,
+      quantity,
+      category: product.category_id ?? undefined,
+    });
+    
     addItem(product, quantity, selectedOptions, note);
     onClose();
   };
