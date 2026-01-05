@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2 } from 'lucide-react';
+import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { PWAInstallModal } from '@/components/pwa';
@@ -285,6 +285,28 @@ export default function OrderTracking() {
                 )}
                 <span className="hidden sm:inline">Ativar</span>
               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Banner informativo quando permissão foi negada */}
+        {pushSupported && permission === 'denied' && !isOrderFinished && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mt-1">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Settings className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-sm text-amber-700">Notificações bloqueadas</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Para receber atualizações do seu pedido, você precisa reativar as notificações nas configurações do navegador:
+                </p>
+                <ol className="text-xs text-muted-foreground mt-2 space-y-1 list-decimal list-inside">
+                  <li>Toque no ícone de cadeado 🔒 na barra de endereço</li>
+                  <li>Encontre "Notificações" e altere para "Permitir"</li>
+                  <li>Recarregue a página</li>
+                </ol>
+              </div>
             </div>
           </div>
         )}
