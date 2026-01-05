@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useComboSlots, useComboSlotProducts } from '@/hooks/useComboSlots';
 import { useCart } from '@/contexts/CartContext';
 import { cn } from '@/lib/utils';
+import { trackViewItem, trackAddToCart } from '@/lib/gtag';
 import { supabase } from '@/integrations/supabase/client';
 import { ImageZoomModal } from './ImageZoomModal';
 import type { Product, SelectedOption } from '@/types';
@@ -141,6 +142,14 @@ export function ComboModal({ product, isOpen, onClose }: ComboModalProps) {
       setNote('');
       setDefaultsLoaded(false);
       setIsImageZoomed(false);
+      
+      // Track view_item event for combo
+      trackViewItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        category: product.category_id ?? undefined,
+      });
     }
   }, [isOpen, product.id]);
 
@@ -213,6 +222,15 @@ export function ComboModal({ product, isOpen, onClose }: ComboModalProps) {
       type: 'combo-selection',
       groupName: sel.slotLabel,
     }));
+
+    // Track add_to_cart event for combo
+    trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: totalPrice / quantity,
+      quantity,
+      category: product.category_id ?? undefined,
+    });
 
     addItem(product, quantity, comboOptions, note);
     onClose();
