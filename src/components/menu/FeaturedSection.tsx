@@ -29,15 +29,15 @@ export function FeaturedSection({ products, onProductClick }: FeaturedSectionPro
   }
 
   return (
-    <section className="py-4 px-4">
+    <section className="py-4 overflow-hidden">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+        <h2 className="text-xl font-bold text-foreground flex items-center gap-2 px-4">
           🔥 Os Mais Pedidos
         </h2>
         
         {/* Navigation Arrows - Hidden on mobile */}
-        <div className="hidden sm:flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2 px-4">
           <button
             onClick={() => scroll('left')}
             className="w-8 h-8 rounded-full bg-muted hover:bg-primary/20 flex items-center justify-center transition-colors"

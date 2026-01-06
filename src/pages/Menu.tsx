@@ -39,7 +39,7 @@ export default function Menu() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* PWA Install Banner */}
       <PWAInstallBanner />
       
@@ -55,7 +55,9 @@ export default function Menu() {
       />
 
       {/* PWA Install Button - Only shows when installable */}
-      <PWAInstallButton className="w-full mx-4 my-2" />
+      <div className="px-4 my-2">
+        <PWAInstallButton className="w-full" />
+      </div>
 
       {/* Featured Section - Only show when no category is selected */}
       {!activeCategory && (
