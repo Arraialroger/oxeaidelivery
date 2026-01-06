@@ -15,14 +15,21 @@ export function Header() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {config?.restaurant_open ? <span className="flex items-center gap-1.5 text-sm font-medium text-green-500">
+        <div className="flex flex-col items-end gap-0.5">
+          {config?.restaurant_open ? (
+            <span className="flex items-center gap-1.5 text-sm font-medium text-green-500">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               Aberto
-            </span> : <span className="flex items-center gap-1.5 text-sm font-medium text-destructive">
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-sm font-medium text-destructive">
               <span className="w-2 h-2 rounded-full bg-destructive" />
               Fechado
-            </span>}
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground">
+            18h às 23h • Ter a Dom
+          </span>
         </div>
       </div>
     </header>;
