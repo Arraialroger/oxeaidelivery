@@ -199,8 +199,11 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
             {!config?.restaurant_open ? (
               <div className="text-center">
-                <p className="text-destructive font-medium mb-2">
+                <p className="text-destructive font-medium mb-1">
                   Restaurante fechado no momento
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Funcionamos das 18h às 23h • Ter a Dom
                 </p>
                 <Button disabled className="w-full h-12 text-base font-semibold opacity-50">
                   Finalizar Pedido
