@@ -28,7 +28,7 @@ export function Header() {
             </span>
           )}
           <span className="text-xs text-muted-foreground">
-            18h às 23h • Ter a Dom
+            Abrimos às 18h
           </span>
         </div>
       </div>
