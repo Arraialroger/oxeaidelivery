@@ -203,7 +203,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   Restaurante fechado no momento
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Funcionamos das 18h às 23h • Ter a Dom
+                  Abrimos às 18h
                 </p>
                 <Button disabled className="w-full h-12 text-base font-semibold opacity-50">
                   Finalizar Pedido
