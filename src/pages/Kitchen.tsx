@@ -217,13 +217,13 @@ const formatPhoneDisplay = (phone: string | undefined) => {
   return phone;
 };
 
-// Notification sound using Web Audio API
+// Notification sound using Web Audio API - LOUD alert for kitchen environment
 const playNotificationSound = () => {
   try {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    // Create a pleasant notification sound
-    const playTone = (frequency: number, startTime: number, duration: number) => {
+    // Create a loud, attention-grabbing notification sound
+    const playTone = (frequency: number, startTime: number, duration: number, type: OscillatorType = 'square') => {
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -231,20 +231,35 @@ const playNotificationSound = () => {
       gainNode.connect(audioContext.destination);
       
       oscillator.frequency.value = frequency;
-      oscillator.type = 'sine';
+      oscillator.type = type;
       
-      gainNode.gain.setValueAtTime(0.3, startTime);
+      // Volume muito mais alto: 0.85 (era 0.3)
+      gainNode.gain.setValueAtTime(0.85, startTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
       
       oscillator.start(startTime);
       oscillator.stop(startTime + duration);
     };
     
-    // Play a pleasant 3-tone notification
     const now = audioContext.currentTime;
-    playTone(523.25, now, 0.15);        // C5
-    playTone(659.25, now + 0.15, 0.15); // E5
-    playTone(783.99, now + 0.3, 0.2);   // G5
+    
+    // Repetir o padrão 3 vezes para garantir que seja ouvido
+    for (let i = 0; i < 3; i++) {
+      const offset = i * 0.7; // 700ms entre cada repetição
+      
+      // Bass hit inicial (grave, mais perceptível)
+      playTone(200, now + offset, 0.1, 'square');
+      
+      // Melodia de alerta (notas mais longas)
+      playTone(523.25, now + offset + 0.1, 0.2, 'square');   // C5
+      playTone(659.25, now + offset + 0.3, 0.2, 'square');   // E5
+      playTone(783.99, now + offset + 0.5, 0.25, 'square');  // G5
+    }
+    
+    // Vibração do dispositivo se disponível
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
+    }
     
   } catch (error) {
     console.error('Error playing notification sound:', error);
