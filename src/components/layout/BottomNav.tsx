@@ -14,15 +14,42 @@ export function BottomNav({ onCartClick }: BottomNavProps) {
   const [isPopping, setIsPopping] = useState(false);
   const prevTotalItems = useRef(totalItems);
 
-  // Trigger pop animation and haptic feedback when items are added
+  // Play a subtle "pling" sound
+  const playPlingSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.1);
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (e) {
+      // Audio not supported
+    }
+  };
+
+  // Trigger pop animation, haptic feedback, and sound when items are added
   useEffect(() => {
     if (totalItems > prevTotalItems.current) {
       setIsPopping(true);
       
       // Haptic feedback (vibration)
       if (navigator.vibrate) {
-        navigator.vibrate([50, 30, 50]); // Short vibration pattern
+        navigator.vibrate([50, 30, 50]);
       }
+      
+      // Play pling sound
+      playPlingSound();
       
       const timer = setTimeout(() => setIsPopping(false), 600);
       return () => clearTimeout(timer);
