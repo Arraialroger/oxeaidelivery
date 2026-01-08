@@ -50,7 +50,7 @@ export function BottomNav({ onCartClick }: BottomNavProps) {
           onClick={onCartClick}
           className="relative flex flex-col items-center gap-1 px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
         >
-          <div className={`relative transition-transform duration-300 ease-out ${isPopping ? 'scale-150' : 'scale-100'}`}>
+          <div className={`relative transition-transform duration-300 ease-out ${isPopping ? 'scale-150 animate-shake' : 'scale-100'}`}>
             <ShoppingBag className={`w-5 h-5 ${isPopping ? 'text-primary' : ''}`} />
             {totalItems > 0 && (
               <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center px-1 ${isPopping ? 'animate-bounce' : ''}`}>
