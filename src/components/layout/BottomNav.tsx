@@ -14,10 +14,16 @@ export function BottomNav({ onCartClick }: BottomNavProps) {
   const [isPopping, setIsPopping] = useState(false);
   const prevTotalItems = useRef(totalItems);
 
-  // Trigger pop animation when items are added
+  // Trigger pop animation and haptic feedback when items are added
   useEffect(() => {
     if (totalItems > prevTotalItems.current) {
       setIsPopping(true);
+      
+      // Haptic feedback (vibration)
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 30, 50]); // Short vibration pattern
+      }
+      
       const timer = setTimeout(() => setIsPopping(false), 600);
       return () => clearTimeout(timer);
     }
