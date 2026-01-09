@@ -6,6 +6,7 @@ import { useProductOptions } from '@/hooks/useProductOptions';
 import { useCart } from '@/contexts/CartContext';
 import { cn } from '@/lib/utils';
 import { trackViewItem, trackAddToCart } from '@/lib/gtag';
+import { fbTrackViewContent, fbTrackAddToCart } from '@/lib/fbpixel';
 import type { Product, SelectedOption } from '@/types';
 import { ComboModal } from './ComboModal';
 import { ImageZoomModal } from './ImageZoomModal';
@@ -35,8 +36,14 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       setHighlightMissing(false);
       setIsImageZoomed(false);
       
-      // Track view_item event
+      // Track view_item event (Google Analytics + Meta Pixel)
       trackViewItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        category: product.category_id ?? undefined,
+      });
+      fbTrackViewContent({
         id: product.id,
         name: product.name,
         price: product.price,
@@ -140,13 +147,19 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       return;
     }
     
-    // Track add_to_cart event
+    // Track add_to_cart event (Google Analytics + Meta Pixel)
     trackAddToCart({
       id: product.id,
       name: product.name,
       price: totalPrice / quantity,
       quantity,
       category: product.category_id ?? undefined,
+    });
+    fbTrackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: totalPrice / quantity,
+      quantity,
     });
     
     addItem(product, quantity, selectedOptions, note);
