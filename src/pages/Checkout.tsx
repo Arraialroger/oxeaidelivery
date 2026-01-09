@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { trackBeginCheckout, trackPurchase } from "@/lib/gtag";
+import { fbTrackInitiateCheckout, fbTrackPurchase } from "@/lib/fbpixel";
 import { useAuth } from "@/hooks/useAuth";
 import { classifyCustomerType } from "@/lib/customerClassification";
 import { useKdsEvents } from "@/hooks/useKdsEvents";
@@ -125,18 +126,17 @@ export default function Checkout() {
   const deliveryFee = config?.delivery_fee ?? 0;
   const total = subtotal + deliveryFee;
 
-  // Track begin_checkout event when entering checkout
+  // Track begin_checkout event when entering checkout (Google Analytics + Meta Pixel)
   useEffect(() => {
     if (items.length > 0 && !checkoutTracked) {
-      trackBeginCheckout(
-        items.map((item) => ({
-          id: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-        })),
-        subtotal
-      );
+      const trackingItems = items.map((item) => ({
+        id: item.product.id,
+        name: item.product.name,
+        price: item.product.price,
+        quantity: item.quantity,
+      }));
+      trackBeginCheckout(trackingItems, subtotal);
+      fbTrackInitiateCheckout(trackingItems, subtotal);
       setCheckoutTracked(true);
     }
   }, [items, subtotal, checkoutTracked]);
@@ -274,18 +274,15 @@ export default function Checkout() {
 
       console.log("[CHECKOUT] Todos os itens criados com sucesso");
 
-      // Track purchase event
-      trackPurchase(
-        order.id,
-        items.map((item) => ({
-          id: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-        })),
-        total,
-        deliveryFee
-      );
+      // Track purchase event (Google Analytics + Meta Pixel)
+      const purchaseItems = items.map((item) => ({
+        id: item.product.id,
+        name: item.product.name,
+        price: item.product.price,
+        quantity: item.quantity,
+      }));
+      trackPurchase(order.id, purchaseItems, total, deliveryFee);
+      fbTrackPurchase(order.id, purchaseItems, total);
 
       clearCart();
 
