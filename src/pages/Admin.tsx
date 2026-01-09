@@ -48,27 +48,26 @@ export default function Admin() {
         <div className="container max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Link to="/">
+              <a href="/" target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-2">
                   <UtensilsCrossed className="w-4 h-4" />
                   <span>Cardápio</span>
                 </Button>
-              </Link>
-              <Link to="/kitchen">
+              </a>
+              <a href="/kitchen" target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-2">
                   <ChefHat className="w-4 h-4" />
                   <span>KDS</span>
                 </Button>
-              </Link>
-              <h1 className="text-xl font-bold">Admin</h1>
+              </a>
             </div>
             <div className="flex items-center gap-2">
-              <Link to="/admin/customers">
+              <a href="/admin/customers" target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-2">
                   <Users className="w-4 h-4" />
                   <span className="hidden sm:inline">CRM</span>
                 </Button>
-              </Link>
+              </a>
               <Button variant="ghost" size="icon" onClick={handleSignOut}>
                 <LogOut className="w-5 h-5" />
               </Button>
