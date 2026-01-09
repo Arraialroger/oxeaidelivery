@@ -217,10 +217,50 @@ const formatPhoneDisplay = (phone: string | undefined) => {
   return phone;
 };
 
-// Notification sound using Web Audio API - LOUD alert for kitchen environment
-const playNotificationSound = () => {
+// Persistent AudioContext reference - created once and reused
+let sharedAudioContext: AudioContext | null = null;
+
+const getSharedAudioContext = (): AudioContext => {
+  if (!sharedAudioContext) {
+    sharedAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  return sharedAudioContext;
+};
+
+// Function to unlock audio context after user interaction
+const unlockAudioContext = async (): Promise<boolean> => {
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioContext = getSharedAudioContext();
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+    return audioContext.state === 'running';
+  } catch (error) {
+    console.error('Error unlocking audio context:', error);
+    return false;
+  }
+};
+
+// Notification sound using Web Audio API - LOUD alert for kitchen environment
+const playNotificationSound = async (): Promise<boolean> => {
+  try {
+    const audioContext = getSharedAudioContext();
+    
+    // Try to resume if suspended
+    if (audioContext.state === 'suspended') {
+      try {
+        await audioContext.resume();
+      } catch (e) {
+        console.warn('Could not resume AudioContext:', e);
+        return false;
+      }
+    }
+    
+    // Check if still not running
+    if (audioContext.state !== 'running') {
+      console.warn('AudioContext not running, state:', audioContext.state);
+      return false;
+    }
     
     // Create a loud, attention-grabbing notification sound
     const playTone = (frequency: number, startTime: number, duration: number, type: OscillatorType = 'square') => {
@@ -261,8 +301,10 @@ const playNotificationSound = () => {
       navigator.vibrate([200, 100, 200, 100, 200]);
     }
     
+    return true;
   } catch (error) {
     console.error('Error playing notification sound:', error);
+    return false;
   }
 };
 
@@ -276,6 +318,7 @@ export default function Kitchen() {
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [audioActivated, setAudioActivated] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
@@ -322,7 +365,7 @@ export default function Kitchen() {
     const newOrders = (data as OrderWithDetails[]) || [];
     
     // Check for new orders and play sound
-    if (!isInitialLoadRef.current && soundEnabled) {
+    if (!isInitialLoadRef.current && soundEnabled && audioActivated) {
       const currentOrderIds = new Set(newOrders.map(o => o.id));
       const newOrderIds = [...currentOrderIds].filter(id => !previousOrderIdsRef.current.has(id));
       
@@ -341,7 +384,7 @@ export default function Kitchen() {
 
     setOrders(newOrders);
     setLoading(false);
-  }, [soundEnabled, toast]);
+  }, [soundEnabled, audioActivated, toast]);
 
   const fetchHistoryOrders = useCallback(async () => {
     setHistoryLoading(true);
@@ -586,13 +629,42 @@ export default function Kitchen() {
         </div>
         <div className="flex items-center gap-2">
           <Button 
-            variant="outline" 
+            variant={soundEnabled && !audioActivated ? "destructive" : "outline"}
             size="icon"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            title={soundEnabled ? 'Desativar som' : 'Ativar som'}
+            className={soundEnabled && !audioActivated ? "animate-pulse" : ""}
+            onClick={async () => {
+              if (!soundEnabled) {
+                // Turning on: unlock audio and play test sound
+                const unlocked = await unlockAudioContext();
+                if (unlocked) {
+                  setAudioActivated(true);
+                  setSoundEnabled(true);
+                  await playNotificationSound();
+                  toast({
+                    title: '🔔 Som ativado!',
+                    description: 'Você receberá alertas sonoros para novos pedidos.',
+                  });
+                } else {
+                  toast({
+                    title: 'Erro ao ativar som',
+                    description: 'Tente novamente.',
+                    variant: 'destructive',
+                  });
+                }
+              } else {
+                // Turning off
+                setSoundEnabled(false);
+              }
+            }}
+            title={soundEnabled ? (audioActivated ? 'Desativar som' : 'Clique para ativar o som') : 'Ativar som'}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </Button>
+          {soundEnabled && !audioActivated && (
+            <Badge variant="destructive" className="animate-pulse text-xs">
+              Clique para ativar
+            </Badge>
+          )}
           <Button variant="outline" onClick={fetchOrders}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Atualizar
