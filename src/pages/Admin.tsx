@@ -9,7 +9,7 @@ import { ProductList } from '@/components/admin/ProductList';
 import { CategoryForm } from '@/components/admin/CategoryForm';
 import { CategoryList } from '@/components/admin/CategoryList';
 import { ConfigForm } from '@/components/admin/ConfigForm';
-import { ArrowLeft, Plus, Package, Layers, Settings, LogOut, Users } from 'lucide-react';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -47,10 +47,17 @@ export default function Admin() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
         <div className="container max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <Link to="/">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="w-5 h-5" />
+                <Button variant="outline" size="sm" className="gap-2">
+                  <UtensilsCrossed className="w-4 h-4" />
+                  <span>Cardápio</span>
+                </Button>
+              </Link>
+              <Link to="/kitchen">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <ChefHat className="w-4 h-4" />
+                  <span>KDS</span>
                 </Button>
               </Link>
               <h1 className="text-xl font-bold">Admin</h1>
