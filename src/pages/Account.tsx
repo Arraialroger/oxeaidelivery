@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Package, Clock, CheckCircle, XCircle, Loader2, LogOut, User } from 'lucide-react';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { Footer } from '@/components/layout/Footer';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -363,6 +364,8 @@ export default function Account() {
             })}
           </div>
         )}
+
+        <Footer />
       </main>
 
       <BottomNav onCartClick={() => setIsCartOpen(true)} />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { Footer } from '@/components/layout/Footer';
 import { CategoryTabs } from '@/components/menu/CategoryTabs';
 import { ProductList } from '@/components/menu/ProductList';
 import { ProductModal } from '@/components/menu/ProductModal';
@@ -72,6 +73,8 @@ export default function Menu() {
         isLoading={isLoading}
         onProductClick={setSelectedProduct}
       />
+
+      <Footer />
 
       <BottomNav onCartClick={() => setIsCartOpen(true)} />
 
