@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, User, MapPin, CreditCard, Check } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -584,19 +585,31 @@ export default function Checkout() {
             Continuar
           </Button>
         ) : (
-          <Button
-            onClick={handleSubmitOrder}
-            disabled={
-              isSubmitting ||
-              (paymentMethod === "cash" &&
-                changeAmount &&
-                getCurrencyValue(changeAmount) > 0 &&
-                getCurrencyValue(changeAmount) < total)
-            }
-            className="w-full h-12 text-base font-semibold"
-          >
-            {isSubmitting ? "Enviando..." : `Enviar Pedido ${formatPrice(total)}`}
-          </Button>
+          <div className="space-y-3">
+            <p className="text-xs text-center text-muted-foreground">
+              Ao confirmar, você concorda com nossos{" "}
+              <Link to="/termos" className="underline hover:text-foreground">
+                Termos de Uso
+              </Link>{" "}
+              e{" "}
+              <Link to="/privacidade" className="underline hover:text-foreground">
+                Política de Privacidade
+              </Link>
+            </p>
+            <Button
+              onClick={handleSubmitOrder}
+              disabled={
+                isSubmitting ||
+                (paymentMethod === "cash" &&
+                  changeAmount &&
+                  getCurrencyValue(changeAmount) > 0 &&
+                  getCurrencyValue(changeAmount) < total)
+              }
+              className="w-full h-12 text-base font-semibold"
+            >
+              {isSubmitting ? "Enviando..." : `Enviar Pedido ${formatPrice(total)}`}
+            </Button>
+          </div>
         )}
       </div>
     </div>
