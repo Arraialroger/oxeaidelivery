@@ -224,7 +224,8 @@ export function KdsPerformanceReport() {
                         contentStyle={{ 
                           backgroundColor: 'hsl(var(--popover))', 
                           border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
+                          borderRadius: '8px',
+                          color: 'hsl(var(--popover-foreground))',
                         }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         formatter={(value: number) => [`${value} pedidos`, 'Quantidade']}
@@ -273,7 +274,8 @@ export function KdsPerformanceReport() {
                         contentStyle={{ 
                           backgroundColor: 'hsl(var(--popover))', 
                           border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
+                          borderRadius: '8px',
+                          color: 'hsl(var(--popover-foreground))',
                         }}
                         formatter={(value: number, name: string) => [`${value} pedidos`, name]}
                       />
