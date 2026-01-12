@@ -35,6 +35,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { KdsPerformanceReport } from '@/components/kitchen/KdsPerformanceReport';
+import { KdsPieTooltip } from '@/components/kitchen/KdsPieTooltip';
 
 // Print order receipt using iframe for reliable browser print dialog
 const printOrderReceipt = (order: OrderWithDetails) => {
@@ -1395,13 +1396,12 @@ export default function Kitchen() {
                                         ))}
                                       </Pie>
                                       <Tooltip
-                                        formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Faturamento']}
-                                        contentStyle={{
-                                          backgroundColor: 'hsl(var(--card))',
-                                          border: '1px solid hsl(var(--border))',
-                                          borderRadius: '8px',
-                                          color: 'hsl(var(--card-foreground))',
-                                        }}
+                                        content={
+                                          <KdsPieTooltip 
+                                            valueFormatter={(v) => `R$ ${v.toFixed(2)}`}
+                                            labelKey="Faturamento"
+                                          />
+                                        }
                                       />
                                       <Legend 
                                         formatter={(value) => (
@@ -1441,13 +1441,12 @@ export default function Kitchen() {
                                       ))}
                                     </Pie>
                                     <Tooltip
-                                      formatter={(value: number) => [`${value} unidades`, 'Vendas']}
-                                      contentStyle={{
-                                        backgroundColor: 'hsl(var(--card))',
-                                        border: '1px solid hsl(var(--border))',
-                                        borderRadius: '8px',
-                                        color: 'hsl(var(--card-foreground))',
-                                      }}
+                                      content={
+                                        <KdsPieTooltip 
+                                          valueFormatter={(v) => `${v} unidades`}
+                                          labelKey="Vendas"
+                                        />
+                                      }
                                     />
                                     <Legend 
                                       formatter={(value) => (
