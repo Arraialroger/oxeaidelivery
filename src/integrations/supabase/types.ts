@@ -178,6 +178,10 @@ export type Database = {
           hero_banner_url: string | null
           id: number
           kds_enabled: boolean | null
+          loyalty_enabled: boolean | null
+          loyalty_min_order: number | null
+          loyalty_reward_value: number | null
+          loyalty_stamps_goal: number | null
           restaurant_open: boolean | null
         }
         Insert: {
@@ -185,6 +189,10 @@ export type Database = {
           hero_banner_url?: string | null
           id: number
           kds_enabled?: boolean | null
+          loyalty_enabled?: boolean | null
+          loyalty_min_order?: number | null
+          loyalty_reward_value?: number | null
+          loyalty_stamps_goal?: number | null
           restaurant_open?: boolean | null
         }
         Update: {
@@ -192,6 +200,10 @@ export type Database = {
           hero_banner_url?: string | null
           id?: number
           kds_enabled?: boolean | null
+          loyalty_enabled?: boolean | null
+          loyalty_min_order?: number | null
+          loyalty_reward_value?: number | null
+          loyalty_stamps_goal?: number | null
           restaurant_open?: boolean | null
         }
         Relationships: []
@@ -202,24 +214,36 @@ export type Database = {
           customer_type: string | null
           id: string
           last_login: string | null
+          last_stamp_at: string | null
           name: string | null
           phone: string
+          stamps_count: number | null
+          stamps_expire_at: string | null
+          stamps_redeemed: number | null
         }
         Insert: {
           created_at?: string | null
           customer_type?: string | null
           id?: string
           last_login?: string | null
+          last_stamp_at?: string | null
           name?: string | null
           phone: string
+          stamps_count?: number | null
+          stamps_expire_at?: string | null
+          stamps_redeemed?: number | null
         }
         Update: {
           created_at?: string | null
           customer_type?: string | null
           id?: string
           last_login?: string | null
+          last_stamp_at?: string | null
           name?: string | null
           phone?: string
+          stamps_count?: number | null
+          stamps_expire_at?: string | null
+          stamps_redeemed?: number | null
         }
         Relationships: []
       }
@@ -332,8 +356,11 @@ export type Database = {
           customer_id: string | null
           delivery_fee: number | null
           id: string
+          loyalty_discount: number | null
           payment_method: string | null
           pix_proof_url: string | null
+          stamp_earned: boolean | null
+          stamp_redeemed: boolean | null
           status: string | null
           subtotal: number | null
           total: number | null
@@ -347,8 +374,11 @@ export type Database = {
           customer_id?: string | null
           delivery_fee?: number | null
           id?: string
+          loyalty_discount?: number | null
           payment_method?: string | null
           pix_proof_url?: string | null
+          stamp_earned?: boolean | null
+          stamp_redeemed?: boolean | null
           status?: string | null
           subtotal?: number | null
           total?: number | null
@@ -362,8 +392,11 @@ export type Database = {
           customer_id?: string | null
           delivery_fee?: number | null
           id?: string
+          loyalty_discount?: number | null
           payment_method?: string | null
           pix_proof_url?: string | null
+          stamp_earned?: boolean | null
+          stamp_redeemed?: boolean | null
           status?: string | null
           subtotal?: number | null
           total?: number | null
@@ -544,6 +577,54 @@ export type Database = {
           phone?: string
         }
         Relationships: []
+      }
+      stamp_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          type: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stamp_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stamp_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
