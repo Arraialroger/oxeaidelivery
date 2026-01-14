@@ -539,6 +539,28 @@ export default function Kitchen() {
     // Registrar evento KDS - fail-safe
     logStatusChange(orderId, newStatus).catch(() => {});
 
+    // LOYALTY: Credit stamp if status = delivered (fail-safe)
+    if (newStatus === 'delivered') {
+      try {
+        const { data: stampResult, error: stampError } = await supabase.functions.invoke('credit-stamp', {
+          body: { orderId, status: newStatus }
+        });
+        if (stampError) {
+          console.error('[Kitchen] Erro ao creditar selo:', stampError);
+        } else {
+          console.log('[Kitchen] Resultado credito selo:', stampResult);
+          if (stampResult?.success) {
+            toast({ 
+              title: `🎉 Selo creditado! (${stampResult.stamps_count}/${stampResult.stamps_goal})`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error('[Kitchen] Falha ao chamar credit-stamp:', e);
+        // Fail-safe: não impede o fluxo
+      }
+    }
+
     // Enviar push notification
     const { data: pushData, error: pushError } = await supabase.functions.invoke('send-push-notification', {
       body: { orderId, status: newStatus }

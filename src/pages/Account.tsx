@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomerOrders } from '@/hooks/useCustomerOrders';
 import { useAuth } from '@/hooks/useAuth';
+import { useConfig } from '@/hooks/useConfig';
+import { useCustomerStamps } from '@/hooks/useCustomerStamps';
+import { StampCard } from '@/components/loyalty/StampCard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -64,6 +67,8 @@ export default function Account() {
   }, [user]);
 
   const { data: orders, isLoading, error } = useCustomerOrders(searchPhone);
+  const { data: config } = useConfig();
+  const { data: stamps } = useCustomerStamps(searchPhone || profilePhone);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,45 +148,58 @@ export default function Account() {
           <>
             {/* Usuário logado */}
             {user ? (
-              <Card className="border-primary/30 bg-primary/5">
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <User className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {user.email}
-                        </p>
-                        {profilePhone && (
-                          <p className="text-xs text-muted-foreground">
-                            {formatPhoneDisplay(profilePhone)}
+              <>
+                <Card className="border-primary/30 bg-primary/5">
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                          <User className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {user.email}
                           </p>
-                        )}
+                          {profilePhone && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatPhoneDisplay(profilePhone)}
+                            </p>
+                          )}
+                        </div>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLogout}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <LogOut className="w-4 h-4 mr-1" />
+                        Sair
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleLogout}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <LogOut className="w-4 h-4 mr-1" />
-                      Sair
-                    </Button>
-                  </div>
-                  
-                  {!profilePhone && (
-                    <div className="mt-4 p-3 rounded-md bg-muted/50">
-                      <p className="text-sm text-muted-foreground">
-                        Seu perfil ainda não tem um telefone cadastrado. 
-                        Busque seus pedidos abaixo ou faça um pedido para vincular seu telefone.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    
+                    {!profilePhone && (
+                      <div className="mt-4 p-3 rounded-md bg-muted/50">
+                        <p className="text-sm text-muted-foreground">
+                          Seu perfil ainda não tem um telefone cadastrado. 
+                          Busque seus pedidos abaixo ou faça um pedido para vincular seu telefone.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                {/* Stamp Card - Loyalty Program */}
+                {config?.loyalty_enabled && (searchPhone || profilePhone) && (
+                  <StampCard 
+                    stampsCount={stamps?.stamps_count || 0}
+                    stampsGoal={config.loyalty_stamps_goal || 8}
+                    rewardValue={config.loyalty_reward_value || 50}
+                    minOrderValue={config.loyalty_min_order || 50}
+                    expiresAt={stamps?.stamps_expire_at}
+                  />
+                )}
+              </>
             ) : (
               /* Usuário não logado - opção de login */
               <Card>

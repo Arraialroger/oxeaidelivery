@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCart } from "@/contexts/CartContext";
 import { useConfig } from "@/hooks/useConfig";
+import { useCustomerStamps } from "@/hooks/useCustomerStamps";
+import { LoyaltyRewardBanner } from "@/components/loyalty/LoyaltyRewardBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -79,6 +81,7 @@ export default function Checkout() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [useReward, setUseReward] = useState(false);
 
   // Step 1: Customer Info
   const [name, setName] = useState("");
@@ -124,8 +127,25 @@ export default function Checkout() {
   const [changeAmount, setChangeAmount] = useState("");
   const [checkoutTracked, setCheckoutTracked] = useState(false);
 
+  // Loyalty: Fetch customer stamps using phone
+  const phoneDigits = getPhoneDigits(phone);
+  const { data: stamps, refetch: refetchStamps } = useCustomerStamps(
+    phoneDigits.length >= 10 ? phoneDigits : null
+  );
+
+  // Check if customer can use reward
+  const canUseReward = !!(
+    config?.loyalty_enabled && 
+    (stamps?.stamps_count || 0) >= (config?.loyalty_stamps_goal || 8)
+  );
+
+  // Calculate loyalty discount
+  const loyaltyDiscount = useReward && canUseReward 
+    ? (config?.loyalty_reward_value || 50) 
+    : 0;
+
   const deliveryFee = config?.delivery_fee ?? 0;
-  const total = subtotal + deliveryFee;
+  const total = subtotal + deliveryFee - loyaltyDiscount;
 
   // Track begin_checkout event when entering checkout (Google Analytics + Meta Pixel)
   useEffect(() => {
@@ -494,6 +514,18 @@ export default function Checkout() {
               ))}
             </div>
 
+            {/* Loyalty Reward Banner */}
+            {config?.loyalty_enabled && phoneDigits.length >= 10 && (
+              <LoyaltyRewardBanner
+                stampsCount={stamps?.stamps_count || 0}
+                stampsGoal={config.loyalty_stamps_goal || 8}
+                rewardValue={config.loyalty_reward_value || 50}
+                canUse={canUseReward}
+                isUsing={useReward}
+                onToggle={() => setUseReward(!useReward)}
+              />
+            )}
+
             {paymentMethod === "cash" && (
               <div className="mt-4">
                 <Label htmlFor="change">Troco para quanto?</Label>
@@ -561,6 +593,12 @@ export default function Checkout() {
                   <span className="text-muted-foreground">Entrega</span>
                   <span>{formatPrice(deliveryFee)}</span>
                 </div>
+                {loyaltyDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-primary">
+                    <span>🎁 Brinde Fidelidade</span>
+                    <span>-{formatPrice(loyaltyDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-lg mt-2">
                   <span>Total</span>
                   <span className="text-primary">{formatPrice(total)}</span>

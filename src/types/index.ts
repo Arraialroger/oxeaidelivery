@@ -99,4 +99,20 @@ export interface Config {
   restaurant_open: boolean | null;
   kds_enabled: boolean | null;
   hero_banner_url: string | null;
+  // Loyalty program fields
+  loyalty_enabled: boolean | null;
+  loyalty_stamps_goal: number | null;
+  loyalty_min_order: number | null;
+  loyalty_reward_value: number | null;
+}
+
+export interface StampTransaction {
+  id: string;
+  customer_id: string | null;
+  order_id: string | null;
+  type: 'earned' | 'redeemed' | 'expired' | 'manual_adjustment';
+  amount: number;
+  balance_after: number;
+  notes: string | null;
+  created_at: string | null;
 }
