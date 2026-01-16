@@ -207,19 +207,47 @@ export default function Checkout() {
         customerType = "tourist";
       }
 
-      const { data: customerId, error: customerError } = await supabase.rpc("get_or_create_customer", {
-        p_phone: phoneDigits,
-        p_name: name || null,
-        p_customer_type: customerType,
-      });
+      // 1. Get or create customer directly
+      let customerId: string;
+      
+      // Check if customer exists by phone
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("phone", phoneDigits)
+        .maybeSingle();
 
-      if (customerError) {
-        console.error("[CHECKOUT] Erro ao criar/buscar cliente:", customerError);
-        throw customerError;
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+        // Update name if provided
+        if (name) {
+          await supabase
+            .from("customers")
+            .update({ name, customer_type: customerType })
+            .eq("id", customerId);
+        }
+        console.log("[CHECKOUT] Cliente existente encontrado:", customerId);
+      } else {
+        // Create new customer
+        const { data: newCustomer, error: customerError } = await supabase
+          .from("customers")
+          .insert({
+            phone: phoneDigits,
+            name: name || null,
+            customer_type: customerType,
+          })
+          .select("id")
+          .single();
+
+        if (customerError) {
+          console.error("[CHECKOUT] Erro ao criar cliente:", customerError);
+          throw customerError;
+        }
+        customerId = newCustomer.id;
+        console.log("[CHECKOUT] Novo cliente criado:", customerId);
       }
-      console.log("[CHECKOUT] Cliente ID obtido via RPC:", customerId);
 
-      // 2. Create address (INSERT allowed by RLS, SELECT will work with new public policy)
+      // 2. Create address
       const { data: address, error: addressError } = await supabase
         .from("addresses")
         .insert({
