@@ -4,56 +4,58 @@
 
 @layer base {
   :root {
-    --background: 240 6% 10%;
+    /* Astral Gastro Bar - Premium Purple & Gold Palette */
+    --background: 260 20% 8%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 0%;
+    --card: 260 25% 6%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 0%;
+    --popover: 260 25% 6%;
     --popover-foreground: 0 0% 98%;
-    --primary: 48 95% 58%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 240 5% 15%;
+    --primary: 45 85% 55%;
+    --primary-foreground: 260 25% 8%;
+    --secondary: 260 15% 18%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 18%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 48 95% 58%;
-    --accent-foreground: 0 0% 0%;
+    --muted: 260 15% 20%;
+    --muted-foreground: 260 10% 60%;
+    --accent: 280 60% 50%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 18%;
-    --input: 240 5% 18%;
-    --ring: 48 95% 58%;
+    --border: 260 15% 22%;
+    --input: 260 15% 18%;
+    --ring: 45 85% 55%;
     --radius: 0.75rem;
-    --sidebar-background: 0 0% 0%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 48 95% 58%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 240 5% 12%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 5% 15%;
-    --sidebar-ring: 48 95% 58%;
+    --sidebar-background: 260 25% 6%;
+    --sidebar-foreground: 260 10% 95%;
+    --sidebar-primary: 45 85% 55%;
+    --sidebar-primary-foreground: 260 25% 8%;
+    --sidebar-accent: 260 20% 14%;
+    --sidebar-accent-foreground: 260 10% 95%;
+    --sidebar-border: 260 15% 18%;
+    --sidebar-ring: 45 85% 55%;
   }
 
   .dark {
-    --background: 240 6% 10%;
+    /* Astral Gastro Bar - Premium Purple & Gold Palette */
+    --background: 260 20% 8%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 0%;
+    --card: 260 25% 6%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 0%;
+    --popover: 260 25% 6%;
     --popover-foreground: 0 0% 98%;
-    --primary: 48 95% 58%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 240 5% 15%;
+    --primary: 45 85% 55%;
+    --primary-foreground: 260 25% 8%;
+    --secondary: 260 15% 18%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 18%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 48 95% 58%;
-    --accent-foreground: 0 0% 0%;
+    --muted: 260 15% 20%;
+    --muted-foreground: 260 10% 60%;
+    --accent: 280 60% 50%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 18%;
-    --input: 240 5% 18%;
-    --ring: 48 95% 58%;
+    --border: 260 15% 22%;
+    --input: 260 15% 18%;
+    --ring: 45 85% 55%;
   }
 }
 
@@ -69,7 +71,7 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    background-image: radial-gradient(ellipse at top, hsl(240 6% 14%) 0%, hsl(var(--background)) 50%);
+    background-image: radial-gradient(ellipse at top, hsl(260 25% 14%) 0%, hsl(var(--background)) 50%);
     min-height: 100vh;
   }
 }
