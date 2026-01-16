@@ -15,11 +15,11 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["logo-bruttus.png", "pwa-192x192.png", "pwa-512x512.png", "apple-touch-icon.png"],
+      includeAssets: ["logo-astral.png", "pwa-192x192.png", "pwa-512x512.png", "apple-touch-icon.png"],
       manifest: {
-        name: "Bruttus Delivery - Burger & Costela",
-        short_name: "Bruttus",
-        description: "Hambúrgueres artesanais e costela defumada com entrega rápida",
+        name: "Astral Gastro Bar",
+        short_name: "Astral",
+        description: "Gastronomia premium com entrega rápida",
         theme_color: "#000000",
         background_color: "#000000",
         display: "standalone",
