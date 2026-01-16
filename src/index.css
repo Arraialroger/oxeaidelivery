@@ -4,58 +4,58 @@
 
 @layer base {
   :root {
-    /* Astral Gastro Bar - Premium Purple & Gold Palette */
-    --background: 260 20% 8%;
-    --foreground: 0 0% 98%;
-    --card: 260 25% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 260 25% 6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 45 85% 55%;
-    --primary-foreground: 260 25% 8%;
-    --secondary: 260 15% 18%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 260 15% 20%;
-    --muted-foreground: 260 10% 60%;
-    --accent: 280 60% 50%;
-    --accent-foreground: 0 0% 98%;
+    /* Astral Gastro Bar - Opção A: Verde Floresta Premium */
+    --background: 150 40% 12%;
+    --foreground: 45 20% 95%;
+    --card: 150 45% 8%;
+    --card-foreground: 45 20% 95%;
+    --popover: 150 45% 8%;
+    --popover-foreground: 45 20% 95%;
+    --primary: 43 50% 54%;
+    --primary-foreground: 150 45% 8%;
+    --secondary: 150 30% 18%;
+    --secondary-foreground: 45 20% 95%;
+    --muted: 140 20% 18%;
+    --muted-foreground: 140 15% 55%;
+    --accent: 28 50% 46%;
+    --accent-foreground: 150 45% 8%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 260 15% 22%;
-    --input: 260 15% 18%;
-    --ring: 45 85% 55%;
+    --border: 150 25% 20%;
+    --input: 150 25% 20%;
+    --ring: 43 50% 54%;
     --radius: 0.75rem;
-    --sidebar-background: 260 25% 6%;
-    --sidebar-foreground: 260 10% 95%;
-    --sidebar-primary: 45 85% 55%;
-    --sidebar-primary-foreground: 260 25% 8%;
-    --sidebar-accent: 260 20% 14%;
-    --sidebar-accent-foreground: 260 10% 95%;
-    --sidebar-border: 260 15% 18%;
-    --sidebar-ring: 45 85% 55%;
+    --sidebar-background: 150 45% 6%;
+    --sidebar-foreground: 45 20% 95%;
+    --sidebar-primary: 43 50% 54%;
+    --sidebar-primary-foreground: 150 45% 8%;
+    --sidebar-accent: 150 30% 15%;
+    --sidebar-accent-foreground: 45 20% 95%;
+    --sidebar-border: 150 25% 18%;
+    --sidebar-ring: 43 50% 54%;
   }
 
   .dark {
-    /* Astral Gastro Bar - Premium Purple & Gold Palette */
-    --background: 260 20% 8%;
-    --foreground: 0 0% 98%;
-    --card: 260 25% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 260 25% 6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 45 85% 55%;
-    --primary-foreground: 260 25% 8%;
-    --secondary: 260 15% 18%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 260 15% 20%;
-    --muted-foreground: 260 10% 60%;
-    --accent: 280 60% 50%;
-    --accent-foreground: 0 0% 98%;
+    /* Astral Gastro Bar - Opção A: Verde Floresta Premium */
+    --background: 150 40% 12%;
+    --foreground: 45 20% 95%;
+    --card: 150 45% 8%;
+    --card-foreground: 45 20% 95%;
+    --popover: 150 45% 8%;
+    --popover-foreground: 45 20% 95%;
+    --primary: 43 50% 54%;
+    --primary-foreground: 150 45% 8%;
+    --secondary: 150 30% 18%;
+    --secondary-foreground: 45 20% 95%;
+    --muted: 140 20% 18%;
+    --muted-foreground: 140 15% 55%;
+    --accent: 28 50% 46%;
+    --accent-foreground: 150 45% 8%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 260 15% 22%;
-    --input: 260 15% 18%;
-    --ring: 45 85% 55%;
+    --border: 150 25% 20%;
+    --input: 150 25% 20%;
+    --ring: 43 50% 54%;
   }
 }
 
@@ -71,7 +71,7 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    background-image: radial-gradient(ellipse at top, hsl(260 25% 14%) 0%, hsl(var(--background)) 50%);
+    background-image: radial-gradient(ellipse at top, hsl(150 35% 16%) 0%, hsl(var(--background)) 50%);
     min-height: 100vh;
   }
 }
