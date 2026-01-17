@@ -22,7 +22,7 @@ export function Footer() {
           </Link>
         </div>
         <p className="text-xs text-muted-foreground">
-          © {currentYear} Delivery Bruttus. Todos os direitos reservados.
+          © {currentYear} Astral Gastro Bar. Todos os direitos reservados.
         </p>
       </div>
     </footer>

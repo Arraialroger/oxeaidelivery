@@ -1094,7 +1094,7 @@ export default function Kitchen() {
                         <html>
                         <head>
                           <meta charset="UTF-8">
-                          <title>Relatório de Pedidos - Bruttus Delivery</title>
+                          <title>Relatório de Pedidos - Astral Gastro Bar</title>
                           <style>
                             * { margin: 0; padding: 0; box-sizing: border-box; }
                             body { 
@@ -1182,7 +1182,7 @@ export default function Kitchen() {
                         </head>
                         <body>
                           <div class="header">
-                            <h1>🍔 Bruttus Delivery</h1>
+                            <h1>🍔 Astral Gastro Bar</h1>
                             <div class="subtitle">Relatório de Pedidos - Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}</div>
                           </div>
                           
