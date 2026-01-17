@@ -12,7 +12,7 @@ export function HeroBanner() {
     <div className="w-full">
       <img
         src={config.hero_banner_url}
-        alt="Banner promocional Bruttus Delivery"
+        alt="Banner promocional Astral Gastro Bar"
         className="w-full h-auto object-cover rounded-b-2xl"
       />
     </div>

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { CartItem, Product, SelectedOption } from '@/types';
 
-const CART_STORAGE_KEY = 'bruttus-cart';
+const CART_STORAGE_KEY = 'astral-cart';
 
 // Load cart from localStorage
 const loadCartFromStorage = (): CartItem[] => {

@@ -33,11 +33,11 @@ export function PWAInstallModal({ isOpen, onClose, onInstall, variant = 'second-
 
   const title = variant === 'after-order' 
     ? 'Instale para pedir mais rápido!' 
-    : 'Instale o App da Bruttus Delivery';
+    : 'Instale o App do Astral Gastro Bar';
 
   const description = variant === 'after-order'
-    ? 'Seu pedido foi enviado! Instale o app e peça seu próximo lanche com um toque.'
-    : 'Tenha a Bruttus Delivery sempre à mão na sua tela inicial.';
+    ? 'Seu pedido foi enviado! Instale o app e peça seu próximo pedido com um toque.'
+    : 'Tenha o Astral Gastro Bar sempre à mão na sua tela inicial.';
 
   return (
     <>

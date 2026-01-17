@@ -452,7 +452,7 @@ serve(async (req) => {
     console.log(`[send-push] Found ${subscriptions.length} subscription(s)`);
 
     // Pegar mensagem do status ou usar custom
-    const message = statusMessages[status] || { title: 'Bruttus Delivery', body: 'Atualização do seu pedido' };
+    const message = statusMessages[status] || { title: 'Astral Gastro Bar', body: 'Atualização do seu pedido' };
     const title = customTitle || message.title;
     const body = customBody || message.body;
 

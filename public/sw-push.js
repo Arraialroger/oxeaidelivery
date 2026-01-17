@@ -21,7 +21,7 @@ self.addEventListener('push', (event) => {
 
   // Parse payload com fallback robusto
   let data = { 
-    title: 'Bruttus Delivery', 
+    title: 'Astral Gastro Bar', 
     body: 'Atualização do seu pedido' 
   };
   
@@ -64,7 +64,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     Promise.all([
       notifyClients,
-      self.registration.showNotification(data.title || 'Bruttus Delivery', options)
+      self.registration.showNotification(data.title || 'Astral Gastro Bar', options)
     ])
   );
 });

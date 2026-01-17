@@ -1,6 +1,5 @@
 import { MapPin } from 'lucide-react';
 import { useConfig } from '@/hooks/useConfig';
-import logoImage from '@/assets/logo-bruttus.png';
 export function Header() {
   const {
     data: config

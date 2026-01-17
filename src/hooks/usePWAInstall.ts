@@ -5,9 +5,9 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const VISIT_COUNT_KEY = 'bruttus_visit_count';
-const INSTALL_DISMISSED_KEY = 'bruttus_install_dismissed';
-const LAST_VISIT_KEY = 'bruttus_last_visit';
+const VISIT_COUNT_KEY = 'astral_visit_count';
+const INSTALL_DISMISSED_KEY = 'astral_install_dismissed';
+const LAST_VISIT_KEY = 'astral_last_visit';
 
 export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);

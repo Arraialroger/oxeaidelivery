@@ -179,8 +179,8 @@ export default function Auth() {
         <Card className="w-full max-w-md border-border bg-card">
           <CardHeader className="text-center space-y-2">
             <img 
-              src="/logo-bruttus.png" 
-              alt="Bruttus" 
+              src="/logo-astral.png" 
+              alt="Astral Gastro Bar" 
               className="h-16 mx-auto mb-2"
             />
             <CardTitle className="text-2xl font-bold text-foreground">
