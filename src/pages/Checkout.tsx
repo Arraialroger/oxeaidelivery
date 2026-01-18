@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCart } from "@/contexts/CartContext";
 import { useConfig } from "@/hooks/useConfig";
 import { useCustomerStamps } from "@/hooks/useCustomerStamps";
+import { useLoyaltyRedemption } from "@/hooks/useLoyaltyRedemption";
 import { LoyaltyRewardBanner } from "@/components/loyalty/LoyaltyRewardBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +78,7 @@ export default function Checkout() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { logOrderReceived } = useKdsEvents();
+  const loyaltyRedemption = useLoyaltyRedemption();
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -267,7 +269,7 @@ export default function Checkout() {
       }
       console.log("[CHECKOUT] Endereço criado:", address.id);
 
-      // 3. Create order
+      // 3. Create order (include loyalty_discount if using reward)
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -278,12 +280,31 @@ export default function Checkout() {
           subtotal,
           delivery_fee: deliveryFee,
           total,
+          loyalty_discount: loyaltyDiscount,
+          stamp_redeemed: useReward && canUseReward,
           status: "pending",
         })
         .select()
         .single();
 
       if (orderError) throw orderError;
+
+      // 4. Process loyalty redemption if customer is using reward
+      if (useReward && canUseReward && stamps) {
+        try {
+          await loyaltyRedemption.mutateAsync({
+            customerId,
+            orderId: order.id,
+            stampsGoal: config?.loyalty_stamps_goal || 8,
+            currentStamps: stamps.stamps_count || 0,
+            rewardValue: config?.loyalty_reward_value || 50,
+          });
+          console.log("[CHECKOUT] Brinde resgatado com sucesso!");
+        } catch (loyaltyError) {
+          // Log but don't block - order was created successfully
+          console.error("[CHECKOUT] Erro ao processar resgate:", loyaltyError);
+        }
+      }
 
       // 🔍 LOG CRÍTICO: Ver o objeto order completo
       console.log("[CHECKOUT] ==========================================");
