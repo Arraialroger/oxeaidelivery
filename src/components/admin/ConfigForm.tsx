@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { useConfig } from '@/hooks/useConfig';
 import { useUpdateConfig } from '@/hooks/useAdminMutations';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Image as ImageIcon, Gift } from 'lucide-react';
 
 export function ConfigForm() {
   const { data: config } = useConfig();
@@ -18,6 +18,10 @@ export function ConfigForm() {
     restaurant_open: true,
     kds_enabled: true,
     hero_banner_url: '',
+    loyalty_enabled: false,
+    loyalty_stamps_goal: '8',
+    loyalty_min_order: '50',
+    loyalty_reward_value: '50',
   });
 
   useEffect(() => {
@@ -27,6 +31,10 @@ export function ConfigForm() {
         restaurant_open: config.restaurant_open ?? true,
         kds_enabled: config.kds_enabled ?? true,
         hero_banner_url: config.hero_banner_url || '',
+        loyalty_enabled: config.loyalty_enabled ?? false,
+        loyalty_stamps_goal: config.loyalty_stamps_goal?.toString() || '8',
+        loyalty_min_order: config.loyalty_min_order?.toString() || '50',
+        loyalty_reward_value: config.loyalty_reward_value?.toString() || '50',
       });
     }
   }, [config]);
@@ -40,6 +48,10 @@ export function ConfigForm() {
         restaurant_open: formData.restaurant_open,
         kds_enabled: formData.kds_enabled,
         hero_banner_url: formData.hero_banner_url || null,
+        loyalty_enabled: formData.loyalty_enabled,
+        loyalty_stamps_goal: parseInt(formData.loyalty_stamps_goal) || 8,
+        loyalty_min_order: parseFloat(formData.loyalty_min_order) || 50,
+        loyalty_reward_value: parseFloat(formData.loyalty_reward_value) || 50,
       });
 
       toast({
@@ -123,6 +135,74 @@ export function ConfigForm() {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
+          </div>
+        )}
+      </div>
+
+      {/* Loyalty Program Section */}
+      <div className="space-y-4 pt-4 border-t">
+        <div className="flex items-center gap-2">
+          <Gift className="w-5 h-5 text-primary" />
+          <Label className="text-base font-semibold">Programa de Fidelidade</Label>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <Label htmlFor="loyalty_enabled">Ativar Programa</Label>
+            <p className="text-sm text-muted-foreground">
+              Recompense clientes fiéis com brindes
+            </p>
+          </div>
+          <Switch
+            id="loyalty_enabled"
+            checked={formData.loyalty_enabled}
+            onCheckedChange={(checked) => setFormData({ ...formData, loyalty_enabled: checked })}
+          />
+        </div>
+
+        {formData.loyalty_enabled && (
+          <div className="space-y-4 pl-2 border-l-2 border-primary/20">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="loyalty_stamps_goal" className="text-sm">Meta de Selos</Label>
+                <Input
+                  id="loyalty_stamps_goal"
+                  type="number"
+                  min="1"
+                  value={formData.loyalty_stamps_goal}
+                  onChange={(e) => setFormData({ ...formData, loyalty_stamps_goal: e.target.value })}
+                  placeholder="8"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="loyalty_min_order" className="text-sm">Pedido Mín. (R$)</Label>
+                <Input
+                  id="loyalty_min_order"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.loyalty_min_order}
+                  onChange={(e) => setFormData({ ...formData, loyalty_min_order: e.target.value })}
+                  placeholder="50"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="loyalty_reward_value" className="text-sm">Brinde (R$)</Label>
+                <Input
+                  id="loyalty_reward_value"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.loyalty_reward_value}
+                  onChange={(e) => setFormData({ ...formData, loyalty_reward_value: e.target.value })}
+                  placeholder="50"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+              ℹ️ Cliente ganha 1 selo por pedido acima de R$ {formData.loyalty_min_order || '50'}. 
+              Ao completar {formData.loyalty_stamps_goal || '8'} selos, ganha R$ {formData.loyalty_reward_value || '50'} de desconto.
+            </p>
           </div>
         )}
       </div>
