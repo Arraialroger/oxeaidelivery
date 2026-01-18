@@ -9,7 +9,8 @@ import { ProductList } from '@/components/admin/ProductList';
 import { CategoryForm } from '@/components/admin/CategoryForm';
 import { CategoryList } from '@/components/admin/CategoryList';
 import { ConfigForm } from '@/components/admin/ConfigForm';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed } from 'lucide-react';
+import { StampTransactionsList } from '@/components/admin/StampTransactionsList';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -79,7 +80,7 @@ export default function Admin() {
       {/* Content */}
       <main className="container max-w-2xl mx-auto px-4 py-6">
         <Tabs defaultValue="products" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="products" className="gap-2">
               <Package className="w-4 h-4" />
               <span className="hidden sm:inline">Produtos</span>
@@ -87,6 +88,10 @@ export default function Admin() {
             <TabsTrigger value="categories" className="gap-2">
               <Layers className="w-4 h-4" />
               <span className="hidden sm:inline">Categorias</span>
+            </TabsTrigger>
+            <TabsTrigger value="loyalty" className="gap-2">
+              <Gift className="w-4 h-4" />
+              <span className="hidden sm:inline">Fidelidade</span>
             </TabsTrigger>
             <TabsTrigger value="config" className="gap-2">
               <Settings className="w-4 h-4" />
@@ -136,6 +141,14 @@ export default function Admin() {
               </Dialog>
             </div>
             <CategoryList />
+          </TabsContent>
+
+          {/* Loyalty Tab */}
+          <TabsContent value="loyalty" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Programa de Fidelidade</h2>
+            </div>
+            <StampTransactionsList />
           </TabsContent>
 
           {/* Config Tab */}
