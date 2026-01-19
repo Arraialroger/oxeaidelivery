@@ -120,7 +120,10 @@ export default function Auth() {
     }
 
     setIsSubmitting(true);
-    const { error: authError } = await signUp(signupEmail, signupPassword);
+    const { error: authError } = await signUp(signupEmail, signupPassword, {
+      name: signupName,
+      phone: signupPhoneDigits,
+    });
 
     if (authError) {
       setIsSubmitting(false);
@@ -132,15 +135,6 @@ export default function Auth() {
         setError('Erro ao criar conta. Tente novamente.');
       }
       return;
-    }
-
-    // Update profile with name and phone after successful signup
-    const { data: { user: newUser } } = await supabase.auth.getUser();
-    if (newUser) {
-      await supabase
-        .from('profiles')
-        .update({ name: signupName, phone: signupPhoneDigits })
-        .eq('id', newUser.id);
     }
 
     setIsSubmitting(false);

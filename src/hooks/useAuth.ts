@@ -68,13 +68,17 @@ export function useAuth() {
     return { error };
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, metadata?: { name?: string; phone?: string }) => {
     const redirectUrl = `${window.location.origin}/`;
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: redirectUrl,
+        data: {
+          name: metadata?.name,
+          phone: metadata?.phone,
+        },
       },
     });
     return { error };
