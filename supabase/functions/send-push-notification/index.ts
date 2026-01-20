@@ -28,6 +28,15 @@ const statusMessages: Record<string, { title: string; body: string }> = {
     title: '❌ Pedido cancelado',
     body: 'Seu pedido foi cancelado',
   },
+  // Mensagens de fidelidade
+  stamp_earned: {
+    title: '⭐ Você ganhou um selo!',
+    body: 'Continue acumulando para ganhar um brinde especial!',
+  },
+  reward_available: {
+    title: '🎁 Brinde disponível!',
+    body: 'Você completou a cartela! Resgate seu brinde no próximo pedido!',
+  },
 };
 
 // Web Push implementation using Web Crypto API (Deno compatible)

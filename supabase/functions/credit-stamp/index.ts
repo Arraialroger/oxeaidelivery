@@ -165,14 +165,64 @@ Deno.serve(async (req) => {
     }
 
     const stampsGoal = config.loyalty_stamps_goal ?? 8;
+    const rewardAvailable = newStampsCount >= stampsGoal;
+    
     console.log(`[credit-stamp] SUCCESS! Customer ${customer.id} now has ${newStampsCount}/${stampsGoal} stamps`);
+
+    // ===== FASE 4: Push Notification de Fidelidade =====
+    try {
+      // Determinar tipo de mensagem: selo simples ou brinde disponível
+      const notificationType = rewardAvailable ? 'reward_available' : 'stamp_earned';
+      
+      // Mensagens personalizadas
+      const customMessages: Record<string, { title: string; body: string }> = {
+        stamp_earned: {
+          title: `⭐ +1 Selo! (${newStampsCount}/${stampsGoal})`,
+          body: `Faltam ${stampsGoal - newStampsCount} selo(s) para seu brinde!`,
+        },
+        reward_available: {
+          title: '🎁 Brinde disponível!',
+          body: 'Você completou a cartela! Resgate seu brinde no próximo pedido!',
+        },
+      };
+
+      const message = customMessages[notificationType];
+      
+      // Chamar send-push-notification com a mensagem de fidelidade
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+      
+      const pushResponse = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          orderId,
+          status: notificationType,
+          customTitle: message.title,
+          customBody: message.body,
+        }),
+      });
+
+      if (pushResponse.ok) {
+        const pushResult = await pushResponse.json();
+        console.log(`[credit-stamp] Push notification (${notificationType}) sent:`, pushResult);
+      } else {
+        console.error(`[credit-stamp] Push notification failed:`, await pushResponse.text());
+      }
+    } catch (pushError) {
+      console.error('[credit-stamp] Error sending push notification:', pushError);
+      // Não falha - selo já foi creditado
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         stamps_count: newStampsCount,
         stamps_goal: stampsGoal,
-        reward_available: newStampsCount >= stampsGoal,
+        reward_available: rewardAvailable,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

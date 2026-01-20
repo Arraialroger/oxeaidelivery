@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2, Settings } from 'lucide-react';
+import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2, Settings, Star, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { PWAInstallModal } from '@/components/pwa';
@@ -8,6 +8,7 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useConfig } from '@/hooks/useConfig';
 
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
@@ -20,6 +21,10 @@ interface OrderData {
   subtotal: number;
   payment_method: string;
   cancellation_reason: string | null;
+  stamp_earned: boolean | null;
+  stamp_redeemed: boolean | null;
+  loyalty_discount: number | null;
+  customer_id: string | null;
   addresses: {
     street: string;
     number: string;
@@ -27,6 +32,11 @@ interface OrderData {
     complement: string | null;
     reference: string | null;
   } | null;
+}
+
+interface CustomerStamps {
+  stamps_count: number;
+  stamps_expire_at: string | null;
 }
 
 interface OrderItem {
@@ -80,8 +90,11 @@ export default function OrderTracking() {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPWAModal, setShowPWAModal] = useState(false);
+  const [customerStamps, setCustomerStamps] = useState<CustomerStamps | null>(null);
+  const [showStampCelebration, setShowStampCelebration] = useState(false);
   const { toast } = useToast();
   
+  const { data: config } = useConfig();
   const { canShowInstallUI, promptInstall, dismissInstall } = usePWAInstall();
   const { isSupported: pushSupported, permission, isSubscribed, isLoading: pushLoading, subscribe, error: pushError } = usePushNotifications(orderId);
   
@@ -124,6 +137,10 @@ export default function OrderTracking() {
           subtotal,
           payment_method,
           cancellation_reason,
+          stamp_earned,
+          stamp_redeemed,
+          loyalty_discount,
+          customer_id,
           addresses (
             street,
             number,
@@ -142,6 +159,19 @@ export default function OrderTracking() {
 
       if (orderData) {
         setOrder(orderData);
+        
+        // Buscar dados de selos do cliente se houver customer_id e selo foi ganho
+        if (orderData.customer_id && orderData.stamp_earned) {
+          const { data: customerData } = await supabase
+            .from('customers')
+            .select('stamps_count, stamps_expire_at')
+            .eq('id', orderData.customer_id)
+            .single();
+          
+          if (customerData) {
+            setCustomerStamps(customerData);
+          }
+        }
       }
 
       const { data: itemsData, error: itemsError } = await supabase
@@ -168,6 +198,17 @@ export default function OrderTracking() {
 
     fetchOrder();
   }, [orderId]);
+
+  // Detectar quando selo é ganho e mostrar celebração
+  useEffect(() => {
+    if (order?.stamp_earned && order?.status === 'delivered' && !showStampCelebration) {
+      // Pequeno delay para criar efeito de "acabou de ganhar"
+      const timer = setTimeout(() => {
+        setShowStampCelebration(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [order?.stamp_earned, order?.status, showStampCelebration]);
 
   // Real-time subscription
   useEffect(() => {
@@ -316,6 +357,75 @@ export default function OrderTracking() {
           <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 flex items-center gap-2">
             <BellRing className="w-4 h-4 text-green-500" />
             <span className="text-sm text-green-600">Notificações ativadas para este pedido</span>
+          </div>
+        )}
+
+        {/* Loyalty Stamp Celebration Banner */}
+        {showStampCelebration && order?.stamp_earned && config?.loyalty_enabled && (
+          <div className={cn(
+            "rounded-2xl p-4 border animate-in fade-in slide-in-from-bottom-4 duration-500",
+            customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8)
+              ? "bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border-amber-500/40"
+              : "bg-gradient-to-r from-primary/10 to-primary/20 border-primary/30"
+          )}>
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 animate-bounce",
+                customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8)
+                  ? "bg-gradient-to-br from-amber-400 to-yellow-500"
+                  : "bg-primary"
+              )}>
+                {customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8) ? (
+                  <Gift className="w-7 h-7 text-white" />
+                ) : (
+                  <Star className="w-7 h-7 text-primary-foreground" />
+                )}
+              </div>
+              <div className="flex-1">
+                {customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8) ? (
+                  <>
+                    <p className="font-bold text-amber-600 text-lg">🎁 Brinde disponível!</p>
+                    <p className="text-sm text-muted-foreground">
+                      Você completou a cartela! Resgate seu brinde de {formatPrice(config.loyalty_reward_value ?? 0)} no próximo pedido!
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold text-primary text-lg">⭐ +1 Selo de Fidelidade!</p>
+                    <p className="text-sm text-muted-foreground">
+                      Você agora tem {customerStamps?.stamps_count ?? 1}/{config.loyalty_stamps_goal ?? 8} selos. 
+                      {customerStamps && (
+                        <span className="block mt-0.5">
+                          Faltam {(config.loyalty_stamps_goal ?? 8) - customerStamps.stamps_count} para ganhar seu brinde!
+                        </span>
+                      )}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Progress bar */}
+            {customerStamps && (
+              <div className="mt-3">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={cn(
+                      "h-full rounded-full transition-all duration-1000",
+                      customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8)
+                        ? "bg-gradient-to-r from-amber-400 to-yellow-500"
+                        : "bg-primary"
+                    )}
+                    style={{ 
+                      width: `${Math.min((customerStamps.stamps_count / (config.loyalty_stamps_goal ?? 8)) * 100, 100)}%` 
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>{customerStamps.stamps_count} selo(s)</span>
+                  <span>Meta: {config.loyalty_stamps_goal ?? 8}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
