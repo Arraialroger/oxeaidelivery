@@ -5,9 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função para aguardar X milissegundos
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -172,57 +169,8 @@ Deno.serve(async (req) => {
     
     console.log(`[credit-stamp] SUCCESS! Customer ${customer.id} now has ${newStampsCount}/${stampsGoal} stamps`);
 
-    // ===== FASE 4: Push Notification de Fidelidade =====
-    try {
-      // Determinar tipo de mensagem: selo simples ou brinde disponível
-      const notificationType = rewardAvailable ? 'reward_available' : 'stamp_earned';
-      
-      // Mensagens personalizadas
-      const customMessages: Record<string, { title: string; body: string }> = {
-        stamp_earned: {
-          title: `⭐ +1 Selo! (${newStampsCount}/${stampsGoal})`,
-          body: `Faltam ${stampsGoal - newStampsCount} selo(s) para seu brinde!`,
-        },
-        reward_available: {
-          title: '🎁 Brinde disponível!',
-          body: 'Você completou a cartela! Resgate seu brinde no próximo pedido!',
-        },
-      };
-
-      const message = customMessages[notificationType];
-      
-      // Aguardar 6 segundos para não sobrepor a notificação de status "Pedido Entregue"
-      console.log('[credit-stamp] Aguardando 6s antes de enviar notificação de selo...');
-      await delay(6000);
-      
-      // Chamar send-push-notification com a mensagem de fidelidade
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-      
-      const pushResponse = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({
-          orderId,
-          status: notificationType,
-          customTitle: message.title,
-          customBody: message.body,
-        }),
-      });
-
-      if (pushResponse.ok) {
-        const pushResult = await pushResponse.json();
-        console.log(`[credit-stamp] Push notification (${notificationType}) sent:`, pushResult);
-      } else {
-        console.error(`[credit-stamp] Push notification failed:`, await pushResponse.text());
-      }
-    } catch (pushError) {
-      console.error('[credit-stamp] Error sending push notification:', pushError);
-      // Não falha - selo já foi creditado
-    }
+    // Notificação push agora é unificada e enviada pelo Kitchen.tsx
+    // Retornamos os dados para que o Kitchen envie uma única notificação combinada
 
     return new Response(
       JSON.stringify({
