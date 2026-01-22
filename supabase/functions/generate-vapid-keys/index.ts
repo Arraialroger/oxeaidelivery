@@ -126,7 +126,7 @@ serve(async (req) => {
     <h3>📋 Próximos Passos:</h3>
     <ol>
       <li>Clique em "Copiar" na <strong>VAPID_PRIVATE_KEY</strong> acima</li>
-      <li>Acesse o <a href="https://supabase.com/dashboard/project/hcmiearxmhruuhphfctf/settings/functions" target="_blank">Painel de Secrets do Supabase</a></li>
+      <li>Acesse o <a href="https://supabase.com/dashboard/project/xcogccusyerkvoimfxeb/settings/functions" target="_blank">Painel de Secrets do Supabase</a></li>
       <li>Encontre o secret <strong>VAPID_PRIVATE_KEY</strong> e clique para editar</li>
       <li>Cole o valor copiado e salve</li>
       <li>Repita o processo para a <strong>VAPID_PUBLIC_KEY</strong></li>
