@@ -5,6 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Função para aguardar X milissegundos
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -187,6 +190,10 @@ Deno.serve(async (req) => {
       };
 
       const message = customMessages[notificationType];
+      
+      // Aguardar 6 segundos para não sobrepor a notificação de status "Pedido Entregue"
+      console.log('[credit-stamp] Aguardando 6s antes de enviar notificação de selo...');
+      await delay(6000);
       
       // Chamar send-push-notification com a mensagem de fidelidade
       const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
