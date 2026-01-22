@@ -28,13 +28,13 @@ export function StampTransactionsList() {
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case 'credit':
-        return 'Crédito';
-      case 'redemption':
+      case 'earned':
+        return 'Ganho';
+      case 'redeemed':
         return 'Resgate';
-      case 'adjustment':
+      case 'manual_adjustment':
         return 'Ajuste';
-      case 'expiration':
+      case 'expired':
         return 'Expiração';
       default:
         return type;
@@ -43,13 +43,13 @@ export function StampTransactionsList() {
 
   const getTypeBadgeVariant = (type: string) => {
     switch (type) {
-      case 'credit':
+      case 'earned':
         return 'default';
-      case 'redemption':
+      case 'redeemed':
         return 'secondary';
-      case 'adjustment':
+      case 'manual_adjustment':
         return 'outline';
-      case 'expiration':
+      case 'expired':
         return 'destructive';
       default:
         return 'outline';
@@ -59,9 +59,9 @@ export function StampTransactionsList() {
   // Calculate stats
   const stats = transactions?.reduce(
     (acc, tx) => {
-      if (tx.type === 'credit') {
+      if (tx.type === 'earned') {
         acc.totalCredits += tx.amount;
-      } else if (tx.type === 'redemption') {
+      } else if (tx.type === 'redeemed') {
         acc.totalRedemptions += Math.abs(tx.amount);
       }
       return acc;
@@ -128,9 +128,9 @@ export function StampTransactionsList() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="credit">Créditos</SelectItem>
-            <SelectItem value="redemption">Resgates</SelectItem>
-            <SelectItem value="adjustment">Ajustes</SelectItem>
+            <SelectItem value="earned">Ganhos</SelectItem>
+            <SelectItem value="redeemed">Resgates</SelectItem>
+            <SelectItem value="manual_adjustment">Ajustes</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -157,14 +157,14 @@ export function StampTransactionsList() {
                     <div className="flex items-start gap-3">
                       <div
                         className={`p-2 rounded-full ${
-                          tx.type === 'credit'
+                          tx.type === 'earned'
                             ? 'bg-primary/10'
-                            : tx.type === 'redemption'
+                            : tx.type === 'redeemed'
                             ? 'bg-secondary'
                             : 'bg-muted'
                         }`}
                       >
-                        {tx.type === 'credit' ? (
+                        {tx.type === 'earned' ? (
                           <TrendingUp className="w-4 h-4 text-primary" />
                         ) : (
                           <TrendingDown className="w-4 h-4 text-muted-foreground" />
