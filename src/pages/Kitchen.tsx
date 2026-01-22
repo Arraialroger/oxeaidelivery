@@ -540,15 +540,19 @@ export default function Kitchen() {
     logStatusChange(orderId, newStatus).catch(() => {});
 
     // LOYALTY: Credit stamp if status = delivered (fail-safe)
+    // Notificação unificada: combina status + selo quando aplicável
+    let stampResult: { success?: boolean; stamps_count?: number; stamps_goal?: number; reward_available?: boolean } | null = null;
+    
     if (newStatus === 'delivered') {
       try {
-        const { data: stampResult, error: stampError } = await supabase.functions.invoke('credit-stamp', {
+        const { data, error: stampError } = await supabase.functions.invoke('credit-stamp', {
           body: { orderId, status: newStatus }
         });
         if (stampError) {
           console.error('[Kitchen] Erro ao creditar selo:', stampError);
         } else {
-          console.log('[Kitchen] Resultado credito selo:', stampResult);
+          console.log('[Kitchen] Resultado credito selo:', data);
+          stampResult = data;
           if (stampResult?.success) {
             toast({ 
               title: `🎉 Selo creditado! (${stampResult.stamps_count}/${stampResult.stamps_goal})`,
@@ -561,9 +565,38 @@ export default function Kitchen() {
       }
     }
 
-    // Enviar push notification
+    // Enviar push notification (unificada quando selo é ganho)
+    let pushBody: { orderId: string; status: string; customTitle?: string; customBody?: string } = { 
+      orderId, 
+      status: newStatus 
+    };
+
+    // Se selo foi creditado com sucesso, enviar notificação unificada
+    if (stampResult?.success) {
+      const stampsCount = stampResult.stamps_count ?? 0;
+      const stampsGoal = stampResult.stamps_goal ?? 8;
+      
+      if (stampResult.reward_available) {
+        // Brinde disponível - mensagem especial
+        pushBody = {
+          orderId,
+          status: 'delivered_with_reward',
+          customTitle: '🎉 Entregue + 🎁 Brinde!',
+          customBody: `Pedido entregue! Você completou ${stampsGoal} selos e ganhou um brinde! Resgate no próximo pedido.`,
+        };
+      } else {
+        // Selo ganho - mensagem combinada
+        pushBody = {
+          orderId,
+          status: 'delivered_with_stamp',
+          customTitle: `🎉 Entregue + ⭐ Selo!`,
+          customBody: `Pedido entregue! +1 selo de fidelidade (${stampsCount}/${stampsGoal}). Faltam ${stampsGoal - stampsCount} para seu brinde!`,
+        };
+      }
+    }
+
     const { data: pushData, error: pushError } = await supabase.functions.invoke('send-push-notification', {
-      body: { orderId, status: newStatus }
+      body: pushBody
     });
     if (pushError) {
       console.error('[Kitchen] Push notification error:', pushError);
