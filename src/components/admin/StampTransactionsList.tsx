@@ -62,7 +62,7 @@ export function StampTransactionsList() {
       if (tx.type === 'earned') {
         acc.totalCredits += tx.amount;
       } else if (tx.type === 'redeemed') {
-        acc.totalRedemptions += Math.abs(tx.amount);
+        acc.totalRedemptions += 1; // Cada transação de resgate = 1 brinde
       }
       return acc;
     },

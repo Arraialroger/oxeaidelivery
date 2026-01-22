@@ -307,7 +307,7 @@ export default function OrderTracking() {
           <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 mt-1">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <Bell className="w-5 h-5 text-primary" />
+                <Bell className="w-5 h-5 text-primary animate-ring-bell" />
               </div>
               <div className="flex-1">
                 <p className="font-medium text-sm">Receba atualizações</p>
@@ -362,71 +362,85 @@ export default function OrderTracking() {
 
         {/* Loyalty Stamp Celebration Banner */}
         {showStampCelebration && order?.stamp_earned && config?.loyalty_enabled && (
-          <div className={cn(
-            "rounded-2xl p-4 border animate-in fade-in slide-in-from-bottom-4 duration-500",
-            customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8)
-              ? "bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border-amber-500/40"
-              : "bg-gradient-to-r from-primary/10 to-primary/20 border-primary/30"
-          )}>
-            <div className="flex items-center gap-4">
+          (() => {
+            const hasReward = customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8);
+            return (
               <div className={cn(
-                "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 animate-bounce",
-                customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8)
-                  ? "bg-gradient-to-br from-amber-400 to-yellow-500"
-                  : "bg-primary"
+                "relative rounded-2xl p-4 border animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden",
+                hasReward
+                  ? "bg-gradient-to-r from-amber-500/20 via-yellow-400/20 to-amber-500/20 border-amber-500/40 bg-[length:200%_100%] animate-shimmer"
+                  : "bg-gradient-to-r from-primary/10 to-primary/20 border-primary/30"
               )}>
-                {customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8) ? (
-                  <Gift className="w-7 h-7 text-white" />
-                ) : (
-                  <Star className="w-7 h-7 text-primary-foreground" />
-                )}
-              </div>
-              <div className="flex-1">
-                {customerStamps && customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8) ? (
+                {/* Decorative sparkles for reward */}
+                {hasReward && (
                   <>
-                    <p className="font-bold text-amber-600 text-lg">🎁 Brinde disponível!</p>
-                    <p className="text-sm text-muted-foreground">
-                      Você completou a cartela! Resgate seu brinde de {formatPrice(config.loyalty_reward_value ?? 0)} no próximo pedido!
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-bold text-primary text-lg">⭐ +1 Selo de Fidelidade!</p>
-                    <p className="text-sm text-muted-foreground">
-                      Você agora tem {customerStamps?.stamps_count ?? 1}/{config.loyalty_stamps_goal ?? 8} selos. 
-                      {customerStamps && (
-                        <span className="block mt-0.5">
-                          Faltam {(config.loyalty_stamps_goal ?? 8) - customerStamps.stamps_count} para ganhar seu brinde!
-                        </span>
-                      )}
-                    </p>
+                    <div className="absolute top-2 left-4 w-2 h-2 bg-yellow-400 rounded-full animate-sparkle" />
+                    <div className="absolute top-4 right-6 w-1.5 h-1.5 bg-amber-400 rounded-full animate-sparkle [animation-delay:0.3s]" />
+                    <div className="absolute bottom-3 left-8 w-1.5 h-1.5 bg-yellow-300 rounded-full animate-sparkle [animation-delay:0.6s]" />
+                    <div className="absolute bottom-4 right-12 w-2 h-2 bg-amber-300 rounded-full animate-sparkle [animation-delay:0.9s]" />
                   </>
                 )}
-              </div>
-            </div>
-            {/* Progress bar */}
-            {customerStamps && (
-              <div className="mt-3">
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className={cn(
-                      "h-full rounded-full transition-all duration-1000",
-                      customerStamps.stamps_count >= (config.loyalty_stamps_goal ?? 8)
-                        ? "bg-gradient-to-r from-amber-400 to-yellow-500"
-                        : "bg-primary"
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className={cn(
+                    "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0",
+                    hasReward
+                      ? "bg-gradient-to-br from-amber-400 to-yellow-500 animate-sparkle shadow-lg shadow-amber-500/30"
+                      : "bg-primary animate-bounce"
+                  )}>
+                    {hasReward ? (
+                      <Gift className="w-7 h-7 text-white" />
+                    ) : (
+                      <Star className="w-7 h-7 text-primary-foreground" />
                     )}
-                    style={{ 
-                      width: `${Math.min((customerStamps.stamps_count / (config.loyalty_stamps_goal ?? 8)) * 100, 100)}%` 
-                    }}
-                  />
+                  </div>
+                  <div className="flex-1">
+                    {hasReward ? (
+                      <>
+                        <p className="font-bold text-amber-600 text-lg">🎁 Brinde disponível!</p>
+                        <p className="text-sm text-muted-foreground">
+                          Você completou a cartela! Resgate seu brinde de {formatPrice(config.loyalty_reward_value ?? 0)} no próximo pedido!
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-bold text-primary text-lg">⭐ +1 Selo de Fidelidade!</p>
+                        <p className="text-sm text-muted-foreground">
+                          Você agora tem {customerStamps?.stamps_count ?? 1}/{config.loyalty_stamps_goal ?? 8} selos. 
+                          {customerStamps && (
+                            <span className="block mt-0.5">
+                              Faltam {(config.loyalty_stamps_goal ?? 8) - customerStamps.stamps_count} para ganhar seu brinde!
+                            </span>
+                          )}
+                        </p>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>{customerStamps.stamps_count} selo(s)</span>
-                  <span>Meta: {config.loyalty_stamps_goal ?? 8}</span>
-                </div>
+                {/* Progress bar */}
+                {customerStamps && (
+                  <div className="mt-3 relative z-10">
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className={cn(
+                          "h-full rounded-full transition-all duration-1000",
+                          hasReward
+                            ? "bg-gradient-to-r from-amber-400 to-yellow-500"
+                            : "bg-primary"
+                        )}
+                        style={{ 
+                          width: `${Math.min((customerStamps.stamps_count / (config.loyalty_stamps_goal ?? 8)) * 100, 100)}%` 
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>{customerStamps.stamps_count} selo(s)</span>
+                      <span>Meta: {config.loyalty_stamps_goal ?? 8}</span>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()
         )}
         
         {/* Cancelled Status */}
