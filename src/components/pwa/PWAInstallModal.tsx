@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Smartphone, Zap, Bell } from 'lucide-react';
+import { Download, Smartphone, Zap, Bell, Gift } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -71,6 +71,12 @@ export function PWAInstallModal({ isOpen, onClose, onInstall, variant = 'second-
                 <Download className="h-4 w-4 text-primary" />
               </div>
               <span>Funciona mesmo sem internet</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <div className="bg-primary/10 p-2 rounded-full">
+                <Gift className="h-4 w-4 text-primary" />
+              </div>
+              <span>Resgate seus brindes de fidelidade</span>
             </div>
           </div>
 
