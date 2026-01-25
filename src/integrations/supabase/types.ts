@@ -560,6 +560,60 @@ export type Database = {
           },
         ]
       }
+      restaurants: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          hero_banner_url: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          owner_id: string | null
+          phone: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          settings: Json | null
+          slug: string
+          status: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          hero_banner_url?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          owner_id?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          settings?: Json | null
+          slug: string
+          status?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          hero_banner_url?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          owner_id?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          settings?: Json | null
+          slug?: string
+          status?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       sms_codes: {
         Row: {
           code: string
