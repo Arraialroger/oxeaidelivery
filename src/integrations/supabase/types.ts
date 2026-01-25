@@ -77,6 +77,44 @@ export type Database = {
           },
         ]
       }
+      business_hours: {
+        Row: {
+          close_time: string | null
+          created_at: string | null
+          day_of_week: number
+          id: string
+          is_closed: boolean | null
+          open_time: string | null
+          restaurant_id: string
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string | null
+          day_of_week: number
+          id?: string
+          is_closed?: boolean | null
+          open_time?: string | null
+          restaurant_id: string
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string | null
+          day_of_week?: number
+          id?: string
+          is_closed?: boolean | null
+          open_time?: string | null
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_hours_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           id: string
@@ -272,6 +310,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "customers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_zones: {
+        Row: {
+          cep_prefix: string | null
+          created_at: string | null
+          delivery_fee_override: number | null
+          id: string
+          is_active: boolean | null
+          neighborhood: string
+          restaurant_id: string
+        }
+        Insert: {
+          cep_prefix?: string | null
+          created_at?: string | null
+          delivery_fee_override?: number | null
+          id?: string
+          is_active?: boolean | null
+          neighborhood: string
+          restaurant_id: string
+        }
+        Update: {
+          cep_prefix?: string | null
+          created_at?: string | null
+          delivery_fee_override?: number | null
+          id?: string
+          is_active?: boolean | null
+          neighborhood?: string
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_zones_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
