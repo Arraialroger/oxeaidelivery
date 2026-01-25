@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 type KdsEventType = 
   | 'order_received'
@@ -17,6 +18,8 @@ type KdsEventType =
  * retornam Promises que resolvem silenciosamente mesmo em caso de erro.
  */
 export const useKdsEvents = () => {
+  const { restaurantId } = useRestaurantContext();
+
   /**
    * Registra um evento genérico no KDS
    * @param orderId - ID do pedido
@@ -28,7 +31,8 @@ export const useKdsEvents = () => {
         .from('kds_events')
         .insert({ 
           order_id: orderId, 
-          event 
+          event,
+          restaurant_id: restaurantId,
         });
 
       if (error) {

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 export interface CustomerWithStats {
   id: string;
@@ -13,11 +14,18 @@ export interface CustomerWithStats {
 }
 
 export function useCustomers(filterType?: 'local' | 'tourist' | 'all') {
+  const { restaurantId } = useRestaurantContext();
+
   return useQuery({
-    queryKey: ['customers', filterType],
+    queryKey: ['customers', restaurantId, filterType],
     queryFn: async () => {
-      // Get all customers
-      let query = supabase.from('customers').select('*');
+      if (!restaurantId) return [];
+
+      // Get all customers for this restaurant
+      let query = supabase
+        .from('customers')
+        .select('*')
+        .eq('restaurant_id', restaurantId);
       
       if (filterType && filterType !== 'all') {
         query = query.eq('customer_type', filterType);
@@ -34,6 +42,7 @@ export function useCustomers(filterType?: 'local' | 'tourist' | 'all') {
             .from('orders')
             .select('total, created_at')
             .eq('customer_id', customer.id)
+            .eq('restaurant_id', restaurantId)
             .order('created_at', { ascending: false });
           
           const totalSpent = orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
@@ -55,6 +64,7 @@ export function useCustomers(filterType?: 'local' | 'tourist' | 'all') {
       
       return customersWithStats;
     },
+    enabled: !!restaurantId,
   });
 }
 

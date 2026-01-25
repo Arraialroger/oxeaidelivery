@@ -1,5 +1,5 @@
 import { Home, ShoppingBag, User } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useState, useEffect, useRef } from 'react';
 
@@ -10,9 +10,14 @@ interface BottomNavProps {
 export function BottomNav({ onCartClick }: BottomNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { slug } = useParams<{ slug: string }>();
   const { totalItems, subtotal } = useCart();
   const [isPopping, setIsPopping] = useState(false);
   const prevTotalItems = useRef(totalItems);
+
+  // Build paths with slug
+  const menuPath = slug ? `/${slug}/menu` : '/';
+  const accountPath = slug ? `/${slug}/account` : '/account';
 
   // Play a subtle "pling" sound
   const playPlingSound = () => {
@@ -70,9 +75,9 @@ export function BottomNav({ onCartClick }: BottomNavProps) {
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border safe-bottom">
       <div className="flex items-center justify-around h-16">
         <button 
-          onClick={() => navigate('/')}
+          onClick={() => navigate(menuPath)}
           className={`flex flex-col items-center gap-1 px-4 py-2 transition-colors ${
-            isActive('/') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            isActive(menuPath) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Home className="w-5 h-5" />
@@ -97,9 +102,9 @@ export function BottomNav({ onCartClick }: BottomNavProps) {
         </button>
 
         <button 
-          onClick={() => navigate('/account')}
+          onClick={() => navigate(accountPath)}
           className={`flex flex-col items-center gap-1 px-4 py-2 transition-colors ${
-            isActive('/account') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            isActive(accountPath) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <User className="w-5 h-5" />

@@ -1,18 +1,18 @@
-import { useConfig } from '@/hooks/useConfig';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 export function HeroBanner() {
-  const { data: config, isLoading } = useConfig();
+  const { restaurant, isLoading } = useRestaurantContext();
 
-  // Don't show anything if loading, no config, or no banner URL
-  if (isLoading || !config?.hero_banner_url) {
+  // Don't show anything if loading, no restaurant, or no banner URL
+  if (isLoading || !restaurant?.hero_banner_url) {
     return null;
   }
 
   return (
     <div className="w-full">
       <img
-        src={config.hero_banner_url}
-        alt="Banner promocional Astral Gastro Bar"
+        src={restaurant.hero_banner_url}
+        alt={`Banner promocional ${restaurant.name}`}
         className="w-full h-auto object-cover rounded-b-2xl"
       />
     </div>

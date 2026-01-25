@@ -1,12 +1,17 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import type { CartItem, Product, SelectedOption } from '@/types';
 
-const CART_STORAGE_KEY = 'astral-cart';
+// Generate cart storage key based on restaurant slug
+const getCartStorageKey = (slug: string | undefined) => {
+  return slug ? `cart-${slug}` : 'cart-default';
+};
 
 // Load cart from localStorage
-const loadCartFromStorage = (): CartItem[] => {
+const loadCartFromStorage = (slug: string | undefined): CartItem[] => {
   try {
-    const stored = localStorage.getItem(CART_STORAGE_KEY);
+    const key = getCartStorageKey(slug);
+    const stored = localStorage.getItem(key);
     if (stored) {
       return JSON.parse(stored);
     }
@@ -29,16 +34,23 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(loadCartFromStorage);
+  const { slug } = useParams<{ slug: string }>();
+  const [items, setItems] = useState<CartItem[]>(() => loadCartFromStorage(slug));
+
+  // Reload cart when slug changes (switching restaurants)
+  useEffect(() => {
+    setItems(loadCartFromStorage(slug));
+  }, [slug]);
 
   // Persist cart to localStorage whenever items change
   useEffect(() => {
     try {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      const key = getCartStorageKey(slug);
+      localStorage.setItem(key, JSON.stringify(items));
     } catch (error) {
       console.error('Error saving cart to storage:', error);
     }
-  }, [items]);
+  }, [items, slug]);
 
   const addItem = useCallback((
     product: Product,
@@ -91,8 +103,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = useCallback(() => {
     setItems([]);
-    localStorage.removeItem(CART_STORAGE_KEY);
-  }, []);
+    try {
+      const key = getCartStorageKey(slug);
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error('Error clearing cart from storage:', error);
+    }
+  }, [slug]);
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
