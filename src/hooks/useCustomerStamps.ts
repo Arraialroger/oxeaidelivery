@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useConfig } from './useConfig';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 export interface CustomerStamps {
   stamps_count: number;
@@ -10,12 +10,12 @@ export interface CustomerStamps {
 }
 
 export function useCustomerStamps(phone: string | null) {
-  const { data: config } = useConfig();
+  const { settings, restaurantId } = useRestaurantContext();
 
   return useQuery({
-    queryKey: ['customer-stamps', phone],
+    queryKey: ['customer-stamps', phone, restaurantId],
     queryFn: async (): Promise<CustomerStamps | null> => {
-      if (!phone) return null;
+      if (!phone || !restaurantId) return null;
 
       // Clean phone number (only digits)
       const cleanPhone = phone.replace(/\D/g, '');
@@ -25,6 +25,7 @@ export function useCustomerStamps(phone: string | null) {
         .from('customers')
         .select('stamps_count, stamps_redeemed, last_stamp_at, stamps_expire_at')
         .eq('phone', cleanPhone)
+        .eq('restaurant_id', restaurantId)
         .maybeSingle();
 
       if (error) {
@@ -49,7 +50,7 @@ export function useCustomerStamps(phone: string | null) {
         stamps_expire_at: data.stamps_expire_at,
       };
     },
-    enabled: !!phone && !!config?.loyalty_enabled,
+    enabled: !!phone && !!settings?.loyalty_enabled && !!restaurantId,
     staleTime: 30000, // 30 seconds
   });
 }

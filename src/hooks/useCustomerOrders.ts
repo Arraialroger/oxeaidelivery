@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 interface OrderItem {
   id: string;
@@ -23,16 +24,19 @@ interface Order {
 }
 
 export function useCustomerOrders(phone: string | null) {
+  const { restaurantId } = useRestaurantContext();
+
   return useQuery({
-    queryKey: ['customer-orders', phone],
+    queryKey: ['customer-orders', phone, restaurantId],
     queryFn: async (): Promise<Order[]> => {
-      if (!phone) return [];
+      if (!phone || !restaurantId) return [];
 
       // Primeiro, buscar o customer_id pelo telefone
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .select('id')
         .eq('phone', phone)
+        .eq('restaurant_id', restaurantId)
         .maybeSingle();
 
       if (customerError) throw customerError;
@@ -60,6 +64,7 @@ export function useCustomerOrders(phone: string | null) {
           )
         `)
         .eq('customer_id', customer.id)
+        .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -67,6 +72,6 @@ export function useCustomerOrders(phone: string | null) {
 
       return (orders || []) as unknown as Order[];
     },
-    enabled: !!phone && phone.length >= 10,
+    enabled: !!phone && phone.length >= 10 && !!restaurantId,
   });
 }

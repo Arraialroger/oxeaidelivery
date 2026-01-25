@@ -1,21 +1,35 @@
 import { MapPin } from 'lucide-react';
-import { useConfig } from '@/hooks/useConfig';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
+
 export function Header() {
-  const {
-    data: config
-  } = useConfig();
-  return <header className="bg-card border-b border-border">
+  const { settings, restaurant } = useRestaurantContext();
+
+  return (
+    <header className="bg-card border-b border-border">
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="w-3.5 h-3.5" />
-            <span>Entrega apenas em Arraial D'ajuda      </span>
+          {restaurant?.logo_url && (
+            <img 
+              src={restaurant.logo_url} 
+              alt={restaurant.name} 
+              className="h-10 w-auto"
+            />
+          )}
+          <div className="flex flex-col">
+            {restaurant?.name && (
+              <span className="font-semibold text-foreground">
+                {restaurant.name}
+              </span>
+            )}
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Entrega em Arraial D'Ajuda</span>
+            </div>
           </div>
         </div>
 
         <div className="flex flex-col items-end gap-0.5">
-          {config?.restaurant_open ? (
+          {settings?.is_open ? (
             <span className="flex items-center gap-1.5 text-sm font-medium text-green-500">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               Aberto
@@ -31,5 +45,6 @@ export function Header() {
           </span>
         </div>
       </div>
-    </header>;
+    </header>
+  );
 }

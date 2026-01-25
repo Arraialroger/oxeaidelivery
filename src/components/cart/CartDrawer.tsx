@@ -2,7 +2,7 @@ import { X, Minus, Plus, Trash2, ShoppingBag, CircleMinus, CirclePlus, RefreshCw
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
 import { useConfig } from '@/hooks/useConfig';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { items, removeItem, updateQuantity, subtotal } = useCart();
   const { data: config } = useConfig();
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
 
   const deliveryFee = config?.delivery_fee ?? 0;
   const total = subtotal + deliveryFee;
@@ -26,7 +27,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
   const handleCheckout = () => {
     onClose();
-    navigate('/checkout');
+    navigate(slug ? `/${slug}/checkout` : '/checkout');
   };
 
   if (!isOpen) return null;
