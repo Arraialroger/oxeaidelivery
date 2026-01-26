@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Download, Filter, Users, MapPin, Plane, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 
 export default function AdminCustomers() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const { user, isAdmin, loading, signOut } = useAuth();
   const { toast } = useToast();
   const [filterType, setFilterType] = useState<'all' | 'local' | 'tourist'>('all');
@@ -22,13 +23,13 @@ export default function AdminCustomers() {
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
-      navigate('/admin/login');
+      navigate(`/${slug}/admin/login`);
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isAdmin, loading, navigate, slug]);
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/admin/login');
+    navigate(`/${slug}/admin/login`);
   };
 
   const handleTypeChange = async (customerId: string, newType: 'local' | 'tourist') => {
@@ -117,7 +118,7 @@ export default function AdminCustomers() {
         <div className="container max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link to="/admin">
+              <Link to={`/${slug}/admin`}>
                 <Button variant="ghost" size="icon">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>

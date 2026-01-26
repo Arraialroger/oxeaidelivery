@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,19 +15,20 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const { user, isAdmin, loading, signOut } = useAuth();
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
-      navigate('/admin/login');
+      navigate(`/${slug}/admin/login`);
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isAdmin, loading, navigate, slug]);
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/admin/login');
+    navigate(`/${slug}/admin/login`);
   };
 
   if (loading) {
@@ -49,13 +50,13 @@ export default function Admin() {
         <div className="container max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <a href="/" target="_blank" rel="noopener noreferrer">
+              <a href={`/${slug}/menu`} target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-2">
                   <UtensilsCrossed className="w-4 h-4" />
                   <span>Cardápio</span>
                 </Button>
               </a>
-              <a href="/kitchen" target="_blank" rel="noopener noreferrer">
+              <a href={`/${slug}/kitchen`} target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-2">
                   <ChefHat className="w-4 h-4" />
                   <span>KDS</span>
@@ -63,7 +64,7 @@ export default function Admin() {
               </a>
             </div>
             <div className="flex items-center gap-2">
-              <a href="/admin/customers" target="_blank" rel="noopener noreferrer">
+              <a href={`/${slug}/admin/customers`} target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-2">
                   <Users className="w-4 h-4" />
                   <span className="hidden sm:inline">CRM</span>

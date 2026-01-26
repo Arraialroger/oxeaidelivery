@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Lock, Mail, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ const loginSchema = z.object({
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const { signIn, user, isAdmin, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,9 +25,9 @@ export default function AdminLogin() {
 
   useEffect(() => {
     if (!loading && user && isAdmin) {
-      navigate('/admin');
+      navigate(`/${slug}/admin`);
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isAdmin, loading, navigate, slug]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +72,7 @@ export default function AdminLogin() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card/95 backdrop-blur border-b border-border">
         <div className="flex items-center gap-4 p-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/${slug}/menu`)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-xl font-bold text-foreground">Admin Login</h1>
