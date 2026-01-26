@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 interface RedemptionParams {
   customerId: string;
@@ -11,6 +12,7 @@ interface RedemptionParams {
 
 export function useLoyaltyRedemption() {
   const queryClient = useQueryClient();
+  const { restaurantId } = useRestaurantContext();
 
   return useMutation({
     mutationFn: async ({
@@ -50,7 +52,7 @@ export function useLoyaltyRedemption() {
         throw orderError;
       }
 
-      // 3. Record transaction for audit
+      // 3. Record transaction for audit with restaurant_id
       const { error: transactionError } = await supabase
         .from('stamp_transactions')
         .insert({
@@ -60,6 +62,7 @@ export function useLoyaltyRedemption() {
           amount: -stampsGoal,
           balance_after: newStampsCount,
           notes: `Brinde resgatado - Desconto R$ ${rewardValue.toFixed(2)}`,
+          restaurant_id: restaurantId,
         });
 
       if (transactionError) {
