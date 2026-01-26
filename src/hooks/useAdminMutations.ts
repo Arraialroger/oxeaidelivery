@@ -2,14 +2,17 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Product, Category } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-export function useCreateProduct() {
+
+export function useCreateProduct(restaurantId: string | null) {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (product: Omit<Product, 'id'>) => {
+    mutationFn: async (product: Omit<Product, 'id' | 'restaurant_id'>) => {
+      if (!restaurantId) throw new Error('Restaurant ID is required');
+      
       const { data, error } = await supabase
         .from('products')
-        .insert(product)
+        .insert({ ...product, restaurant_id: restaurantId })
         .select()
         .single();
       if (error) throw error;
@@ -58,13 +61,15 @@ export function useDeleteProduct() {
   });
 }
 
-export function useDuplicateProduct() {
+export function useDuplicateProduct(restaurantId: string | null) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (product: Product) => {
-      // 1. Create the duplicated product
+      if (!restaurantId) throw new Error('Restaurant ID is required');
+      
+      // 1. Create the duplicated product with restaurant_id
       const { data: newProduct, error: productError } = await supabase
         .from('products')
         .insert({
@@ -74,6 +79,8 @@ export function useDuplicateProduct() {
           image_url: product.image_url,
           category_id: product.category_id,
           is_active: product.is_active,
+          is_combo: product.is_combo,
+          restaurant_id: restaurantId,
         })
         .select()
         .single();
@@ -92,6 +99,7 @@ export function useDuplicateProduct() {
         const newOptions = options.map(({ id, product_id, ...opt }) => ({
           ...opt,
           product_id: newProduct.id,
+          restaurant_id: restaurantId,
         }));
 
         const { error: insertOptionsError } = await supabase
@@ -133,14 +141,16 @@ export function useReorderProducts() {
   });
 }
 
-export function useCreateCategory() {
+export function useCreateCategory(restaurantId: string | null) {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (category: Omit<Category, 'id'>) => {
+    mutationFn: async (category: Omit<Category, 'id' | 'restaurant_id'>) => {
+      if (!restaurantId) throw new Error('Restaurant ID is required');
+      
       const { data, error } = await supabase
         .from('categories')
-        .insert(category)
+        .insert({ ...category, restaurant_id: restaurantId })
         .select()
         .single();
       if (error) throw error;

@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStampTransactions } from '@/hooks/useStampTransactions';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { Gift, TrendingUp, TrendingDown, Search, Filter } from 'lucide-react';
 
 export function StampTransactionsList() {
-  const { data: transactions, isLoading } = useStampTransactions(100);
+  const { restaurantId } = useRestaurantContext();
+  const { data: transactions, isLoading } = useStampTransactions(restaurantId, 100);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 

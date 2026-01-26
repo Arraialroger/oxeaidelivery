@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCreateCategory, useUpdateCategory } from '@/hooks/useAdminMutations';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Category } from '@/types';
 import { Loader2 } from 'lucide-react';
@@ -13,7 +14,8 @@ interface CategoryFormProps {
 }
 
 export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
-  const createCategory = useCreateCategory();
+  const { restaurantId } = useRestaurantContext();
+  const createCategory = useCreateCategory(restaurantId);
   const updateCategory = useUpdateCategory();
   const { toast } = useToast();
 

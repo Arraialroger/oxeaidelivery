@@ -8,6 +8,7 @@ import {
 import { CalendarIcon, Clock, TrendingUp, XCircle, Package, Loader2, AlertCircle } from 'lucide-react';
 
 import { useKdsMetrics } from '@/hooks/useKdsMetrics';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
@@ -23,16 +24,17 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function KdsPerformanceReport() {
+  const { restaurantId } = useRestaurantContext();
   const { metrics, loading, error, fetchMetrics } = useKdsMetrics();
   const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 7));
   const [endDate, setEndDate] = useState<Date>(new Date());
 
   useEffect(() => {
-    fetchMetrics({
+    fetchMetrics(restaurantId, {
       start: startOfDay(startDate),
       end: endOfDay(endDate)
     });
-  }, [startDate, endDate, fetchMetrics]);
+  }, [startDate, endDate, fetchMetrics, restaurantId]);
 
   const formatMinutes = (minutes: number | null) => {
     if (minutes === null) return '-';

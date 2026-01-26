@@ -37,15 +37,21 @@ export const useKdsMetrics = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMetrics = useCallback(async (dateRange?: DateRange) => {
+  const fetchMetrics = useCallback(async (restaurantId: string | null, dateRange?: DateRange) => {
+    if (!restaurantId) {
+      setMetrics(null);
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
     try {
-      // Buscar todos os eventos do período
+      // Buscar todos os eventos do período para o restaurante específico
       let eventsQuery = supabase
         .from('kds_events')
         .select('*')
+        .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: true });
 
       if (dateRange) {
