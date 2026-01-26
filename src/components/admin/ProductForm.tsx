@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCategories } from '@/hooks/useCategories';
 import { useCreateProduct, useUpdateProduct } from '@/hooks/useAdminMutations';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/types';
 import { Loader2 } from 'lucide-react';
@@ -17,8 +18,9 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ product, onSuccess }: ProductFormProps) {
+  const { restaurantId } = useRestaurantContext();
   const { data: categories } = useCategories();
-  const createProduct = useCreateProduct();
+  const createProduct = useCreateProduct(restaurantId);
   const updateProduct = useUpdateProduct();
   const { toast } = useToast();
 

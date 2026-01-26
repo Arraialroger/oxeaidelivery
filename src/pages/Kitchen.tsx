@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ChefHat, Check, Truck, RefreshCw, CreditCard, Banknote, QrCode, Volume2, VolumeX, Printer, X, History, XCircle, Search, CalendarIcon, TrendingUp, ShoppingBag, DollarSign, Download, FileText, PieChartIcon, Loader2, BarChart3, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useKdsEvents } from '@/hooks/useKdsEvents';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -311,6 +312,8 @@ const playNotificationSound = async (): Promise<boolean> => {
 
 export default function Kitchen() {
   const { isAdmin, loading: authLoading } = useAuth();
+  const { slug } = useParams<{ slug: string }>();
+  const { restaurantId } = useRestaurantContext();
   const navigate = useNavigate();
   const { logStatusChange, logOrderPrinted, logOrderCancelled } = useKdsEvents();
   
@@ -335,6 +338,8 @@ export default function Kitchen() {
 
   // useCallback hooks - MUST be before any early returns
   const fetchOrders = useCallback(async () => {
+    if (!restaurantId) return;
+    
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -355,6 +360,7 @@ export default function Kitchen() {
           options:order_item_options(option_name, option_price)
         )
       `)
+      .eq('restaurant_id', restaurantId)
       .in('status', ['pending', 'preparing', 'ready', 'out_for_delivery'])
       .order('created_at', { ascending: true });
 
@@ -385,9 +391,11 @@ export default function Kitchen() {
 
     setOrders(newOrders);
     setLoading(false);
-  }, [soundEnabled, audioActivated, toast]);
+  }, [restaurantId, soundEnabled, audioActivated, toast]);
 
   const fetchHistoryOrders = useCallback(async () => {
+    if (!restaurantId) return;
+    
     setHistoryLoading(true);
     const { data, error } = await supabase
       .from('orders')
@@ -409,6 +417,7 @@ export default function Kitchen() {
           options:order_item_options(option_name, option_price)
         )
       `)
+      .eq('restaurant_id', restaurantId)
       .in('status', ['delivered', 'cancelled'])
       .order('created_at', { ascending: false })
       .limit(50);
@@ -421,14 +430,14 @@ export default function Kitchen() {
     }
 
     setHistoryOrders((data as OrderWithDetails[]) || []);
-  }, []);
+  }, [restaurantId]);
 
   // useEffect hooks - MUST be before any early returns
   useEffect(() => {
     if (!authLoading && !isAdmin) {
-      navigate('/admin/login');
+      navigate(`/${slug}/admin/login`);
     }
-  }, [authLoading, isAdmin, navigate]);
+  }, [authLoading, isAdmin, navigate, slug]);
 
   useEffect(() => {
     if (historyOpen) {

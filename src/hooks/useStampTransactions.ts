@@ -16,21 +16,25 @@ export interface StampTransaction {
   } | null;
 }
 
-export function useStampTransactions(limit = 50) {
+export function useStampTransactions(restaurantId: string | null, limit = 50) {
   return useQuery({
-    queryKey: ['stamp-transactions', limit],
+    queryKey: ['stamp-transactions', restaurantId, limit],
     queryFn: async () => {
+      if (!restaurantId) return [];
+      
       const { data, error } = await supabase
         .from('stamp_transactions')
         .select(`
           *,
           customer:customers(name, phone)
         `)
+        .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
       return data as StampTransaction[];
     },
+    enabled: !!restaurantId,
   });
 }

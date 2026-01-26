@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAdminProducts } from '@/hooks/useAdminProducts';
 import { useDeleteProduct, useDuplicateProduct, useReorderProducts } from '@/hooks/useAdminMutations';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from './ProductForm';
 import { ProductOptionsManager } from './ProductOptionsManager';
@@ -153,9 +154,10 @@ function SortableProduct({
 }
 
 export function ProductList() {
-  const { data: products, isLoading } = useAdminProducts();
+  const { restaurantId } = useRestaurantContext();
+  const { data: products, isLoading } = useAdminProducts(restaurantId || undefined);
   const deleteProduct = useDeleteProduct();
-  const duplicateProduct = useDuplicateProduct();
+  const duplicateProduct = useDuplicateProduct(restaurantId);
   const reorderProducts = useReorderProducts();
   const { toast } = useToast();
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
