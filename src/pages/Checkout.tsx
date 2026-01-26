@@ -19,6 +19,7 @@ import { fbTrackInitiateCheckout, fbTrackPurchase } from "@/lib/fbpixel";
 import { useAuth } from "@/hooks/useAuth";
 import { classifyCustomerType } from "@/lib/customerClassification";
 import { useKdsEvents } from "@/hooks/useKdsEvents";
+import { useRestaurantContext } from "@/contexts/RestaurantContext";
 
 type PaymentMethod = "pix" | "card" | "cash";
 
@@ -79,6 +80,7 @@ export default function Checkout() {
   const { user } = useAuth();
   const { logOrderReceived } = useKdsEvents();
   const loyaltyRedemption = useLoyaltyRedemption();
+  const { restaurantId, slug } = useRestaurantContext();
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -212,11 +214,12 @@ export default function Checkout() {
       // 1. Get or create customer directly
       let customerId: string;
       
-      // Check if customer exists by phone
+      // Check if customer exists by phone AND restaurant_id (multi-tenant)
       const { data: existingCustomer } = await supabase
         .from("customers")
         .select("id")
         .eq("phone", phoneDigits)
+        .eq("restaurant_id", restaurantId)
         .maybeSingle();
 
       if (existingCustomer) {
@@ -230,13 +233,14 @@ export default function Checkout() {
         }
         console.log("[CHECKOUT] Cliente existente encontrado:", customerId);
       } else {
-        // Create new customer
+        // Create new customer with restaurant_id
         const { data: newCustomer, error: customerError } = await supabase
           .from("customers")
           .insert({
             phone: phoneDigits,
             name: name || null,
             customer_type: customerType,
+            restaurant_id: restaurantId,
           })
           .select("id")
           .single();
@@ -249,7 +253,7 @@ export default function Checkout() {
         console.log("[CHECKOUT] Novo cliente criado:", customerId);
       }
 
-      // 2. Create address
+      // 2. Create address with restaurant_id
       const { data: address, error: addressError } = await supabase
         .from("addresses")
         .insert({
@@ -259,6 +263,7 @@ export default function Checkout() {
           neighborhood,
           complement: complement || null,
           reference: reference || null,
+          restaurant_id: restaurantId,
         })
         .select()
         .single();
@@ -269,7 +274,7 @@ export default function Checkout() {
       }
       console.log("[CHECKOUT] Endereço criado:", address.id);
 
-      // 3. Create order (include loyalty_discount if using reward)
+      // 3. Create order with restaurant_id (include loyalty_discount if using reward)
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -283,6 +288,7 @@ export default function Checkout() {
           loyalty_discount: loyaltyDiscount,
           stamp_redeemed: useReward && canUseReward,
           status: "pending",
+          restaurant_id: restaurantId,
         })
         .select()
         .single();
@@ -356,8 +362,8 @@ export default function Checkout() {
 
       clearCart();
 
-      // 🔍 LOG CRÍTICO: URL de navegação
-      const targetUrl = `/order/${order.id}?new=true`;
+      // 🔍 LOG CRÍTICO: URL de navegação com slug multi-tenant
+      const targetUrl = `/${slug}/order/${order.id}?new=true`;
       console.log("[CHECKOUT] ==========================================");
       console.log("[CHECKOUT] NAVEGANDO PARA:", targetUrl);
       console.log("[CHECKOUT] ==========================================");
@@ -386,7 +392,7 @@ export default function Checkout() {
   };
 
   if (items.length === 0) {
-    navigate("/");
+    navigate(slug ? `/${slug}/menu` : "/");
     return null;
   }
 
@@ -400,7 +406,7 @@ export default function Checkout() {
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">Restaurante Fechado</h1>
           <p className="text-muted-foreground mb-6">No momento não estamos aceitando pedidos. Volte mais tarde!</p>
-          <Button onClick={() => navigate("/")}>Voltar ao Cardápio</Button>
+          <Button onClick={() => navigate(slug ? `/${slug}/menu` : "/")}>Voltar ao Cardápio</Button>
         </div>
       </div>
     );

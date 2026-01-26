@@ -21,41 +21,10 @@ Deno.serve(async (req) => {
 
     console.log(`[credit-stamp] Processing order ${orderId} with status ${status}`);
 
-    // GUARD 1: Fetch config and check feature flag
-    const { data: config, error: configError } = await supabase
-      .from('config')
-      .select('loyalty_enabled, loyalty_stamps_goal, loyalty_min_order')
-      .single();
-
-    if (configError) {
-      console.error('[credit-stamp] Config error:', configError);
-      return new Response(
-        JSON.stringify({ skipped: true, reason: 'config_error', error: configError.message }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!config?.loyalty_enabled) {
-      console.log('[credit-stamp] Loyalty program disabled');
-      return new Response(
-        JSON.stringify({ skipped: true, reason: 'loyalty_disabled' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // GUARD 2: Check if status is 'delivered'
-    if (status !== 'delivered') {
-      console.log(`[credit-stamp] Status is ${status}, not 'delivered'. Skipping.`);
-      return new Response(
-        JSON.stringify({ skipped: true, reason: 'status_not_delivered' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // GUARD 3: Fetch order and check if stamp was already earned
+    // GUARD 1: Fetch order and check if stamp was already earned
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id, total, customer_id, stamp_earned')
+      .select('id, total, customer_id, stamp_earned, restaurant_id')
       .eq('id', orderId)
       .single();
 
@@ -63,6 +32,54 @@ Deno.serve(async (req) => {
       console.error('[credit-stamp] Order not found:', orderError);
       return new Response(
         JSON.stringify({ skipped: true, reason: 'order_not_found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // GUARD 2: Check if order has restaurant_id
+    if (!order.restaurant_id) {
+      console.log('[credit-stamp] Order has no restaurant_id');
+      return new Response(
+        JSON.stringify({ skipped: true, reason: 'no_restaurant_id' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // GUARD 3: Fetch restaurant settings and check feature flag
+    const { data: restaurant, error: restaurantError } = await supabase
+      .from('restaurants')
+      .select('settings')
+      .eq('id', order.restaurant_id)
+      .single();
+
+    if (restaurantError || !restaurant) {
+      console.error('[credit-stamp] Restaurant not found:', restaurantError);
+      return new Response(
+        JSON.stringify({ skipped: true, reason: 'restaurant_not_found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const settings = restaurant.settings as {
+      loyalty_enabled?: boolean;
+      loyalty_stamps_goal?: number;
+      loyalty_min_order?: number;
+      loyalty_reward_value?: number;
+    } | null;
+
+    if (!settings?.loyalty_enabled) {
+      console.log('[credit-stamp] Loyalty program disabled for this restaurant');
+      return new Response(
+        JSON.stringify({ skipped: true, reason: 'loyalty_disabled' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // GUARD 4: Check if status is 'delivered'
+    if (status !== 'delivered') {
+      console.log(`[credit-stamp] Status is ${status}, not 'delivered'. Skipping.`);
+      return new Response(
+        JSON.stringify({ skipped: true, reason: 'status_not_delivered' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -75,8 +92,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // GUARD 4: Check minimum order value
-    const minOrder = config.loyalty_min_order ?? 50;
+    // GUARD 5: Check minimum order value
+    const minOrder = settings.loyalty_min_order ?? 50;
     if ((order.total ?? 0) < minOrder) {
       console.log(`[credit-stamp] Order total ${order.total} is below minimum ${minOrder}`);
       return new Response(
@@ -90,7 +107,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // GUARD 5: Check if customer exists
+    // GUARD 6: Check if customer exists
     if (!order.customer_id) {
       console.log('[credit-stamp] Order has no customer_id');
       return new Response(
@@ -147,7 +164,7 @@ Deno.serve(async (req) => {
       // Don't fail - stamp was already credited to customer
     }
 
-    // Record transaction for audit
+    // Record transaction for audit with restaurant_id
     const { error: transactionError } = await supabase
       .from('stamp_transactions')
       .insert({
@@ -157,6 +174,7 @@ Deno.serve(async (req) => {
         amount: 1,
         balance_after: newStampsCount,
         notes: `Selo creditado - Pedido #${orderId.slice(0, 8)}`,
+        restaurant_id: order.restaurant_id,
       });
 
     if (transactionError) {
@@ -164,7 +182,7 @@ Deno.serve(async (req) => {
       // Don't fail - stamp was already credited
     }
 
-    const stampsGoal = config.loyalty_stamps_goal ?? 8;
+    const stampsGoal = settings.loyalty_stamps_goal ?? 8;
     const rewardAvailable = newStampsCount >= stampsGoal;
     
     console.log(`[credit-stamp] SUCCESS! Customer ${customer.id} now has ${newStampsCount}/${stampsGoal} stamps`);
