@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, ArrowLeft, Mail, Lock, User, Phone } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 const loginSchema = z.object({
   email: z.string().trim().email({ message: 'E-mail inválido' }),
@@ -39,6 +39,8 @@ const formatPhone = (value: string) => {
 
 export default function Auth() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
+  const { restaurant } = useRestaurantContext();
   const { user, loading, signIn, signUp } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
@@ -61,9 +63,9 @@ export default function Auth() {
   // Redirect if already logged in
   useEffect(() => {
     if (!loading && user) {
-      navigate('/account');
+      navigate(`/${slug}/account`);
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, slug]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,7 +162,7 @@ export default function Auth() {
       {/* Header */}
       <header className="p-4">
         <Link 
-          to="/" 
+          to={`/${slug}/menu`}
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -173,8 +175,8 @@ export default function Auth() {
         <Card className="w-full max-w-md border-border bg-card">
           <CardHeader className="text-center space-y-2">
             <img 
-              src="/logo-astral.png" 
-              alt="Astral Gastro Bar" 
+              src={restaurant?.logo_url || '/placeholder.svg'} 
+              alt={restaurant?.name || 'Restaurante'} 
               className="h-16 mx-auto mb-2"
             />
             <CardTitle className="text-2xl font-bold text-foreground">
@@ -373,7 +375,7 @@ export default function Auth() {
               <Button 
                 variant="outline" 
                 className="w-full"
-                onClick={() => navigate('/')}
+                onClick={() => navigate(`/${slug}/menu`)}
               >
                 Continuar como visitante
               </Button>
