@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Search, Package, Clock, CheckCircle, XCircle, Loader2, LogOut, User } from 'lucide-react';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Footer } from '@/components/layout/Footer';
@@ -26,6 +26,7 @@ const statusConfig: Record<string, { label: string; icon: React.ReactNode; color
 
 export default function Account() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const { user, loading: authLoading, signOut } = useAuth();
   
   const [phone, setPhone] = useState('');
@@ -127,7 +128,7 @@ export default function Account() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(`/${slug}/menu`)}
             className="shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -215,7 +216,7 @@ export default function Account() {
                     </div>
                     <Button
                       size="sm"
-                      onClick={() => navigate('/auth')}
+                      onClick={() => navigate(`/${slug}/auth`)}
                     >
                       Entrar
                     </Button>
@@ -371,7 +372,7 @@ export default function Account() {
                         variant="outline"
                         size="sm"
                         className="w-full mt-3"
-                        onClick={() => navigate(`/order/${order.id}`)}
+                        onClick={() => navigate(`/${slug}/order/${order.id}`)}
                       >
                         Acompanhar Pedido
                       </Button>
