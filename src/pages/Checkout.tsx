@@ -392,7 +392,7 @@ export default function Checkout() {
   };
 
   if (items.length === 0) {
-    navigate(slug ? `/${slug}/menu` : "/");
+    navigate(`/${slug}/menu`);
     return null;
   }
 
@@ -406,7 +406,7 @@ export default function Checkout() {
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">Restaurante Fechado</h1>
           <p className="text-muted-foreground mb-6">No momento não estamos aceitando pedidos. Volte mais tarde!</p>
-          <Button onClick={() => navigate(slug ? `/${slug}/menu` : "/")}>Voltar ao Cardápio</Button>
+          <Button onClick={() => navigate(`/${slug}/menu`)}>Voltar ao Cardápio</Button>
         </div>
       </div>
     );

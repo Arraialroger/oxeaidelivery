@@ -83,7 +83,7 @@ const statusSteps = [
 ];
 
 export default function OrderTracking() {
-  const { orderId } = useParams<{ orderId: string }>();
+  const { orderId, slug } = useParams<{ orderId: string; slug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderData | null>(null);
@@ -277,7 +277,7 @@ export default function OrderTracking() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">Pedido não encontrado</p>
-        <button onClick={() => navigate('/')} className="text-primary underline">
+        <button onClick={() => navigate(`/${slug}/menu`)} className="text-primary underline">
           Voltar ao Menu
         </button>
       </div>
@@ -289,7 +289,7 @@ export default function OrderTracking() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-card border-b border-border">
         <div className="flex items-center gap-3 p-4">
-          <button onClick={() => navigate('/')}>
+          <button onClick={() => navigate(`/${slug}/menu`)}>
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div className="flex-1">
