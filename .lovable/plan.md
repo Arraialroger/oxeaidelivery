@@ -1,135 +1,247 @@
 
-# Diagnóstico: Redirecionamento Incorreto Após Confirmação de E-mail
+# Auditoria Completa de Autenticação Multi-Tenant
 
-## Problema Identificado
+## Resumo Executivo
 
-Ao criar uma conta em `/bruttus/account`, após confirmar o e-mail, o usuário é redirecionado para `/astral/menu` em vez de `/bruttus/menu` ou `/bruttus/account`.
+Analisei **10 arquivos** relacionados a autenticação e navegação. Identifiquei **6 pontos de inconsistência** que quebram o contexto multi-tenant, afetando a experiência do usuário entre restaurantes.
 
-## Causa Raiz
+---
 
-O problema está na linha 72 do arquivo `src/hooks/useAuth.ts`:
+## Status por Arquivo
 
+| Arquivo | Status | Problemas |
+|---------|--------|-----------|
+| `useAuth.ts` | ✅ OK | Recentemente corrigido com slug |
+| `Auth.tsx` | ✅ OK | Recentemente corrigido |
+| `Account.tsx` | ✅ OK | Recentemente corrigido |
+| `Admin.tsx` | ✅ OK | Usa slug corretamente |
+| `AdminLogin.tsx` | ✅ OK | Usa slug corretamente |
+| `AdminCustomers.tsx` | ✅ OK | Usa slug corretamente |
+| `BottomNav.tsx` | ⚠️ AVISO | Fallback sem slug |
+| `OrderTracking.tsx` | ❌ CRÍTICO | 2 navegações quebradas |
+| `Checkout.tsx` | ⚠️ AVISO | 1 navegação com fallback |
+
+---
+
+## Problemas Identificados
+
+### 1. OrderTracking.tsx - CRÍTICO (2 problemas)
+
+**Linha 280** - "Voltar ao Menu" quando pedido não encontrado:
 ```typescript
-const signUp = async (email: string, password: string, metadata?: { name?: string; phone?: string }) => {
-  const redirectUrl = `${window.location.origin}/`;  // <-- PROBLEMA AQUI
-  // ...
-}
+// ATUAL (ERRADO)
+<button onClick={() => navigate('/')} className="text-primary underline">
+  Voltar ao Menu
+</button>
+
+// CORRETO
+<button onClick={() => navigate(`/${slug}/menu`)} className="text-primary underline">
+  Voltar ao Menu
+</button>
 ```
 
-O `emailRedirectTo` está configurado como `${window.location.origin}/` (a raiz do site), **sem incluir o slug do restaurante**.
-
-### Fluxo Atual (Quebrado)
-
-```text
-1. Usuário em /bruttus/auth clica "Criar conta"
-2. useAuth.signUp() é chamado com redirectUrl = "https://astral.oxeai.com.br/"
-3. E-mail de confirmação é enviado com link para "https://astral.oxeai.com.br/"
-4. Usuário clica no link do e-mail
-5. Supabase autentica e redireciona para "https://astral.oxeai.com.br/"
-6. App carrega na raiz "/" (página Index/landing)
-7. Como o useAuth detecta usuário logado, mas não há slug...
-8. O comportamento padrão ou algum fallback leva a /astral/menu
-```
-
-O slug `bruttus` é completamente perdido no passo 2, pois o `useAuth` não tem acesso ao contexto do restaurante (ele é um hook genérico, não conectado ao RestaurantContext).
-
-## Solução Proposta
-
-### Opção 1: Passar o slug para o signUp (Recomendada)
-
-Modificar a função `signUp` para aceitar o slug como parâmetro:
-
-**src/hooks/useAuth.ts:**
+**Linha 292** - Botão voltar no header:
 ```typescript
-const signUp = async (
-  email: string, 
-  password: string, 
-  metadata?: { name?: string; phone?: string },
-  restaurantSlug?: string  // Novo parâmetro
-) => {
-  // Usar slug se fornecido, senão usa raiz
-  const redirectPath = restaurantSlug ? `/${restaurantSlug}/account` : '/';
-  const redirectUrl = `${window.location.origin}${redirectPath}`;
-  
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: redirectUrl,
-      data: {
-        name: metadata?.name,
-        phone: metadata?.phone,
-        restaurant_slug: restaurantSlug, // Salvar para referência futura
-      },
-    },
-  });
-  return { error };
-};
+// ATUAL (ERRADO)
+<button onClick={() => navigate('/')}>
+  <ArrowLeft className="w-6 h-6" />
+</button>
+
+// CORRETO
+<button onClick={() => navigate(`/${slug}/menu`)}>
+  <ArrowLeft className="w-6 h-6" />
+</button>
 ```
 
-**src/pages/Auth.tsx:**
+**Impacto**: Usuário acompanhando pedido em `/bruttus/order/123` que clica em "Voltar" vai para `/` (landing page) em vez de `/bruttus/menu`.
+
+---
+
+### 2. BottomNav.tsx - AVISO (1 problema)
+
+**Linha 20** - Fallback do accountPath:
 ```typescript
-const { error: authError } = await signUp(signupEmail, signupPassword, {
-  name: signupName,
-  phone: signupPhoneDigits,
-}, slug);  // Passar o slug aqui
+// ATUAL (RISCO)
+const accountPath = slug ? `/${slug}/account` : '/account';
+
+// IDEAL (sem fallback perigoso)
+const accountPath = `/${slug}/account`;
 ```
 
-### Opção 2: Usar URL atual como redirect
+**Análise**: Este código nunca deve executar o fallback porque o BottomNav só é renderizado dentro do RestaurantLayout, que sempre terá um slug. Porém, o fallback para `/account` criaria uma rota inexistente se acionado.
 
-Uma alternativa mais simples seria usar a URL atual como base:
+**Impacto**: Baixo - o cenário sem slug é teoricamente impossível na arquitetura atual, mas o código defensivo com fallback incorreto pode mascarar bugs futuros.
 
+---
+
+### 3. Checkout.tsx - AVISO (1 problema)
+
+**Linha 409** - Botão quando restaurante está fechado:
 ```typescript
-const signUp = async (email: string, password: string, metadata?: ...) => {
-  // Pega a URL atual e substitui /auth por /account
-  const currentPath = window.location.pathname;
-  const redirectPath = currentPath.replace('/auth', '/account');
-  const redirectUrl = `${window.location.origin}${redirectPath}`;
-  // ...
-}
+// ATUAL (COM FALLBACK)
+<Button onClick={() => navigate(slug ? `/${slug}/menu` : "/")}>Voltar ao Cardápio</Button>
+
+// IDEAL (sem fallback)
+<Button onClick={() => navigate(`/${slug}/menu`)}>Voltar ao Cardápio</Button>
 ```
 
-## Arquivos a Modificar
+**Análise**: Similar ao BottomNav, este fallback nunca deveria ser acionado porque Checkout está dentro do RestaurantLayout.
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/hooks/useAuth.ts` | Adicionar parâmetro `slug` ao `signUp` e construir URL dinâmica |
-| `src/pages/Auth.tsx` | Passar o `slug` ao chamar `signUp` |
+**Impacto**: Baixo - mesma situação do BottomNav.
 
-## Fluxo Corrigido
+---
 
-```text
-1. Usuário em /bruttus/auth clica "Criar conta"
-2. useAuth.signUp() é chamado com slug = "bruttus"
-3. redirectUrl = "https://astral.oxeai.com.br/bruttus/account"
-4. E-mail de confirmação contém link correto
-5. Usuário clica no link
-6. Supabase redireciona para /bruttus/account
-7. Usuário vê a página de conta do Bruttus (contexto correto)
+## Arquivos Verificados (OK)
+
+### useAuth.ts ✅
+- `signUp` aceita `restaurantSlug` como parâmetro
+- `emailRedirectTo` construído dinamicamente: `/${slug}/account`
+- `signIn` e `signOut` não precisam de contexto de restaurante
+
+### Auth.tsx ✅
+- Usa `useParams` para extrair slug
+- Usa `useRestaurantContext` para branding dinâmico
+- Todas as navegações incluem slug: `/${slug}/account`, `/${slug}/menu`
+- Passa slug para `signUp`
+
+### Account.tsx ✅
+- Usa `useParams` para extrair slug
+- Navegações corrigidas: `/${slug}/menu`, `/${slug}/auth`, `/${slug}/order/${id}`
+
+### Admin.tsx ✅
+- Links externos usam `/${slug}/menu`, `/${slug}/kitchen`
+- Logout redireciona para `/${slug}/admin/login`
+
+### AdminLogin.tsx ✅
+- Pós-login redireciona para `/${slug}/admin`
+- Botão voltar vai para `/${slug}/menu`
+
+### AdminCustomers.tsx ✅
+- Logout redireciona para `/${slug}/admin/login`
+- Navegações mantêm contexto do slug
+
+---
+
+## Plano de Correção
+
+### Fase 1: Correções Críticas (OrderTracking.tsx)
+
+**Alterações necessárias:**
+
+1. Adicionar extração do slug (já existe orderId, adicionar slug):
+```typescript
+const { orderId, slug } = useParams<{ orderId: string; slug: string }>();
 ```
 
-## Validação Pós-Implementação
+2. Corrigir navegação quando pedido não encontrado (linha 280):
+```typescript
+<button onClick={() => navigate(`/${slug}/menu`)} className="text-primary underline">
+```
 
-| Teste | Resultado Esperado |
-|-------|-------------------|
-| Criar conta em `/bruttus/auth` | E-mail contém link para `/bruttus/account` |
-| Criar conta em `/astral/auth` | E-mail contém link para `/astral/account` |
-| Confirmar e-mail (Bruttus) | Redireciona para `/bruttus/account` |
-| Confirmar e-mail (Astral) | Redireciona para `/astral/account` |
+3. Corrigir botão voltar no header (linha 292):
+```typescript
+<button onClick={() => navigate(`/${slug}/menu`)}>
+```
 
-## Consideração sobre Link Expirado
+### Fase 2: Limpeza Defensiva (Opcional)
 
-Nos logs de autenticação, vi mensagens de "Email link is invalid or has expired" - isso indica que o link de confirmação tem validade limitada. Isso é comportamento normal do Supabase e não está relacionado a este bug.
+Remover fallbacks desnecessários em:
+- `BottomNav.tsx` linha 20
+- `Checkout.tsx` linha 409
 
-## Risco
+Isso é opcional porque esses fallbacks nunca são acionados na arquitetura atual, mas removê-los tornaria o código mais limpo e explícito.
 
-**Baixo** - A mudança é cirúrgica e afeta apenas o redirect após signup. Login, logout e outras funcionalidades permanecem inalteradas.
+---
+
+## Fluxos de Autenticação Validados
+
+### Fluxo de Signup (Cliente)
+```
+/bruttus/auth > Criar conta
+     ↓
+useAuth.signUp(email, pass, metadata, "bruttus")
+     ↓
+emailRedirectTo = "https://site.com/bruttus/account"
+     ↓
+E-mail enviado com link correto
+     ↓
+Usuário confirma e vai para /bruttus/account ✅
+```
+
+### Fluxo de Login (Cliente)
+```
+/bruttus/auth > Login
+     ↓
+useAuth.signIn(email, pass)
+     ↓
+Auth.tsx: navigate(`/${slug}/account`) = /bruttus/account ✅
+```
+
+### Fluxo de Logout (Cliente)
+```
+/bruttus/account > Sair
+     ↓
+useAuth.signOut()
+     ↓
+Permanece em /bruttus/account (deslogado) ✅
+```
+
+### Fluxo de Login (Admin)
+```
+/bruttus/admin/login > Login
+     ↓
+useEffect detecta isAdmin
+     ↓
+navigate(`/${slug}/admin`) = /bruttus/admin ✅
+```
+
+### Fluxo de Logout (Admin)
+```
+/bruttus/admin > Logout
+     ↓
+signOut()
+     ↓
+navigate(`/${slug}/admin/login`) = /bruttus/admin/login ✅
+```
+
+---
+
+## Resumo de Alterações
+
+| Arquivo | Tipo | Alterações |
+|---------|------|------------|
+| `OrderTracking.tsx` | Crítico | 3 alterações (adicionar slug + 2 navigates) |
+| `BottomNav.tsx` | Opcional | 1 alteração (remover fallback) |
+| `Checkout.tsx` | Opcional | 1 alteração (remover fallback) |
+
+---
+
+## Validação Pós-Correção
+
+| Cenário | Teste | Esperado |
+|---------|-------|----------|
+| Order Tracking voltar | `/bruttus/order/123` > Voltar | `/bruttus/menu` |
+| Order não encontrado | `/bruttus/order/xxx` > Voltar ao Menu | `/bruttus/menu` |
+| Login cliente | `/bruttus/auth` > Login | `/bruttus/account` |
+| Signup cliente | `/bruttus/auth` > Criar conta | Email → `/bruttus/account` |
+| Logout cliente | `/bruttus/account` > Sair | Permanece em `/bruttus/account` |
+| Login admin | `/bruttus/admin/login` | `/bruttus/admin` |
+| Logout admin | `/bruttus/admin` > Sair | `/bruttus/admin/login` |
+
+---
 
 ## Estimativa
 
 | Tarefa | Tempo |
 |--------|-------|
-| Atualizar useAuth.ts | 2 min |
-| Atualizar Auth.tsx | 1 min |
-| Testar fluxo completo | 5 min |
-| **Total** | **~8 min** |
+| Corrigir OrderTracking.tsx | 3 min |
+| Limpeza BottomNav.tsx (opcional) | 1 min |
+| Limpeza Checkout.tsx (opcional) | 1 min |
+| Testar fluxos | 5 min |
+| **Total** | **~10 min** |
+
+---
+
+## Risco
+
+**Baixo** - As correções são cirúrgicas e afetam apenas navegação. Não há alterações em lógica de autenticação ou dados.
