@@ -125,7 +125,7 @@ export default function Auth() {
     const { error: authError } = await signUp(signupEmail, signupPassword, {
       name: signupName,
       phone: signupPhoneDigits,
-    });
+    }, slug);
 
     if (authError) {
       setIsSubmitting(false);

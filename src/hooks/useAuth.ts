@@ -68,8 +68,14 @@ export function useAuth() {
     return { error };
   };
 
-  const signUp = async (email: string, password: string, metadata?: { name?: string; phone?: string }) => {
-    const redirectUrl = `${window.location.origin}/`;
+  const signUp = async (
+    email: string, 
+    password: string, 
+    metadata?: { name?: string; phone?: string },
+    restaurantSlug?: string
+  ) => {
+    const redirectPath = restaurantSlug ? `/${restaurantSlug}/account` : '/';
+    const redirectUrl = `${window.location.origin}${redirectPath}`;
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -78,6 +84,7 @@ export function useAuth() {
         data: {
           name: metadata?.name,
           phone: metadata?.phone,
+          restaurant_slug: restaurantSlug,
         },
       },
     });
