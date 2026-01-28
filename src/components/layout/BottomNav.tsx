@@ -15,9 +15,9 @@ export function BottomNav({ onCartClick }: BottomNavProps) {
   const [isPopping, setIsPopping] = useState(false);
   const prevTotalItems = useRef(totalItems);
 
-  // Build paths with slug
-  const menuPath = slug ? `/${slug}/menu` : '/';
-  const accountPath = slug ? `/${slug}/account` : '/account';
+  // Build paths with slug (slug is always present within RestaurantLayout)
+  const menuPath = `/${slug}/menu`;
+  const accountPath = `/${slug}/account`;
 
   // Play a subtle "pling" sound
   const playPlingSound = () => {
