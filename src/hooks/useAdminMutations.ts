@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Product, Category } from '@/types';
+import type { RestaurantSettings } from '@/types/restaurant';
+import { DEFAULT_SETTINGS } from '@/types/restaurant';
 import { useToast } from '@/hooks/use-toast';
 
 export function useCreateProduct(restaurantId: string | null) {
@@ -221,6 +223,67 @@ export function useReorderCategories() {
   });
 }
 
+/**
+ * Hook to update restaurant settings (multi-tenant).
+ * Updates the restaurants.settings JSONB column for the specific restaurant.
+ */
+export function useUpdateRestaurantSettings(restaurantId: string | null) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (newSettings: Partial<RestaurantSettings> & { hero_banner_url?: string | null }) => {
+      if (!restaurantId) throw new Error('Restaurant ID is required');
+      
+      // Fetch current settings
+      const { data: current, error: fetchError } = await supabase
+        .from('restaurants')
+        .select('settings, hero_banner_url')
+        .eq('id', restaurantId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Extract hero_banner_url if present (it's a separate column)
+      const { hero_banner_url, ...settingsToMerge } = newSettings;
+      
+      // Merge settings with defaults as fallback - cast to handle Json type
+      const currentSettings = (current?.settings ?? DEFAULT_SETTINGS) as unknown as RestaurantSettings;
+      const mergedSettings = { 
+        ...DEFAULT_SETTINGS,
+        ...currentSettings, 
+        ...settingsToMerge 
+      };
+      
+      // Build update payload - cast settings back to Json for Supabase
+      const updatePayload: Record<string, unknown> = {
+        settings: mergedSettings as unknown as Record<string, unknown>,
+      };
+      
+      // Only include hero_banner_url if it was explicitly provided
+      if (hero_banner_url !== undefined) {
+        updatePayload.hero_banner_url = hero_banner_url;
+      }
+      
+      const { data, error } = await supabase
+        .from('restaurants')
+        .update(updatePayload)
+        .eq('id', restaurantId)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      // Invalidate restaurant queries to refresh the context
+      queryClient.invalidateQueries({ queryKey: ['restaurant'] });
+    },
+  });
+}
+
+/**
+ * @deprecated Use useUpdateRestaurantSettings instead for multi-tenant support
+ */
 export function useUpdateConfig() {
   const queryClient = useQueryClient();
   
