@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
 import Index from "./pages/Index";
+import RestaurantDetails from "./pages/RestaurantDetails";
 
 const queryClient = new QueryClient();
 
@@ -32,8 +33,11 @@ const App = () => (
             {/* Landing / Home page */}
             <Route path="/" element={<Index />} />
             
+            {/* Restaurant details page (outside RestaurantLayout for lighter context) */}
+            <Route path="/:slug" element={<RestaurantDetails />} />
+            
             {/* Multi-tenant restaurant routes */}
-            <Route path="/:slug" element={<RestaurantLayout />}>
+            <Route path="/:slug/*" element={<RestaurantLayout />}>
               <Route index element={<Navigate to="menu" replace />} />
               <Route path="menu" element={<Menu />} />
               <Route path="checkout" element={<Checkout />} />

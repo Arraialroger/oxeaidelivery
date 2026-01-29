@@ -720,12 +720,19 @@ export type Database = {
       }
       restaurants: {
         Row: {
+          accepted_payments: string[] | null
           address: string | null
+          avg_delivery_time: number | null
           category: string | null
           created_at: string | null
+          description: string | null
+          facebook: string | null
+          gallery_urls: string[] | null
           hero_banner_url: string | null
           id: string
+          instagram: string | null
           logo_url: string | null
+          min_order: number | null
           name: string
           owner_id: string | null
           phone: string | null
@@ -738,12 +745,19 @@ export type Database = {
           whatsapp: string | null
         }
         Insert: {
+          accepted_payments?: string[] | null
           address?: string | null
+          avg_delivery_time?: number | null
           category?: string | null
           created_at?: string | null
+          description?: string | null
+          facebook?: string | null
+          gallery_urls?: string[] | null
           hero_banner_url?: string | null
           id?: string
+          instagram?: string | null
           logo_url?: string | null
+          min_order?: number | null
           name: string
           owner_id?: string | null
           phone?: string | null
@@ -756,12 +770,19 @@ export type Database = {
           whatsapp?: string | null
         }
         Update: {
+          accepted_payments?: string[] | null
           address?: string | null
+          avg_delivery_time?: number | null
           category?: string | null
           created_at?: string | null
+          description?: string | null
+          facebook?: string | null
+          gallery_urls?: string[] | null
           hero_banner_url?: string | null
           id?: string
+          instagram?: string | null
           logo_url?: string | null
+          min_order?: number | null
           name?: string
           owner_id?: string | null
           phone?: string | null
