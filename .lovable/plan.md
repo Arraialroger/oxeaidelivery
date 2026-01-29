@@ -1,187 +1,130 @@
-# Correção: Configurações Multi-Tenant ✅ IMPLEMENTADO
 
-## Status: CONCLUÍDO
+
+# Correção: Erro "Cannot coerce the result to a single JSON object"
 
 ## Diagnóstico
 
-O painel administrativo está usando a **tabela `config` legada** (1 linha global) em vez da coluna **`restaurants.settings`** (JSONB por restaurante).
+O erro ocorre porque a **RLS policy bloqueia o UPDATE** na tabela `restaurants`.
 
-### Arquitetura Atual (Problema)
+### Causa Raiz
 
-```text
-ConfigForm.tsx
-     ↓
-useUpdateConfig()
-     ↓
-UPDATE config SET ... WHERE id = 1  ← ERRADO! Tabela global
-```
+| Dado | Valor |
+|------|-------|
+| Policy atual | `owner_id = auth.uid()` |
+| `restaurants.owner_id` | `NULL` para ambos restaurantes |
+| Resultado | Query retorna 0 linhas, `.single()` falha |
 
-### Arquitetura Correta (Solução)
+A arquitetura de autenticação do sistema usa `user_roles` para definir administradores:
 
 ```text
-ConfigForm.tsx
-     ↓
-useUpdateRestaurantSettings()
-     ↓
-UPDATE restaurants SET settings = ... WHERE id = {restaurantId}  ← CORRETO! Multi-tenant
+user_roles
+├── user_id: eef6d9a1... (arraialroger@gmail.com)
+├── role: admin
+└── restaurant_id: 5fc8a42e... (Bruttus)
 ```
+
+Porém, a RLS policy da tabela `restaurants` olha para `owner_id`, que está vazio.
 
 ---
 
-## Dados Atuais no Banco
+## Solução
 
-| Restaurante | Tabela | loyalty_enabled |
-|-------------|--------|-----------------|
-| Astral | `restaurants.settings` | true |
-| Bruttus | `restaurants.settings` | false |
-| Global (legada) | `config` | true |
+### Opção A: Atualizar RLS Policy (Recomendada)
 
-Os dados na tabela correta (`restaurants`) já estão lá! O problema é que o painel de admin não lê nem escreve nela.
+Modificar a policy para aceitar tanto `owner_id` quanto admins via `user_roles`:
+
+```sql
+-- Remover policy antiga
+DROP POLICY IF EXISTS "Owners can manage their restaurant" ON public.restaurants;
+
+-- Criar nova policy que aceita owners OU admins
+CREATE POLICY "Owners and admins can manage their restaurant"
+ON public.restaurants
+FOR ALL
+TO authenticated
+USING (
+  owner_id = auth.uid() 
+  OR (
+    has_role(auth.uid(), 'admin'::app_role) 
+    AND id = get_user_restaurant_id(auth.uid())
+  )
+)
+WITH CHECK (
+  owner_id = auth.uid() 
+  OR (
+    has_role(auth.uid(), 'admin'::app_role) 
+    AND id = get_user_restaurant_id(auth.uid())
+  )
+);
+```
+
+### Opção B: Preencher owner_id (Simples, mas limitada)
+
+Atualizar os restaurantes com o `user_id` dos admins:
+
+```sql
+UPDATE restaurants SET owner_id = 'e7a6285a-7d5c-4bdc-a8f5-021444c106ea' WHERE slug = 'astral';
+UPDATE restaurants SET owner_id = 'eef6d9a1-9676-4de2-8254-36c587bfd81d' WHERE slug = 'bruttus';
+```
+
+**Limitação:** Só um owner por restaurante. Se quiser múltiplos admins, use Opção A.
 
 ---
 
-## Plano de Correção
+## Correção Adicional no Código
 
-### Fase 1: Atualizar Hook de Leitura
-
-**Arquivo:** `src/hooks/useConfig.ts`
-
-O hook já lê da tabela correta (`restaurants.settings`), mas precisa passar o `restaurantId` para o contexto.
-
-Verificar se está funcionando corretamente.
-
-### Fase 2: Criar Hook de Escrita Multi-Tenant
+Mesmo após corrigir a RLS, o código deve tratar graciosamente quando nenhum resultado retorna:
 
 **Arquivo:** `src/hooks/useAdminMutations.ts`
 
-Substituir o `useUpdateConfig` atual por `useUpdateRestaurantSettings`:
+**Alteração:** Trocar `.single()` por `.maybeSingle()` ou remover retorno:
 
 ```typescript
-export function useUpdateRestaurantSettings(restaurantId: string | null) {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (settings: Partial<RestaurantSettings>) => {
-      if (!restaurantId) throw new Error('Restaurant ID is required');
-      
-      // Buscar settings atuais
-      const { data: current } = await supabase
-        .from('restaurants')
-        .select('settings')
-        .eq('id', restaurantId)
-        .single();
-      
-      // Mesclar settings
-      const mergedSettings = { ...current?.settings, ...settings };
-      
-      const { data, error } = await supabase
-        .from('restaurants')
-        .update({ settings: mergedSettings })
-        .eq('id', restaurantId)
-        .select()
-        .single();
-        
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['restaurant'] });
-    },
-  });
-}
+// Linha 271-272 - ANTES
+.select()
+.single();
+
+// DEPOIS
+.select()
+.maybeSingle();  // Não falha se 0 linhas
 ```
 
-### Fase 3: Atualizar ConfigForm
+Ou simplesmente remover o `.select().single()` já que não precisamos do retorno:
 
-**Arquivo:** `src/components/admin/ConfigForm.tsx`
+```typescript
+const { error, count } = await supabase
+  .from('restaurants')
+  .update(updatePayload)
+  .eq('id', restaurantId);
+  
+if (error) throw error;
+if (count === 0) throw new Error('Você não tem permissão para atualizar este restaurante.');
+```
 
-1. Importar o contexto do restaurante
-2. Usar o novo hook `useUpdateRestaurantSettings(restaurantId)`
-3. Adicionar campos extras do restaurante (banner, nome, etc.)
+---
 
-### Fase 4: Remover Tabela Legada
+## Plano de Execução
 
-Após confirmar que tudo funciona, criar migration para:
-
-1. Remover a tabela `config`
-2. Remover referências ao hook antigo `useUpdateConfig`
+| Passo | Ação |
+|-------|------|
+| 1 | Criar migration para atualizar RLS policy da tabela `restaurants` |
+| 2 | Atualizar `useUpdateRestaurantSettings` para tratar 0 linhas afetadas |
+| 3 | Testar salvamento de configurações em ambos restaurantes |
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useAdminMutations.ts` | Adicionar `useUpdateRestaurantSettings` |
-| `src/components/admin/ConfigForm.tsx` | Usar contexto e novo hook |
-| `src/hooks/useConfig.ts` | Verificar compatibilidade |
-| Migration SQL | Remover tabela `config` (opcional, após validação) |
+| Arquivo/Recurso | Alteração |
+|-----------------|-----------|
+| Migration SQL | Nova RLS policy para `restaurants` |
+| `src/hooks/useAdminMutations.ts` | Remover `.single()` e adicionar verificação de `count` |
 
 ---
 
-## Fluxo Corrigido
+## Impacto
 
-```text
-Admin acessa /bruttus/admin
-          ↓
-RestaurantContext identifica restaurantId = "5fc8a42e..."
-          ↓
-ConfigForm carrega settings do Bruttus
-          ↓
-Admin habilita loyalty_enabled
-          ↓
-UPDATE restaurants SET settings = {..., loyalty_enabled: true} 
-WHERE id = "5fc8a42e..."
-          ↓
-Bruttus agora tem fidelidade ativada!
-```
-
----
-
-## Benefícios
-
-1. Cada restaurante tem suas próprias configurações
-2. Não há mais confusão com tabela global
-3. Arquitetura consistente com o resto do sistema multi-tenant
-4. Código mais simples e manutenível
-
----
-
-## Seção Técnica
-
-### Campos a migrar da tabela `config` para `restaurants.settings`
-
-A tabela `config` tem esses campos que precisam estar em `settings`:
-
-| Campo `config` | Campo `settings` | Status |
-|----------------|------------------|--------|
-| `delivery_fee` | `delivery_fee` | Já existe |
-| `restaurant_open` | `is_open` | Já existe |
-| `kds_enabled` | `kds_enabled` | Já existe |
-| `hero_banner_url` | Deveria ir para `restaurants.hero_banner_url` | Já existe coluna na tabela |
-| `loyalty_enabled` | `loyalty_enabled` | Já existe |
-| `loyalty_stamps_goal` | `loyalty_stamps_goal` | Já existe |
-| `loyalty_min_order` | `loyalty_min_order` | Já existe |
-| `loyalty_reward_value` | `loyalty_reward_value` | Já existe |
-
-### RLS da tabela `restaurants`
-
-A política atual permite que owners atualizem seus restaurantes:
-
-```sql
-Policy: "Owners can manage their restaurant"
-USING (owner_id = auth.uid())
-WITH CHECK (owner_id = auth.uid())
-```
-
-Isso significa que o admin precisa estar logado como owner. Precisamos verificar se a policy permite também admins com role na `user_roles`.
-
----
-
-## Indicadores de Sucesso
-
-1. Admin do Bruttus consegue habilitar fidelidade
-2. Configurações do Astral não são afetadas
-3. Cada restaurante vê apenas suas próprias configurações
-4. A tabela `config` pode ser removida sem impacto
+- Admin do Bruttus poderá salvar configurações do Bruttus
+- Admin do Astral poderá salvar configurações do Astral
+- Cada um só consegue editar seu próprio restaurante (isolamento mantido)
 
