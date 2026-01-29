@@ -10,8 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { GalleryUploader } from './GalleryUploader';
+import { ImageUploader } from './ImageUploader';
 import { useRestaurantProfile, UpdateProfileData } from '@/hooks/useRestaurantProfile';
-import { Loader2, Save, Instagram, Facebook, Store } from 'lucide-react';
+import { Loader2, Save, Instagram, Store, Image } from 'lucide-react';
 
 const PAYMENT_OPTIONS = [
   { id: 'pix', label: 'PIX' },
@@ -21,6 +22,8 @@ const PAYMENT_OPTIONS = [
 ];
 
 const formSchema = z.object({
+  logo_url: z.string().optional().nullable(),
+  hero_banner_url: z.string().optional().nullable(),
   description: z.string().max(500, 'Máximo 500 caracteres').optional().nullable(),
   instagram: z.string().max(50).optional().nullable(),
   facebook: z.string().max(100).optional().nullable(),
@@ -41,6 +44,8 @@ export function RestaurantProfileForm() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      logo_url: null,
+      hero_banner_url: null,
       description: '',
       instagram: '',
       facebook: '',
@@ -57,6 +62,8 @@ export function RestaurantProfileForm() {
   useEffect(() => {
     if (profile) {
       form.reset({
+        logo_url: profile.logo_url || null,
+        hero_banner_url: profile.hero_banner_url || null,
         description: profile.description || '',
         instagram: profile.instagram || '',
         facebook: profile.facebook || '',
@@ -73,6 +80,8 @@ export function RestaurantProfileForm() {
 
   const onSubmit = async (data: FormData) => {
     const updateData: UpdateProfileData = {
+      logo_url: data.logo_url || null,
+      hero_banner_url: data.hero_banner_url || null,
       description: data.description || null,
       instagram: data.instagram || null,
       facebook: data.facebook || null,
@@ -99,6 +108,61 @@ export function RestaurantProfileForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Logo and Banner */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Image className="w-4 h-4" />
+              Logo e Banner
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="logo_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Logo</FormLabel>
+                    <FormControl>
+                      <ImageUploader
+                        imageUrl={field.value}
+                        onImageChange={field.onChange}
+                        uploadImage={uploadImage}
+                        label="Logo"
+                        path="logo"
+                        aspectRatio={1}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="hero_banner_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Banner</FormLabel>
+                    <FormControl>
+                      <ImageUploader
+                        imageUrl={field.value}
+                        onImageChange={field.onChange}
+                        uploadImage={uploadImage}
+                        label="Banner"
+                        path="banner"
+                        aspectRatio={16 / 9}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Header Info */}
         <Card>
           <CardHeader className="pb-3">
@@ -109,10 +173,10 @@ export function RestaurantProfileForm() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              {profile?.logo_url && (
+              {form.watch('logo_url') && (
                 <img
-                  src={profile.logo_url}
-                  alt={profile.name}
+                  src={form.watch('logo_url')!}
+                  alt={profile?.name}
                   className="w-12 h-12 rounded-full object-cover"
                 />
               )}
