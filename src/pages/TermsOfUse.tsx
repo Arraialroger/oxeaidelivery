@@ -1,8 +1,16 @@
 import { ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useRestaurantBySlug } from "@/hooks/useRestaurant";
 
 const TermsOfUse = () => {
+  const { slug } = useParams<{ slug: string }>();
+  const { data: restaurant } = useRestaurantBySlug(slug);
+  
+  const restaurantName = restaurant?.name || 'Restaurante';
+  const whatsapp = restaurant?.whatsapp || restaurant?.phone || '(XX) XXXXX-XXXX';
+  const backLink = slug ? `/${slug}/menu` : '/';
+  
   const lastUpdated = new Date().toLocaleDateString('pt-BR', {
     year: 'numeric',
     month: 'long',
@@ -14,7 +22,7 @@ const TermsOfUse = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Link to="/">
+          <Link to={backLink}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -33,7 +41,7 @@ const TermsOfUse = () => {
           <section className="mb-8">
             <h2 className="text-lg font-semibold mb-3">1. Aceitação dos Termos</h2>
             <p className="text-muted-foreground mb-4">
-              Ao acessar e utilizar o aplicativo Astral Gastro Bar, você concorda em cumprir e estar 
+              Ao acessar e utilizar o aplicativo {restaurantName}, você concorda em cumprir e estar 
               vinculado a estes Termos de Uso. Se você não concordar com qualquer parte destes termos, 
               não deverá utilizar nosso aplicativo.
             </p>
@@ -42,7 +50,7 @@ const TermsOfUse = () => {
           <section className="mb-8">
             <h2 className="text-lg font-semibold mb-3">2. Descrição do Serviço</h2>
             <p className="text-muted-foreground mb-4">
-              O Astral Gastro Bar é um aplicativo de delivery de alimentos que permite aos usuários:
+              O {restaurantName} é um aplicativo de delivery de alimentos que permite aos usuários:
             </p>
             <ul className="list-disc list-inside text-muted-foreground mb-4 space-y-1">
               <li>Visualizar o cardápio de produtos disponíveis</li>
@@ -123,7 +131,7 @@ const TermsOfUse = () => {
             <h2 className="text-lg font-semibold mb-3">8. Propriedade Intelectual</h2>
             <p className="text-muted-foreground mb-4">
               Todo o conteúdo do aplicativo, incluindo textos, gráficos, logotipos, imagens e software, 
-              é de propriedade do Astral Gastro Bar ou de seus licenciadores e está protegido por leis 
+              é de propriedade do {restaurantName} ou de seus licenciadores e está protegido por leis 
               de propriedade intelectual.
             </p>
           </section>
@@ -131,7 +139,7 @@ const TermsOfUse = () => {
           <section className="mb-8">
             <h2 className="text-lg font-semibold mb-3">9. Limitação de Responsabilidade</h2>
             <p className="text-muted-foreground mb-4">
-              O Astral Gastro Bar não será responsável por:
+              O {restaurantName} não será responsável por:
             </p>
             <ul className="list-disc list-inside text-muted-foreground mb-4 space-y-1">
               <li>Danos indiretos, incidentais ou consequenciais</li>
@@ -164,8 +172,8 @@ const TermsOfUse = () => {
               Para dúvidas sobre estes Termos de Uso, entre em contato conosco:
             </p>
             <ul className="list-none text-muted-foreground space-y-1">
-              <li>E-mail: contato@astralgastrobar.com.br</li>
-              <li>WhatsApp: (XX) XXXXX-XXXX</li>
+              <li><strong>{restaurantName}</strong></li>
+              <li>WhatsApp: {whatsapp}</li>
             </ul>
           </section>
         </div>
@@ -174,7 +182,7 @@ const TermsOfUse = () => {
       {/* Footer */}
       <footer className="border-t py-6 mt-8">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Astral Gastro Bar. Todos os direitos reservados.
+          © {new Date().getFullYear()} {restaurantName}. Todos os direitos reservados.
         </div>
       </footer>
     </div>

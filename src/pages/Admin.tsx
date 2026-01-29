@@ -11,7 +11,8 @@ import { CategoryList } from '@/components/admin/CategoryList';
 import { ConfigForm } from '@/components/admin/ConfigForm';
 import { StampTransactionsList } from '@/components/admin/StampTransactionsList';
 import { RestaurantProfileForm } from '@/components/admin/RestaurantProfileForm';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store } from 'lucide-react';
+import { BusinessHoursForm } from '@/components/admin/BusinessHoursForm';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -82,7 +83,7 @@ export default function Admin() {
       {/* Content */}
       <main className="container max-w-2xl mx-auto px-4 py-6">
         <Tabs defaultValue="products" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="products" className="gap-2">
               <Package className="w-4 h-4" />
               <span className="hidden sm:inline">Produtos</span>
@@ -94,6 +95,10 @@ export default function Admin() {
             <TabsTrigger value="loyalty" className="gap-2">
               <Gift className="w-4 h-4" />
               <span className="hidden sm:inline">Fidelidade</span>
+            </TabsTrigger>
+            <TabsTrigger value="hours" className="gap-2">
+              <Clock className="w-4 h-4" />
+              <span className="hidden sm:inline">Horários</span>
             </TabsTrigger>
             <TabsTrigger value="profile" className="gap-2">
               <Store className="w-4 h-4" />
@@ -155,6 +160,11 @@ export default function Admin() {
               <h2 className="text-lg font-semibold">Programa de Fidelidade</h2>
             </div>
             <StampTransactionsList />
+          </TabsContent>
+
+          {/* Hours Tab */}
+          <TabsContent value="hours">
+            <BusinessHoursForm />
           </TabsContent>
 
           {/* Profile Tab */}

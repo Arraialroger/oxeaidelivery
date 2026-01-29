@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useUpdateRestaurantSettings } from '@/hooks/useAdminMutations';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Image as ImageIcon, Gift } from 'lucide-react';
+import { Loader2, Gift } from 'lucide-react';
 
 export function ConfigForm() {
   const { restaurant, restaurantId, settings } = useRestaurantContext();
@@ -17,7 +17,6 @@ export function ConfigForm() {
     delivery_fee: '',
     is_open: true,
     kds_enabled: true,
-    hero_banner_url: '',
     loyalty_enabled: false,
     loyalty_stamps_goal: '8',
     loyalty_min_order: '50',
@@ -26,19 +25,18 @@ export function ConfigForm() {
 
   // Load settings from restaurant context
   useEffect(() => {
-    if (settings && restaurant) {
+    if (settings) {
       setFormData({
         delivery_fee: settings.delivery_fee?.toString() || '0',
         is_open: settings.is_open ?? true,
         kds_enabled: settings.kds_enabled ?? true,
-        hero_banner_url: restaurant.hero_banner_url || '',
         loyalty_enabled: settings.loyalty_enabled ?? false,
         loyalty_stamps_goal: settings.loyalty_stamps_goal?.toString() || '8',
         loyalty_min_order: settings.loyalty_min_order?.toString() || '50',
         loyalty_reward_value: settings.loyalty_reward_value?.toString() || '50',
       });
     }
-  }, [settings, restaurant]);
+  }, [settings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +55,6 @@ export function ConfigForm() {
         delivery_fee: parseFloat(formData.delivery_fee) || 0,
         is_open: formData.is_open,
         kds_enabled: formData.kds_enabled,
-        hero_banner_url: formData.hero_banner_url || null,
         loyalty_enabled: formData.loyalty_enabled,
         loyalty_stamps_goal: parseInt(formData.loyalty_stamps_goal) || 8,
         loyalty_min_order: parseFloat(formData.loyalty_min_order) || 50,
@@ -127,36 +124,6 @@ export function ConfigForm() {
           checked={formData.kds_enabled}
           onCheckedChange={(checked) => setFormData({ ...formData, kds_enabled: checked })}
         />
-      </div>
-
-      {/* Banner da Home Section */}
-      <div className="space-y-3 pt-4 border-t">
-        <div className="flex items-center gap-2">
-          <ImageIcon className="w-5 h-5 text-primary" />
-          <Label className="text-base font-semibold">Banner da Home</Label>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          URL da imagem do banner promocional exibido no topo da página inicial.
-        </p>
-        <Input
-          id="hero_banner_url"
-          type="url"
-          value={formData.hero_banner_url}
-          onChange={(e) => setFormData({ ...formData, hero_banner_url: e.target.value })}
-          placeholder="https://exemplo.com/banner.jpg ou /images/banner.jpeg"
-        />
-        {formData.hero_banner_url && (
-          <div className="mt-2 rounded-lg overflow-hidden border">
-            <img 
-              src={formData.hero_banner_url} 
-              alt="Preview do banner" 
-              className="w-full h-auto object-cover max-h-40"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </div>
-        )}
       </div>
 
       {/* Loyalty Program Section */}

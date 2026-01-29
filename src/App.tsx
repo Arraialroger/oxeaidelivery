@@ -48,9 +48,11 @@ const App = () => (
               <Route path="admin" element={<Admin />} />
               <Route path="admin/login" element={<AdminLogin />} />
               <Route path="admin/customers" element={<AdminCustomers />} />
+              <Route path="privacidade" element={<PrivacyPolicy />} />
+              <Route path="termos" element={<TermsOfUse />} />
             </Route>
             
-            {/* Global pages (no restaurant context needed) */}
+            {/* Global pages (no restaurant context needed - fallback) */}
             <Route path="/privacidade" element={<PrivacyPolicy />} />
             <Route path="/termos" element={<TermsOfUse />} />
             
