@@ -9,7 +9,8 @@ import { useCategories } from '@/hooks/useCategories';
 import { useCreateProduct, useUpdateProduct } from '@/hooks/useAdminMutations';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useToast } from '@/hooks/use-toast';
-import { isValidPrice, isValidHttpsUrl } from '@/lib/formatUtils';
+import { isValidPrice } from '@/lib/formatUtils';
+import { ImageUploader } from '@/components/admin/ImageUploader';
 import type { Product } from '@/types';
 import { Loader2 } from 'lucide-react';
 
@@ -38,6 +39,10 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
   const isEditing = !!product;
   const mutation = isEditing ? updateProduct : createProduct;
 
+  const handleImageChange = (url: string | null) => {
+    setFormData({ ...formData, image_url: url || '' });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -46,16 +51,6 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
       toast({
         title: 'Preço inválido',
         description: 'Digite um valor numérico válido.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Validate image URL
-    if (formData.image_url && !isValidHttpsUrl(formData.image_url)) {
-      toast({
-        title: 'URL de imagem inválida',
-        description: 'A URL deve começar com https://',
         variant: 'destructive',
       });
       return;
@@ -171,14 +166,14 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         </div>
       </div>
 
+      {/* Image Upload */}
       <div className="space-y-2">
-        <Label htmlFor="image_url">URL da Imagem</Label>
-        <Input
-          id="image_url"
-          type="url"
-          value={formData.image_url}
-          onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-          placeholder="https://..."
+        <Label>Imagem do Produto</Label>
+        <ImageUploader
+          currentImageUrl={formData.image_url || null}
+          onImageChange={handleImageChange}
+          folder="products"
+          aspectRatio="4:3"
         />
       </div>
 

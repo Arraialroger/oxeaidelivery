@@ -1,13 +1,21 @@
 import { ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useRestaurantBySlug } from "@/hooks/useRestaurant";
 
 const PrivacyPolicy = () => {
+  const { slug } = useParams<{ slug: string }>();
+  const { data: restaurant } = useRestaurantBySlug(slug);
+  
+  const restaurantName = restaurant?.name || 'Restaurante';
+  const whatsapp = restaurant?.whatsapp || restaurant?.phone || '(XX) XXXXX-XXXX';
+  const backLink = slug ? `/${slug}/menu` : '/';
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Link to="/">
+          <Link to={backLink}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -25,7 +33,7 @@ const PrivacyPolicy = () => {
           <section className="space-y-4">
             <h2 className="text-2xl font-semibold text-foreground">1. Introdução</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Bem-vindo ao Astral Gastro Bar. Esta Política de Privacidade descreve como coletamos, 
+              Bem-vindo ao {restaurantName}. Esta Política de Privacidade descreve como coletamos, 
               usamos, armazenamos e protegemos suas informações pessoais quando você utiliza 
               nosso aplicativo de delivery.
             </p>
@@ -147,9 +155,8 @@ const PrivacyPolicy = () => {
               seus dados, entre em contato conosco:
             </p>
             <div className="bg-muted p-4 rounded-lg">
-              <p className="text-foreground font-medium">Astral Gastro Bar</p>
-              <p className="text-muted-foreground">E-mail: contato@astralgastrobar.com.br</p>
-              <p className="text-muted-foreground">WhatsApp: (XX) XXXXX-XXXX</p>
+              <p className="text-foreground font-medium">{restaurantName}</p>
+              <p className="text-muted-foreground">WhatsApp: {whatsapp}</p>
             </div>
           </section>
         </div>
@@ -158,7 +165,7 @@ const PrivacyPolicy = () => {
       <footer className="border-t border-border mt-8 py-6">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Astral Gastro Bar. Todos os direitos reservados.
+            © {new Date().getFullYear()} {restaurantName}. Todos os direitos reservados.
           </p>
         </div>
       </footer>

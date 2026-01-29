@@ -4,27 +4,67 @@ import { Card } from '@/components/ui/card';
 import { ImagePlus, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { supabase } from '@/integrations/supabase/client';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 interface ImageUploaderProps {
-  imageUrl: string | null;
+  imageUrl?: string | null;
+  currentImageUrl?: string | null;
   onImageChange: (url: string | null) => void;
-  uploadImage: (file: File, path: string) => Promise<string>;
-  label: string;
-  path: string;
-  aspectRatio?: number;
+  uploadImage?: (file: File, path: string) => Promise<string>;
+  label?: string;
+  path?: string;
+  folder?: string;
+  aspectRatio?: number | string;
   className?: string;
+}
+
+function parseAspectRatio(ratio: number | string | undefined): number {
+  if (typeof ratio === 'number') return ratio;
+  if (typeof ratio === 'string') {
+    const [width, height] = ratio.split(':').map(Number);
+    if (width && height) return width / height;
+  }
+  return 1;
 }
 
 export function ImageUploader({
   imageUrl,
+  currentImageUrl,
   onImageChange,
   uploadImage,
-  label,
+  label = 'Imagem',
   path,
+  folder = 'images',
   aspectRatio = 1,
   className = '',
 }: ImageUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const { restaurantId } = useRestaurantContext();
+  
+  // Support both imageUrl and currentImageUrl props
+  const displayUrl = imageUrl ?? currentImageUrl ?? null;
+  const numericRatio = parseAspectRatio(aspectRatio);
+
+  const defaultUploadImage = async (file: File, uploadPath: string): Promise<string> => {
+    if (!restaurantId) throw new Error('Restaurant ID is required');
+    
+    const ext = file.name.split('.').pop();
+    const fileName = `${Date.now()}.${ext}`;
+    const fullPath = `${restaurantId}/${folder}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('restaurants')
+      .upload(fullPath, file, { upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('restaurants')
+      .getPublicUrl(fullPath);
+
+    return data.publicUrl;
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -33,7 +73,8 @@ export function ImageUploader({
     setIsUploading(true);
 
     try {
-      const url = await uploadImage(file, path);
+      const uploadFn = uploadImage || defaultUploadImage;
+      const url = await uploadFn(file, path || folder);
       onImageChange(url);
       toast.success(`${label} atualizado com sucesso`);
     } catch (error) {
@@ -51,11 +92,11 @@ export function ImageUploader({
 
   return (
     <div className={className}>
-      {imageUrl ? (
+      {displayUrl ? (
         <Card className="relative overflow-hidden group">
-          <AspectRatio ratio={aspectRatio}>
+          <AspectRatio ratio={numericRatio}>
             <img
-              src={imageUrl}
+              src={displayUrl}
               alt={label}
               className="w-full h-full object-cover"
             />
@@ -95,7 +136,7 @@ export function ImageUploader({
       ) : (
         <label className="cursor-pointer block">
           <Card className="border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-colors">
-            <AspectRatio ratio={aspectRatio}>
+            <AspectRatio ratio={numericRatio}>
               <div className="flex flex-col items-center justify-center h-full gap-2">
                 {isUploading ? (
                   <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
