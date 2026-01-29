@@ -1,155 +1,205 @@
 
-# Plano: Corrigir Navegação e Adicionar Painel de Perfil do Lojista
+# Plano: Resolver 6 Demandas do Sistema Multi-Tenant
 
-## Visão Geral
+## Respostas às Perguntas
 
-Este plano resolve o bug de navegação entre o marketplace e a página de detalhes, e adiciona um painel no Admin para o lojista gerenciar seu próprio perfil.
+### 1. Banner no Menu (Verificação)
+**Confirmado:** O banner JÁ ESTÁ sendo exibido corretamente no cardápio (Menu.tsx).
 
----
+O componente `HeroBanner` na linha 53 de `Menu.tsx` usa `restaurant.hero_banner_url` do contexto do restaurante. O sistema já está funcionando corretamente - cada restaurante exibe seu próprio banner com base na coluna `hero_banner_url` da tabela `restaurants`.
 
-## Problema Identificado
-
-O botão de informação (ícone "i") no card do restaurante aponta para `/:slug`, mas o React Router está priorizando a rota `/:slug/*` que redireciona automaticamente para o menu.
-
-**Evidência no código:**
-- `RestaurantCard.tsx` linha 126: `<Link to={\`/${restaurant.slug}\`}>` (correto)
-- `App.tsx` linha 40-41: `/:slug/*` com `index → Navigate to="menu"` (conflito)
+**Nenhuma ação necessária** para este item.
 
 ---
 
-## Parte 1: Correção do Bug de Navegação
+### 2. Configuração de Horário de Funcionamento
 
-### 1.1 Reorganizar Rotas no App.tsx
+Adicionar uma nova aba "Horários" no painel Admin para configurar os horários de cada dia da semana.
 
-**Mudança:** Garantir que a rota `/:slug` seja tratada como uma rota terminal (sem match de wildcard).
-
-```
-Antes:
-  /:slug     → RestaurantDetails
-  /:slug/*   → RestaurantLayout (com redirect para menu)
-
-Depois:
-  Mesma estrutura, mas com ajuste de prioridade usando "end" ou reordenação
-```
-
-### 1.2 Arquivos a Modificar
-
-| Arquivo | Ação |
-|---------|------|
-| `src/App.tsx` | Ajustar ordem/especificidade das rotas |
-
----
-
-## Parte 2: Painel de Edição do Perfil do Lojista
-
-### 2.1 Nova Aba no Admin
-
-Adicionar uma nova aba "Perfil" no painel administrativo que permite editar:
-
-- Descrição do restaurante
-- Redes sociais (Instagram, Facebook)
-- Galeria de fotos (upload de até 6 imagens)
-- Formas de pagamento aceitas
-- Tempo médio de entrega
-- Pedido mínimo
-
-### 2.2 Componentes a Criar
-
+**Componentes a Criar:**
 | Componente | Descrição |
 |------------|-----------|
-| `src/components/admin/RestaurantProfileForm.tsx` | Formulário completo de edição |
-| `src/components/admin/GalleryUploader.tsx` | Upload múltiplo de imagens para galeria |
+| `src/components/admin/BusinessHoursForm.tsx` | Formulário para editar horários por dia |
 
-### 2.3 Modificações Necessárias
+**Hook a Criar:**
+| Hook | Descrição |
+|------|-----------|
+| `src/hooks/useBusinessHoursMutations.ts` | Mutações para CRUD de horários |
 
-| Arquivo | Ação |
-|---------|------|
-| `src/pages/Admin.tsx` | Adicionar aba "Perfil" com ícone Store |
-| `src/hooks/useRestaurantProfile.ts` | Hook para buscar e atualizar dados do restaurante |
-
-### 2.4 Fluxo de Upload de Imagens
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│                   Galeria de Fotos                      │
-├─────────────────────────────────────────────────────────┤
-│  1. Lojista seleciona imagens (até 6)                   │
-│  2. Upload para Supabase Storage (bucket: restaurants)  │
-│  3. URLs salvas na coluna gallery_urls[]                │
-│  4. Exibidas na página de detalhes                      │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 2.5 Bucket de Storage (Nova Migração)
-
-Criar bucket `restaurants` no Supabase Storage para armazenar:
-- Logos
-- Banners
-- Fotos da galeria
+**Interface do Formulário:**
+- 7 linhas (Domingo a Sábado)
+- Cada linha: checkbox "Fechado" + inputs de abertura/fechamento
+- Botão "Salvar Horários"
 
 ---
 
-## Parte 3: Dados de Teste para Astral
+### 3. Campo URL do Banner (Duplicidade)
 
-Após implementar o painel, o lojista poderá adicionar os dados. Mas para testes imediatos, rodar SQL:
+**Análise Correta:** Você está certo! O campo "Banner da Home" no `ConfigForm.tsx` (linhas 132-160) está duplicado, pois:
+- Na aba **Perfil** → Upload de banner (via `RestaurantProfileForm.tsx`)
+- Na aba **Config** → URL do banner (campo de texto)
 
-```sql
-UPDATE restaurants 
-SET 
-  description = 'A melhor hamburgueria artesanal da região.',
-  instagram = '@astralburger',
-  gallery_urls = ARRAY['url1', 'url2', 'url3']
-WHERE slug = 'astral';
+Ambos escrevem na mesma coluna `hero_banner_url` da tabela `restaurants`.
+
+**Ação:** Remover a seção "Banner da Home" do `ConfigForm.tsx`, já que o upload pelo Perfil é mais intuitivo e moderno.
+
+---
+
+### 4. Imagem do Produto (URL vs Upload)
+
+**Análise Estratégica:**
+
+| Opção | Vantagens | Desvantagens |
+|-------|-----------|--------------|
+| **URL (atual)** | Simples, rápido | Exige conhecimento técnico, links podem quebrar |
+| **Upload (proposto)** | Intuitivo, imagens seguras no storage | Mais desenvolvimento |
+
+**Recomendação:** Implementar **upload de imagem** para produtos, similar ao que foi feito com logo/banner. Isso torna o sistema mais profissional e acessível para lojistas não-técnicos.
+
+**Solução:** Reutilizar o componente `ImageUploader` já criado no formulário de produto.
+
+---
+
+### 5. Política de Privacidade Multi-Tenant
+
+**Problema Identificado:** Os arquivos `PrivacyPolicy.tsx`, `TermsOfUse.tsx` e `Footer.tsx` estão hardcoded com "Astral Gastro Bar". Todos os restaurantes veem a mesma política.
+
+**Solução:** Tornar dinâmico usando o contexto do restaurante:
+- O `Footer.tsx` deve exibir o nome do restaurante atual (do contexto)
+- Os links de privacidade/termos devem redirecionar para `/:slug/privacidade` e `/:slug/termos`
+- As páginas devem buscar os dados do restaurante pelo slug
+
+**Opção Avançada (futuro):** Permitir que cada lojista edite seu próprio texto de política via Admin. Por ora, usar template genérico com nome dinâmico.
+
+---
+
+### 6. Explicação: Crop de Imagem
+
+**O que é?**
+O "crop" (recorte) de imagem permite que o usuário ajuste a área da foto antes do upload, garantindo que a imagem se encaixe perfeitamente na proporção desejada.
+
+**Exemplo Prático:**
+1. Lojista seleciona uma foto de banner (ex: 2000x1500px)
+2. O sistema abre um modal de recorte mostrando uma área 16:9
+3. Lojista move/redimensiona a área de seleção
+4. Apenas a área selecionada é enviada ao servidor
+
+**Benefícios:**
+- Imagens sempre na proporção correta
+- Evita distorção ou cortes automáticos ruins
+- Melhor experiência para o lojista
+
+**Biblioteca sugerida:** `react-image-crop` ou `react-easy-crop`
+
+---
+
+## Plano de Implementação
+
+### Fase 1: Correções Urgentes
+
+#### 1.1 Remover Banner da Home do ConfigForm
+**Arquivo:** `src/components/admin/ConfigForm.tsx`
+- Remover linhas 132-160 (seção "Banner da Home")
+- Remover `hero_banner_url` do estado e submit
+
+#### 1.2 Tornar Footer Dinâmico
+**Arquivo:** `src/components/layout/Footer.tsx`
+- Importar `useRestaurantContext`
+- Exibir `restaurant.name` em vez de "Astral Gastro Bar"
+- Ajustar links para usar slug do restaurante
+
+### Fase 2: Horários de Funcionamento
+
+#### 2.1 Criar Hook de Mutações
+**Arquivo:** `src/hooks/useBusinessHoursMutations.ts`
+```typescript
+// CRUD para business_hours
+// - upsertBusinessHours: atualiza ou insere horário
+// - deleteBusinessHours: remove horário de um dia
 ```
+
+#### 2.2 Criar Formulário de Horários
+**Arquivo:** `src/components/admin/BusinessHoursForm.tsx`
+- Grid com 7 dias da semana
+- Inputs de hora (abertura/fechamento)
+- Switch "Fechado" para cada dia
+
+#### 2.3 Integrar ao Admin
+**Arquivo:** `src/pages/Admin.tsx`
+- Nova aba "Horários" com ícone Clock
+
+### Fase 3: Upload de Imagem para Produtos
+
+#### 3.1 Modificar ProductForm
+**Arquivo:** `src/components/admin/ProductForm.tsx`
+- Substituir campo URL por `ImageUploader`
+- Usar bucket `restaurants` para armazenar (path: `{restaurant_id}/products/{product_id}`)
+
+### Fase 4: Política de Privacidade Multi-Tenant
+
+#### 4.1 Criar Rotas Dinâmicas
+**Arquivo:** `src/App.tsx`
+- Adicionar rotas `/:slug/privacidade` e `/:slug/termos`
+
+#### 4.2 Atualizar Páginas
+**Arquivos:** `PrivacyPolicy.tsx`, `TermsOfUse.tsx`
+- Buscar restaurante pelo slug
+- Substituir "Astral Gastro Bar" por `restaurant.name`
+- Usar contatos do restaurante (whatsapp, phone)
 
 ---
 
 ## Resumo das Entregas
 
-| # | Entrega | Impacto |
-|---|---------|---------|
-| 1 | Corrigir navegação /:slug vs /:slug/* | Bug crítico resolvido |
-| 2 | Aba "Perfil" no Admin | Lojista autônomo |
-| 3 | Upload de galeria | Fotos gerenciadas pelo lojista |
-| 4 | Storage bucket | Infraestrutura para imagens |
+| # | Tarefa | Prioridade | Status |
+|---|--------|------------|--------|
+| 1 | Banner no Menu | - | Já funciona ✅ |
+| 2 | Horários de Funcionamento | Alta | A implementar |
+| 3 | Remover Banner do Config | Média | A implementar |
+| 4 | Upload de Imagem no Produto | Média | A implementar |
+| 5 | Política Multi-Tenant | Alta | A implementar |
+| 6 | Crop de Imagem | Baixa | Explicado (futuro) |
 
 ---
 
 ## Seção Técnica
 
-### Detalhes da Correção de Rotas
-
-O React Router v6 usa matching por especificidade. A rota `/:slug/*` captura qualquer path que comece com um slug, incluindo `/:slug` sozinho quando não há mais segmentos.
-
-**Solução técnica:**
-Mover a rota `/:slug` (RestaurantDetails) para **depois** da rota `/:slug/*`, mas garantir que seja uma rota separada e terminal. Alternativamente, usar um path mais específico como `/:slug/info` para detalhes.
-
-Recomendação: Manter `/:slug` como detalhes (mais limpo semanticamente), ajustando a configuração do Router.
-
-### RLS para Storage
-
-```sql
--- Política para upload de imagens do restaurante
-CREATE POLICY "Restaurant owners can upload images"
-ON storage.objects
-FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'restaurants' AND
-  has_role(auth.uid(), 'admin')
-);
-```
-
-### Hook useRestaurantProfile
+### Estrutura do BusinessHoursForm
 
 ```typescript
-// Busca dados do restaurante do admin logado
-const { data: profile, update } = useRestaurantProfile();
+interface DayConfig {
+  day_of_week: number; // 0=Domingo, 6=Sábado
+  is_closed: boolean;
+  open_time: string | null; // "18:00"
+  close_time: string | null; // "23:00"
+}
+```
 
-// Atualiza campos
-await update({
-  description: 'Nova descrição',
-  instagram: '@novoinsta',
-  gallery_urls: ['url1', 'url2']
-});
+### Lógica de Upload de Produto
+
+O bucket `restaurants` já existe. A estrutura de paths será:
+```
+restaurants/
+  {restaurant_id}/
+    logo-{timestamp}.png
+    banner-{timestamp}.png
+    gallery/
+      {timestamp}.png
+    products/
+      {product_id}-{timestamp}.png
+```
+
+### Footer Dinâmico
+
+```tsx
+export function Footer() {
+  const { restaurant } = useRestaurantContext();
+  const name = restaurant?.name || 'Restaurante';
+  
+  return (
+    <footer>
+      <p>© {year} {name}. Todos os direitos reservados.</p>
+    </footer>
+  );
+}
 ```
