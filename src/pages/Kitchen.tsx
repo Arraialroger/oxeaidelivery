@@ -448,12 +448,17 @@ export default function Kitchen() {
   useEffect(() => {
     fetchOrders();
 
-    // Real-time subscription
+    // Real-time subscription - FILTRADO por restaurant_id para isolamento multi-tenant
     const channel = supabase
-      .channel('orders-realtime')
+      .channel(`orders-realtime-${restaurantId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `restaurant_id=eq.${restaurantId}`
+        },
         () => {
           fetchOrders();
           // Também atualiza histórico se estiver aberto
