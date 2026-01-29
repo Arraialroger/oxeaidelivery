@@ -3,19 +3,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useConfig } from '@/hooks/useConfig';
-import { useUpdateConfig } from '@/hooks/useAdminMutations';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
+import { useUpdateRestaurantSettings } from '@/hooks/useAdminMutations';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Image as ImageIcon, Gift } from 'lucide-react';
 
 export function ConfigForm() {
-  const { data: config } = useConfig();
-  const updateConfig = useUpdateConfig();
+  const { restaurant, restaurantId, settings } = useRestaurantContext();
+  const updateSettings = useUpdateRestaurantSettings(restaurantId);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     delivery_fee: '',
-    restaurant_open: true,
+    is_open: true,
     kds_enabled: true,
     hero_banner_url: '',
     loyalty_enabled: false,
@@ -24,28 +24,38 @@ export function ConfigForm() {
     loyalty_reward_value: '50',
   });
 
+  // Load settings from restaurant context
   useEffect(() => {
-    if (config) {
+    if (settings && restaurant) {
       setFormData({
-        delivery_fee: config.delivery_fee?.toString() || '0',
-        restaurant_open: config.restaurant_open ?? true,
-        kds_enabled: config.kds_enabled ?? true,
-        hero_banner_url: config.hero_banner_url || '',
-        loyalty_enabled: config.loyalty_enabled ?? false,
-        loyalty_stamps_goal: config.loyalty_stamps_goal?.toString() || '8',
-        loyalty_min_order: config.loyalty_min_order?.toString() || '50',
-        loyalty_reward_value: config.loyalty_reward_value?.toString() || '50',
+        delivery_fee: settings.delivery_fee?.toString() || '0',
+        is_open: settings.is_open ?? true,
+        kds_enabled: settings.kds_enabled ?? true,
+        hero_banner_url: restaurant.hero_banner_url || '',
+        loyalty_enabled: settings.loyalty_enabled ?? false,
+        loyalty_stamps_goal: settings.loyalty_stamps_goal?.toString() || '8',
+        loyalty_min_order: settings.loyalty_min_order?.toString() || '50',
+        loyalty_reward_value: settings.loyalty_reward_value?.toString() || '50',
       });
     }
-  }, [config]);
+  }, [settings, restaurant]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!restaurantId) {
+      toast({
+        title: 'Erro',
+        description: 'Restaurante não identificado',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      await updateConfig.mutateAsync({
+      await updateSettings.mutateAsync({
         delivery_fee: parseFloat(formData.delivery_fee) || 0,
-        restaurant_open: formData.restaurant_open,
+        is_open: formData.is_open,
         kds_enabled: formData.kds_enabled,
         hero_banner_url: formData.hero_banner_url || null,
         loyalty_enabled: formData.loyalty_enabled,
@@ -56,10 +66,11 @@ export function ConfigForm() {
 
       toast({
         title: 'Configurações atualizadas!',
+        description: `As configurações de ${restaurant?.name || 'seu restaurante'} foram salvas.`,
       });
     } catch (error: any) {
       toast({
-        title: 'Erro',
+        title: 'Erro ao salvar',
         description: error.message,
         variant: 'destructive',
       });
@@ -68,6 +79,15 @@ export function ConfigForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Restaurant indicator */}
+      {restaurant && (
+        <div className="bg-muted/50 p-3 rounded-lg border">
+          <p className="text-sm text-muted-foreground">
+            Configurando: <span className="font-medium text-foreground">{restaurant.name}</span>
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="delivery_fee">Taxa de Entrega (R$)</Label>
         <Input
@@ -83,15 +103,15 @@ export function ConfigForm() {
 
       <div className="flex items-center justify-between">
         <div>
-          <Label htmlFor="restaurant_open">Restaurante Aberto</Label>
+          <Label htmlFor="is_open">Restaurante Aberto</Label>
           <p className="text-sm text-muted-foreground">
             Permite novos pedidos
           </p>
         </div>
         <Switch
-          id="restaurant_open"
-          checked={formData.restaurant_open}
-          onCheckedChange={(checked) => setFormData({ ...formData, restaurant_open: checked })}
+          id="is_open"
+          checked={formData.is_open}
+          onCheckedChange={(checked) => setFormData({ ...formData, is_open: checked })}
         />
       </div>
 
@@ -207,8 +227,8 @@ export function ConfigForm() {
         )}
       </div>
 
-      <Button type="submit" className="w-full" disabled={updateConfig.isPending}>
-        {updateConfig.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+      <Button type="submit" className="w-full" disabled={updateSettings.isPending}>
+        {updateSettings.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
         Salvar Configurações
       </Button>
     </form>
