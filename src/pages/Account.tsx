@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Search, Package, Clock, CheckCircle, XCircle, Loader2, LogOut, User } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Footer } from '@/components/layout/Footer';
 import { CartDrawer } from '@/components/cart/CartDrawer';
@@ -14,6 +15,7 @@ import { useCustomerStamps } from '@/hooks/useCustomerStamps';
 import { StampCard } from '@/components/loyalty/StampCard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 const statusConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   pending: { label: 'Pendente', icon: <Clock className="w-4 h-4" />, color: 'text-yellow-500' },
@@ -28,12 +30,24 @@ export default function Account() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { restaurantId, restaurant } = useRestaurantContext();
+  const queryClient = useQueryClient();
   
   const [phone, setPhone] = useState('');
   const [searchPhone, setSearchPhone] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [profilePhone, setProfilePhone] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+
+  // Limpar estado quando o restaurante (slug) muda - isolamento multi-tenant
+  useEffect(() => {
+    setSearchPhone(null);
+    setPhone('');
+    setProfilePhone(null);
+    // Invalidar queries relacionadas ao cliente para forçar refetch com novo restaurantId
+    queryClient.invalidateQueries({ queryKey: ['customerOrders'] });
+    queryClient.invalidateQueries({ queryKey: ['customerStamps'] });
+  }, [slug, queryClient]);
 
   // Fetch profile phone when user is logged in
   useEffect(() => {

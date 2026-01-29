@@ -435,10 +435,16 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Buscar subscriptions ativas para o pedido
+    // Buscar subscriptions ativas para o pedido COM dados do restaurante
     const { data: subscriptions, error: fetchError } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select(`
+        *,
+        orders!inner(
+          restaurant_id,
+          restaurants!inner(slug)
+        )
+      `)
       .eq('order_id', orderId)
       .gt('expires_at', new Date().toISOString());
 
@@ -460,16 +466,23 @@ serve(async (req) => {
 
     console.log(`[send-push] Found ${subscriptions.length} subscription(s)`);
 
+    // Extrair o slug do restaurante do primeiro resultado
+    const restaurantSlug = subscriptions[0]?.orders?.restaurants?.slug || '';
+    if (!restaurantSlug) {
+      console.warn('[send-push] Could not determine restaurant slug, using orderId only in URL');
+    }
+
     // Pegar mensagem do status ou usar custom
     const message = statusMessages[status] || { title: 'Astral Gastro Bar', body: 'Atualização do seu pedido' };
     const title = customTitle || message.title;
     const body = customBody || message.body;
 
+    // Construir URL COM slug do restaurante
     const pushPayload = {
       title,
       body,
       orderId,
-      url: `/order/${orderId}`,
+      url: restaurantSlug ? `/${restaurantSlug}/order/${orderId}` : `/order/${orderId}`,
     };
 
     let sentCount = 0;
