@@ -21,8 +21,11 @@ export default function Menu() {
   const [showPWAModal, setShowPWAModal] = useState(false);
 
   const { data: categories = [] } = useCategories();
-  const { data: products = [], isLoading } = useProducts(activeCategory);
-  const { data: allProducts = [] } = useProducts(null);
+  // Single query - filter in memory to avoid duplicate requests
+  const { data: allProducts = [], isLoading } = useProducts(null);
+  const products = activeCategory 
+    ? allProducts.filter(p => p.category_id === activeCategory)
+    : allProducts;
   
   const { shouldShowSecondVisitPrompt, shouldShowIOSPrompt, promptInstall, dismissInstall, isIOSSafari } = usePWAInstall();
 

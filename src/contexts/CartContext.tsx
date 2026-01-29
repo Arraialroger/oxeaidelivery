@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import type { CartItem, Product, SelectedOption } from '@/types';
+import { CART_DEBOUNCE_MS } from '@/lib/constants';
 
 // Generate cart storage key based on restaurant slug
 const getCartStorageKey = (slug: string | undefined) => {
@@ -15,8 +16,8 @@ const loadCartFromStorage = (slug: string | undefined): CartItem[] => {
     if (stored) {
       return JSON.parse(stored);
     }
-  } catch (error) {
-    console.error('Error loading cart from storage:', error);
+  } catch {
+    // Silent fail
   }
   return [];
 };
@@ -36,20 +37,33 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { slug } = useParams<{ slug: string }>();
   const [items, setItems] = useState<CartItem[]>(() => loadCartFromStorage(slug));
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reload cart when slug changes (switching restaurants)
   useEffect(() => {
     setItems(loadCartFromStorage(slug));
   }, [slug]);
 
-  // Persist cart to localStorage whenever items change
+  // Persist cart to localStorage with debounce
   useEffect(() => {
-    try {
-      const key = getCartStorageKey(slug);
-      localStorage.setItem(key, JSON.stringify(items));
-    } catch (error) {
-      console.error('Error saving cart to storage:', error);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
     }
+    
+    debounceRef.current = setTimeout(() => {
+      try {
+        const key = getCartStorageKey(slug);
+        localStorage.setItem(key, JSON.stringify(items));
+      } catch {
+        // Silent fail
+      }
+    }, CART_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, [items, slug]);
 
   const addItem = useCallback((
@@ -106,8 +120,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       const key = getCartStorageKey(slug);
       localStorage.removeItem(key);
-    } catch (error) {
-      console.error('Error clearing cart from storage:', error);
+    } catch {
+      // Silent fail
     }
   }, [slug]);
 

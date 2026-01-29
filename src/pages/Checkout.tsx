@@ -23,54 +23,8 @@ import { useRestaurantContext } from "@/contexts/RestaurantContext";
 
 type PaymentMethod = "pix" | "card" | "cash";
 
-// Format phone to Brazilian format: (XX) XXXXX-XXXX
-const formatPhone = (value: string): string => {
-  const numbers = value.replace(/\D/g, "");
-  const limited = numbers.slice(0, 11);
-
-  if (limited.length <= 2) {
-    return limited.length > 0 ? `(${limited}` : "";
-  }
-  if (limited.length <= 7) {
-    return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
-  }
-  return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
-};
-
-// Get only digits from formatted phone
-const getPhoneDigits = (value: string): string => {
-  return value.replace(/\D/g, "");
-};
-
-// Validate Brazilian phone (10 or 11 digits)
-const isValidPhone = (value: string): boolean => {
-  const digits = getPhoneDigits(value);
-  return digits.length >= 10 && digits.length <= 11;
-};
-
-// Format currency to Brazilian format: R$ X,XX
-const formatCurrency = (value: string): string => {
-  // Remove all non-numeric characters
-  const numbers = value.replace(/\D/g, "");
-
-  if (!numbers) return "";
-
-  // Convert to number (in cents) and format
-  const cents = parseInt(numbers, 10);
-  const reais = cents / 100;
-
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(reais);
-};
-
-// Get numeric value from formatted currency
-const getCurrencyValue = (value: string): number => {
-  const numbers = value.replace(/\D/g, "");
-  if (!numbers) return 0;
-  return parseInt(numbers, 10) / 100;
-};
+import { formatPhone, getPhoneDigits, isValidPhone } from "@/lib/phoneUtils";
+import { formatPrice, formatCurrencyInput, getCurrencyValue } from "@/lib/formatUtils";
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -110,7 +64,9 @@ export default function Checkout() {
           }
         }
       } catch (error) {
-        console.error("[CHECKOUT] Erro ao carregar perfil:", error);
+        if (import.meta.env.DEV) {
+          console.error("[CHECKOUT] Erro ao carregar perfil:", error);
+        }
       } finally {
         setProfileLoaded(true);
       }
@@ -166,12 +122,7 @@ export default function Checkout() {
     }
   }, [items, subtotal, checkoutTracked]);
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(price);
-  };
+  // formatPrice is now imported from @/lib/formatUtils
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhone(e.target.value);
@@ -190,24 +141,21 @@ export default function Checkout() {
   };
 
   const handleSubmitOrder = async () => {
-    console.log("[CHECKOUT] ==========================================");
-    console.log("[CHECKOUT] Iniciando handleSubmitOrder");
-    console.log("[CHECKOUT] Items no carrinho:", items.length);
+    if (import.meta.env.DEV) {
+      console.log("[CHECKOUT] Iniciando handleSubmitOrder, items:", items.length);
+    }
     setIsSubmitting(true);
 
     try {
       // Get only digits for storage
       const phoneDigits = getPhoneDigits(phone);
 
-      // 1. Get or create customer using RPC (bypasses RLS with SECURITY DEFINER)
-      // CRITICAL: Classify customer type with SAFE try-catch
+      // Classify customer type with SAFE try-catch
       // This NEVER blocks checkout - if it fails, defaults to 'tourist'
       let customerType: "local" | "tourist" = "tourist";
       try {
         customerType = classifyCustomerType(phone);
-        console.log("[CHECKOUT] Cliente classificado como:", customerType);
-      } catch (classifyError) {
-        console.warn("[CHECKOUT] Erro na classificação, usando tourist:", classifyError);
+      } catch {
         customerType = "tourist";
       }
 
@@ -231,7 +179,6 @@ export default function Checkout() {
             .update({ name, customer_type: customerType })
             .eq("id", customerId);
         }
-        console.log("[CHECKOUT] Cliente existente encontrado:", customerId);
       } else {
         // Create new customer with restaurant_id
         const { data: newCustomer, error: customerError } = await supabase
@@ -246,11 +193,9 @@ export default function Checkout() {
           .single();
 
         if (customerError) {
-          console.error("[CHECKOUT] Erro ao criar cliente:", customerError);
           throw customerError;
         }
         customerId = newCustomer.id;
-        console.log("[CHECKOUT] Novo cliente criado:", customerId);
       }
 
       // 2. Create address with restaurant_id
@@ -269,10 +214,8 @@ export default function Checkout() {
         .single();
 
       if (addressError) {
-        console.error("[CHECKOUT] Erro ao criar endereço:", addressError);
         throw addressError;
       }
-      console.log("[CHECKOUT] Endereço criado:", address.id);
 
       // 3. Create order with restaurant_id (include loyalty_discount if using reward)
       const { data: order, error: orderError } = await supabase
@@ -305,19 +248,10 @@ export default function Checkout() {
             currentStamps: stamps.stamps_count || 0,
             rewardValue: config?.loyalty_reward_value || 50,
           });
-          console.log("[CHECKOUT] Brinde resgatado com sucesso!");
-        } catch (loyaltyError) {
-          // Log but don't block - order was created successfully
-          console.error("[CHECKOUT] Erro ao processar resgate:", loyaltyError);
+        } catch {
+          // Silent fail - order was created successfully
         }
       }
-
-      // 🔍 LOG CRÍTICO: Ver o objeto order completo
-      console.log("[CHECKOUT] ==========================================");
-      console.log("[CHECKOUT] PEDIDO CRIADO COM SUCESSO!");
-      console.log("[CHECKOUT] Objeto order completo:", JSON.stringify(order, null, 2));
-      console.log("[CHECKOUT] order.id:", order.id);
-      console.log("[CHECKOUT] typeof order.id:", typeof order.id);
 
       // 4. Create order items
       for (const item of items) {
@@ -348,8 +282,6 @@ export default function Checkout() {
         }
       }
 
-      console.log("[CHECKOUT] Todos os itens criados com sucesso");
-
       // Track purchase event (Google Analytics + Meta Pixel)
       const purchaseItems = items.map((item) => ({
         id: item.product.id,
@@ -362,11 +294,7 @@ export default function Checkout() {
 
       clearCart();
 
-      // 🔍 LOG CRÍTICO: URL de navegação com slug multi-tenant
       const targetUrl = `/${slug}/order/${order.id}?new=true`;
-      console.log("[CHECKOUT] ==========================================");
-      console.log("[CHECKOUT] NAVEGANDO PARA:", targetUrl);
-      console.log("[CHECKOUT] ==========================================");
 
       toast({
         title: "Pedido enviado!",
@@ -378,9 +306,9 @@ export default function Checkout() {
 
       navigate(targetUrl);
     } catch (error) {
-      console.error("[CHECKOUT] ==========================================");
-      console.error("[CHECKOUT] ERRO NO CHECKOUT:", error);
-      console.error("[CHECKOUT] ==========================================");
+      if (import.meta.env.DEV) {
+        console.error("[CHECKOUT] ERRO:", error);
+      }
       toast({
         title: "Erro ao enviar pedido",
         description: "Tente novamente.",
@@ -589,7 +517,7 @@ export default function Checkout() {
                   type="tel"
                   inputMode="numeric"
                   value={changeAmount}
-                  onChange={(e) => setChangeAmount(formatCurrency(e.target.value))}
+                  onChange={(e) => setChangeAmount(formatCurrencyInput(e.target.value))}
                   placeholder="R$ 0,00"
                   className="mt-1"
                 />

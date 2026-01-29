@@ -1,36 +1,42 @@
 
-# Auditoria Completa de Codigo - Code Review
+# Code Review - Status de Correções
 
-## Resumo Executivo
+## ✅ CONCLUÍDO
 
-Analisei **25+ arquivos** incluindo paginas, hooks, contextos, edge functions e politicas RLS. Identifiquei **23 problemas** categorizados por severidade.
+### Segurança (P0)
+- [x] Corrigida função `update_restaurants_updated_at` com `SET search_path = public`
+- [x] RLS policy `order_items` - agora valida restaurant_id via orders
+- [x] RLS policy `order_item_options` - agora valida via order_items → orders
+- [x] RLS policy `push_subscriptions` - requer restaurant_id válido
+- [x] RLS policy `sms_codes` - valida formato do telefone
+- [x] RLS policy `orders` INSERT - requer restaurant_id válido
+
+### Console Logs (P1)
+- [x] Removidos/condicionados logs em `Checkout.tsx`
+- [x] Logs só aparecem em `import.meta.env.DEV`
+
+### Desempenho (P2)
+- [x] Debounce de 500ms no `CartContext.tsx` para localStorage
+- [x] `Menu.tsx` agora usa 1 query + filtro em memória (era 2 queries)
+
+### Código (P3)
+- [x] Criado `src/lib/phoneUtils.ts` - formatPhone, getPhoneDigits, isValidPhone
+- [x] Criado `src/lib/formatUtils.ts` - formatPrice, formatDateTime, isValidPrice, isValidHttpsUrl
+- [x] Criado `src/lib/constants.ts` - constantes nomeadas (STAMP_EXPIRATION_DAYS, etc)
+- [x] `ProductForm.tsx` - validação de preço e URL HTTPS
+- [x] `ProductForm.tsx` - type guard no catch (error instanceof Error)
+
+## ⏳ PENDENTE (Ação Manual)
+
+### Supabase Dashboard
+- [ ] **Habilitar "Leaked Password Protection"** em Auth Settings
+  → https://supabase.com/dashboard/project/xcogccusyerkvoimfxeb/auth/providers
+
+### Warnings Restantes (Intencionais)
+- `push_subscriptions` DELETE com `true` - necessário para cleanup
+- `sms_codes` DELETE com `true` - necessário para cleanup
 
 ---
-
-## 1. ERROS CRITICOS
-
-### 1.1 Console.logs em Producao (Checkout.tsx)
-**Arquivo:** `src/pages/Checkout.tsx` - Linhas 193-195, 316-319, 365-369, 381-383
-**Problema:** Logs extensivos com dados sensiveis (IDs de pedido, dados de cliente) que vazam para o console do navegador em producao.
-**Risco:** Exposicao de dados, facilita engenharia reversa.
-**Correcao:** Remover ou envolver em condicional `process.env.NODE_ENV === 'development'`.
-
-```typescript
-// ATUAL (ERRADO)
-console.log("[CHECKOUT] PEDIDO CRIADO COM SUCESSO!");
-console.log("[CHECKOUT] Objeto order completo:", JSON.stringify(order, null, 2));
-
-// CORRETO
-if (import.meta.env.DEV) {
-  console.log("[CHECKOUT] Order created:", order.id);
-}
-```
-
-### 1.2 AudioContext Global Nao Gerenciado (Kitchen.tsx)
-**Arquivo:** `src/pages/Kitchen.tsx` - Linha 223
-**Problema:** `sharedAudioContext` e uma variavel global fora do React que nunca e limpa.
-**Risco:** Memory leak em sessoes longas do KDS.
-**Correcao:** Mover para um ref ou gerenciar o ciclo de vida.
 
 ```typescript
 // ATUAL (ERRADO - variavel global)
