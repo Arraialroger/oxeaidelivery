@@ -9,6 +9,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useCreateProduct, useUpdateProduct } from '@/hooks/useAdminMutations';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useToast } from '@/hooks/use-toast';
+import { isValidPrice, isValidHttpsUrl } from '@/lib/formatUtils';
 import type { Product } from '@/types';
 import { Loader2 } from 'lucide-react';
 
@@ -39,6 +40,26 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate price
+    if (!isValidPrice(formData.price)) {
+      toast({
+        title: 'Preço inválido',
+        description: 'Digite um valor numérico válido.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate image URL
+    if (formData.image_url && !isValidHttpsUrl(formData.image_url)) {
+      toast({
+        title: 'URL de imagem inválida',
+        description: 'A URL deve começar com https://',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       if (isEditing) {
@@ -82,10 +103,11 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
       }
 
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
         title: 'Erro',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     }
