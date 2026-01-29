@@ -264,15 +264,17 @@ export function useUpdateRestaurantSettings(restaurantId: string | null) {
         updatePayload.hero_banner_url = hero_banner_url;
       }
       
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('restaurants')
         .update(updatePayload)
         .eq('id', restaurantId)
-        .select()
-        .single();
+        .select();
         
       if (error) throw error;
-      return data;
+      if (!data || data.length === 0) {
+        throw new Error('Você não tem permissão para atualizar este restaurante.');
+      }
+      return data[0];
     },
     onSuccess: () => {
       // Invalidate restaurant queries to refresh the context
