@@ -123,7 +123,7 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
               Ver Cardápio
             </Button>
           </Link>
-          <Link to={`/${restaurant.slug}`}>
+          <Link to={`/${restaurant.slug}/info`}>
             <Button variant="outline" size="sm" className="px-3">
               <Info className="w-4 h-4" />
             </Button>

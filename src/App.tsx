@@ -33,8 +33,8 @@ const App = () => (
             {/* Landing / Home page */}
             <Route path="/" element={<Index />} />
             
-            {/* Restaurant details page (outside RestaurantLayout for lighter context) */}
-            <Route path="/:slug" element={<RestaurantDetails />} />
+            {/* Restaurant details/info page (outside RestaurantLayout for lighter context) */}
+            <Route path="/:slug/info" element={<RestaurantDetails />} />
             
             {/* Multi-tenant restaurant routes */}
             <Route path="/:slug/*" element={<RestaurantLayout />}>
