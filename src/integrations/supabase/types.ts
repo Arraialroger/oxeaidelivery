@@ -721,6 +721,7 @@ export type Database = {
       restaurants: {
         Row: {
           address: string | null
+          category: string | null
           created_at: string | null
           hero_banner_url: string | null
           id: string
@@ -738,6 +739,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          category?: string | null
           created_at?: string | null
           hero_banner_url?: string | null
           id?: string
@@ -755,6 +757,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          category?: string | null
           created_at?: string | null
           hero_banner_url?: string | null
           id?: string
