@@ -1,130 +1,155 @@
 
+# Plano: Corrigir Navegação e Adicionar Painel de Perfil do Lojista
 
-# Correção: Erro "Cannot coerce the result to a single JSON object"
+## Visão Geral
 
-## Diagnóstico
-
-O erro ocorre porque a **RLS policy bloqueia o UPDATE** na tabela `restaurants`.
-
-### Causa Raiz
-
-| Dado | Valor |
-|------|-------|
-| Policy atual | `owner_id = auth.uid()` |
-| `restaurants.owner_id` | `NULL` para ambos restaurantes |
-| Resultado | Query retorna 0 linhas, `.single()` falha |
-
-A arquitetura de autenticação do sistema usa `user_roles` para definir administradores:
-
-```text
-user_roles
-├── user_id: eef6d9a1... (arraialroger@gmail.com)
-├── role: admin
-└── restaurant_id: 5fc8a42e... (Bruttus)
-```
-
-Porém, a RLS policy da tabela `restaurants` olha para `owner_id`, que está vazio.
+Este plano resolve o bug de navegação entre o marketplace e a página de detalhes, e adiciona um painel no Admin para o lojista gerenciar seu próprio perfil.
 
 ---
 
-## Solução
+## Problema Identificado
 
-### Opção A: Atualizar RLS Policy (Recomendada)
+O botão de informação (ícone "i") no card do restaurante aponta para `/:slug`, mas o React Router está priorizando a rota `/:slug/*` que redireciona automaticamente para o menu.
 
-Modificar a policy para aceitar tanto `owner_id` quanto admins via `user_roles`:
+**Evidência no código:**
+- `RestaurantCard.tsx` linha 126: `<Link to={\`/${restaurant.slug}\`}>` (correto)
+- `App.tsx` linha 40-41: `/:slug/*` com `index → Navigate to="menu"` (conflito)
+
+---
+
+## Parte 1: Correção do Bug de Navegação
+
+### 1.1 Reorganizar Rotas no App.tsx
+
+**Mudança:** Garantir que a rota `/:slug` seja tratada como uma rota terminal (sem match de wildcard).
+
+```
+Antes:
+  /:slug     → RestaurantDetails
+  /:slug/*   → RestaurantLayout (com redirect para menu)
+
+Depois:
+  Mesma estrutura, mas com ajuste de prioridade usando "end" ou reordenação
+```
+
+### 1.2 Arquivos a Modificar
+
+| Arquivo | Ação |
+|---------|------|
+| `src/App.tsx` | Ajustar ordem/especificidade das rotas |
+
+---
+
+## Parte 2: Painel de Edição do Perfil do Lojista
+
+### 2.1 Nova Aba no Admin
+
+Adicionar uma nova aba "Perfil" no painel administrativo que permite editar:
+
+- Descrição do restaurante
+- Redes sociais (Instagram, Facebook)
+- Galeria de fotos (upload de até 6 imagens)
+- Formas de pagamento aceitas
+- Tempo médio de entrega
+- Pedido mínimo
+
+### 2.2 Componentes a Criar
+
+| Componente | Descrição |
+|------------|-----------|
+| `src/components/admin/RestaurantProfileForm.tsx` | Formulário completo de edição |
+| `src/components/admin/GalleryUploader.tsx` | Upload múltiplo de imagens para galeria |
+
+### 2.3 Modificações Necessárias
+
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/Admin.tsx` | Adicionar aba "Perfil" com ícone Store |
+| `src/hooks/useRestaurantProfile.ts` | Hook para buscar e atualizar dados do restaurante |
+
+### 2.4 Fluxo de Upload de Imagens
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│                   Galeria de Fotos                      │
+├─────────────────────────────────────────────────────────┤
+│  1. Lojista seleciona imagens (até 6)                   │
+│  2. Upload para Supabase Storage (bucket: restaurants)  │
+│  3. URLs salvas na coluna gallery_urls[]                │
+│  4. Exibidas na página de detalhes                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2.5 Bucket de Storage (Nova Migração)
+
+Criar bucket `restaurants` no Supabase Storage para armazenar:
+- Logos
+- Banners
+- Fotos da galeria
+
+---
+
+## Parte 3: Dados de Teste para Astral
+
+Após implementar o painel, o lojista poderá adicionar os dados. Mas para testes imediatos, rodar SQL:
 
 ```sql
--- Remover policy antiga
-DROP POLICY IF EXISTS "Owners can manage their restaurant" ON public.restaurants;
+UPDATE restaurants 
+SET 
+  description = 'A melhor hamburgueria artesanal da região.',
+  instagram = '@astralburger',
+  gallery_urls = ARRAY['url1', 'url2', 'url3']
+WHERE slug = 'astral';
+```
 
--- Criar nova policy que aceita owners OU admins
-CREATE POLICY "Owners and admins can manage their restaurant"
-ON public.restaurants
-FOR ALL
+---
+
+## Resumo das Entregas
+
+| # | Entrega | Impacto |
+|---|---------|---------|
+| 1 | Corrigir navegação /:slug vs /:slug/* | Bug crítico resolvido |
+| 2 | Aba "Perfil" no Admin | Lojista autônomo |
+| 3 | Upload de galeria | Fotos gerenciadas pelo lojista |
+| 4 | Storage bucket | Infraestrutura para imagens |
+
+---
+
+## Seção Técnica
+
+### Detalhes da Correção de Rotas
+
+O React Router v6 usa matching por especificidade. A rota `/:slug/*` captura qualquer path que comece com um slug, incluindo `/:slug` sozinho quando não há mais segmentos.
+
+**Solução técnica:**
+Mover a rota `/:slug` (RestaurantDetails) para **depois** da rota `/:slug/*`, mas garantir que seja uma rota separada e terminal. Alternativamente, usar um path mais específico como `/:slug/info` para detalhes.
+
+Recomendação: Manter `/:slug` como detalhes (mais limpo semanticamente), ajustando a configuração do Router.
+
+### RLS para Storage
+
+```sql
+-- Política para upload de imagens do restaurante
+CREATE POLICY "Restaurant owners can upload images"
+ON storage.objects
+FOR INSERT
 TO authenticated
-USING (
-  owner_id = auth.uid() 
-  OR (
-    has_role(auth.uid(), 'admin'::app_role) 
-    AND id = get_user_restaurant_id(auth.uid())
-  )
-)
 WITH CHECK (
-  owner_id = auth.uid() 
-  OR (
-    has_role(auth.uid(), 'admin'::app_role) 
-    AND id = get_user_restaurant_id(auth.uid())
-  )
+  bucket_id = 'restaurants' AND
+  has_role(auth.uid(), 'admin')
 );
 ```
 
-### Opção B: Preencher owner_id (Simples, mas limitada)
-
-Atualizar os restaurantes com o `user_id` dos admins:
-
-```sql
-UPDATE restaurants SET owner_id = 'e7a6285a-7d5c-4bdc-a8f5-021444c106ea' WHERE slug = 'astral';
-UPDATE restaurants SET owner_id = 'eef6d9a1-9676-4de2-8254-36c587bfd81d' WHERE slug = 'bruttus';
-```
-
-**Limitação:** Só um owner por restaurante. Se quiser múltiplos admins, use Opção A.
-
----
-
-## Correção Adicional no Código
-
-Mesmo após corrigir a RLS, o código deve tratar graciosamente quando nenhum resultado retorna:
-
-**Arquivo:** `src/hooks/useAdminMutations.ts`
-
-**Alteração:** Trocar `.single()` por `.maybeSingle()` ou remover retorno:
+### Hook useRestaurantProfile
 
 ```typescript
-// Linha 271-272 - ANTES
-.select()
-.single();
+// Busca dados do restaurante do admin logado
+const { data: profile, update } = useRestaurantProfile();
 
-// DEPOIS
-.select()
-.maybeSingle();  // Não falha se 0 linhas
+// Atualiza campos
+await update({
+  description: 'Nova descrição',
+  instagram: '@novoinsta',
+  gallery_urls: ['url1', 'url2']
+});
 ```
-
-Ou simplesmente remover o `.select().single()` já que não precisamos do retorno:
-
-```typescript
-const { error, count } = await supabase
-  .from('restaurants')
-  .update(updatePayload)
-  .eq('id', restaurantId);
-  
-if (error) throw error;
-if (count === 0) throw new Error('Você não tem permissão para atualizar este restaurante.');
-```
-
----
-
-## Plano de Execução
-
-| Passo | Ação |
-|-------|------|
-| 1 | Criar migration para atualizar RLS policy da tabela `restaurants` |
-| 2 | Atualizar `useUpdateRestaurantSettings` para tratar 0 linhas afetadas |
-| 3 | Testar salvamento de configurações em ambos restaurantes |
-
----
-
-## Arquivos a Modificar
-
-| Arquivo/Recurso | Alteração |
-|-----------------|-----------|
-| Migration SQL | Nova RLS policy para `restaurants` |
-| `src/hooks/useAdminMutations.ts` | Remover `.single()` e adicionar verificação de `count` |
-
----
-
-## Impacto
-
-- Admin do Bruttus poderá salvar configurações do Bruttus
-- Admin do Astral poderá salvar configurações do Astral
-- Cada um só consegue editar seu próprio restaurante (isolamento mantido)
-
