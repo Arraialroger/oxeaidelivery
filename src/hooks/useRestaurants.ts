@@ -10,8 +10,9 @@ interface RestaurantListItem {
   category: string | null;
   address: string | null;
   settings: {
-    is_open: boolean;
-    delivery_fee: number;
+    is_open?: boolean;
+    delivery_fee?: number;
+    schedule_mode?: 'auto' | 'manual';
   };
 }
 
@@ -42,6 +43,7 @@ export function useRestaurants(categoryFilter?: string) {
         settings: {
           is_open: (restaurant.settings as any)?.is_open ?? true,
           delivery_fee: (restaurant.settings as any)?.delivery_fee ?? 5,
+          schedule_mode: (restaurant.settings as any)?.schedule_mode ?? 'auto',
         },
       }));
     },
