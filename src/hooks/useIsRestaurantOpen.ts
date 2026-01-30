@@ -36,7 +36,20 @@ export function useIsRestaurantOpen(): OpenStatus {
       };
     }
 
-    // If no business hours configured, fall back to manual is_open setting
+    // Check schedule mode - if manual, use is_open directly
+    const scheduleMode = settings?.schedule_mode ?? 'auto';
+    
+    if (scheduleMode === 'manual') {
+      return {
+        isOpen: settings?.is_open ?? false,
+        isLoading: false,
+        nextOpenTime: null,
+        nextCloseTime: null,
+        todayHours: null,
+      };
+    }
+
+    // Auto mode: If no business hours configured, fall back to manual is_open setting
     if (!businessHours || businessHours.length === 0) {
       return {
         isOpen: settings?.is_open ?? false,
@@ -131,7 +144,7 @@ export function useIsRestaurantOpen(): OpenStatus {
       nextCloseTime: null,
       todayHours: null,
     };
-  }, [businessHours, isLoading, settings?.is_open]);
+  }, [businessHours, isLoading, settings?.is_open, settings?.schedule_mode]);
 }
 
 /**

@@ -3,6 +3,7 @@ import { MapPin, Clock, Star, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useRestaurantOpenStatus } from '@/hooks/useRestaurantOpenStatus';
 
 interface RestaurantCardProps {
   restaurant: {
@@ -14,8 +15,9 @@ interface RestaurantCardProps {
     category: string | null;
     address: string | null;
     settings: {
-      is_open: boolean;
-      delivery_fee: number;
+      is_open?: boolean;
+      delivery_fee?: number;
+      schedule_mode?: 'auto' | 'manual';
     };
   };
 }
@@ -34,7 +36,11 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function RestaurantCard({ restaurant }: RestaurantCardProps) {
-  const isOpen = restaurant.settings?.is_open ?? true;
+  const { isOpen, isLoading: statusLoading } = useRestaurantOpenStatus(
+    restaurant.id,
+    restaurant.settings
+  );
+  
   const categoryLabel = categoryLabels[restaurant.category || 'restaurant'] || 'Restaurante';
   const deliveryFee = restaurant.settings?.delivery_fee ?? 5;
 
@@ -55,16 +61,25 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <div className="absolute inset-0 bg-gradient-to-t from-card/90 via-card/30 to-transparent" />
           
           {/* Status Badge */}
-          <Badge
-            variant={isOpen ? 'default' : 'secondary'}
-            className={`absolute top-2 right-2 ${
-              isOpen 
-                ? 'bg-green-500/90 text-white border-0' 
-                : 'bg-muted text-muted-foreground'
-            }`}
-          >
-            {isOpen ? 'Aberto' : 'Fechado'}
-          </Badge>
+          {statusLoading ? (
+            <Badge
+              variant="secondary"
+              className="absolute top-2 right-2 bg-muted text-muted-foreground animate-pulse"
+            >
+              ...
+            </Badge>
+          ) : (
+            <Badge
+              variant={isOpen ? 'default' : 'secondary'}
+              className={`absolute top-2 right-2 ${
+                isOpen 
+                  ? 'bg-green-500/90 text-white border-0' 
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {isOpen ? 'Aberto' : 'Fechado'}
+            </Badge>
+          )}
 
           {/* Logo */}
           {restaurant.logo_url && (

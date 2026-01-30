@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useUpdateRestaurantSettings } from '@/hooks/useAdminMutations';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Gift } from 'lucide-react';
+import { Loader2, Gift, Clock, Settings2 } from 'lucide-react';
 
 export function ConfigForm() {
   const { restaurant, restaurantId, settings } = useRestaurantContext();
@@ -16,6 +17,7 @@ export function ConfigForm() {
   const [formData, setFormData] = useState({
     delivery_fee: '',
     is_open: true,
+    schedule_mode: 'auto' as 'auto' | 'manual',
     kds_enabled: true,
     loyalty_enabled: false,
     loyalty_stamps_goal: '8',
@@ -29,6 +31,7 @@ export function ConfigForm() {
       setFormData({
         delivery_fee: settings.delivery_fee?.toString() || '0',
         is_open: settings.is_open ?? true,
+        schedule_mode: settings.schedule_mode ?? 'auto',
         kds_enabled: settings.kds_enabled ?? true,
         loyalty_enabled: settings.loyalty_enabled ?? false,
         loyalty_stamps_goal: settings.loyalty_stamps_goal?.toString() || '8',
@@ -54,6 +57,7 @@ export function ConfigForm() {
       await updateSettings.mutateAsync({
         delivery_fee: parseFloat(formData.delivery_fee) || 0,
         is_open: formData.is_open,
+        schedule_mode: formData.schedule_mode,
         kds_enabled: formData.kds_enabled,
         loyalty_enabled: formData.loyalty_enabled,
         loyalty_stamps_goal: parseInt(formData.loyalty_stamps_goal) || 8,
@@ -98,18 +102,67 @@ export function ConfigForm() {
         />
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <Label htmlFor="is_open">Restaurante Aberto</Label>
-          <p className="text-sm text-muted-foreground">
-            Permite novos pedidos
-          </p>
+      {/* Schedule Mode Section */}
+      <div className="space-y-4 pt-4 border-t">
+        <div className="flex items-center gap-2">
+          <Clock className="w-5 h-5 text-primary" />
+          <Label className="text-base font-semibold">Controle de Abertura</Label>
         </div>
-        <Switch
-          id="is_open"
-          checked={formData.is_open}
-          onCheckedChange={(checked) => setFormData({ ...formData, is_open: checked })}
-        />
+
+        <RadioGroup
+          value={formData.schedule_mode}
+          onValueChange={(value: 'auto' | 'manual') => 
+            setFormData({ ...formData, schedule_mode: value })
+          }
+          className="space-y-3"
+        >
+          <div className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/50 transition-colors">
+            <RadioGroupItem value="auto" id="mode-auto" className="mt-0.5" />
+            <div className="flex-1">
+              <Label htmlFor="mode-auto" className="font-medium cursor-pointer">
+                Modo Automático
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Abre e fecha automaticamente conforme os horários configurados na aba "Horários"
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/50 transition-colors">
+            <RadioGroupItem value="manual" id="mode-manual" className="mt-0.5" />
+            <div className="flex-1">
+              <Label htmlFor="mode-manual" className="font-medium cursor-pointer">
+                Modo Manual
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Você controla manualmente quando o restaurante está aberto ou fechado
+              </p>
+            </div>
+          </div>
+        </RadioGroup>
+
+        {formData.schedule_mode === 'manual' && (
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <Label htmlFor="is_open">Restaurante Aberto</Label>
+              <p className="text-sm text-muted-foreground">
+                Permite novos pedidos
+              </p>
+            </div>
+            <Switch
+              id="is_open"
+              checked={formData.is_open}
+              onCheckedChange={(checked) => setFormData({ ...formData, is_open: checked })}
+            />
+          </div>
+        )}
+
+        {formData.schedule_mode === 'auto' && (
+          <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded flex items-center gap-1.5">
+            <Settings2 className="w-3.5 h-3.5" />
+            Configure os horários de funcionamento na aba "Horários"
+          </p>
+        )}
       </div>
 
       <div className="flex items-center justify-between">

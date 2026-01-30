@@ -17,6 +17,7 @@ export interface Restaurant {
 
 export interface RestaurantSettings {
   is_open: boolean;
+  schedule_mode: 'auto' | 'manual';
   kds_enabled: boolean;
   delivery_fee: number;
   local_ddd: string;
@@ -28,6 +29,7 @@ export interface RestaurantSettings {
 
 export const DEFAULT_SETTINGS: RestaurantSettings = {
   is_open: true,
+  schedule_mode: 'auto',
   kds_enabled: true,
   delivery_fee: 5,
   local_ddd: '73',
