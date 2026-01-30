@@ -29,6 +29,9 @@ export default function RestaurantDetails() {
   const { data: restaurant, isLoading, isError } = useRestaurantDetails(slug);
   const { data: businessHours } = useBusinessHours(restaurant?.id);
   const { data: featuredProducts } = useFeaturedProducts(restaurant?.id, 4);
+  
+  // All hooks must be called before any conditional returns
+  const { isOpen, nextOpenTime } = useRestaurantOpenStatus(restaurant?.id, restaurant?.settings ?? null);
 
   if (isLoading) {
     return (
@@ -54,8 +57,6 @@ export default function RestaurantDetails() {
     );
   }
 
-  // Use the automatic open status hook
-  const { isOpen, nextOpenTime } = useRestaurantOpenStatus(restaurant.id, restaurant.settings);
   const whatsappLink = formatWhatsAppLink(restaurant.whatsapp);
   const acceptedPayments = restaurant.accepted_payments || ['pix', 'dinheiro', 'credito', 'debito'];
 
