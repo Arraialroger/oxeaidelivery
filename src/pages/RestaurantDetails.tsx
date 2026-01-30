@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Clock, Phone, MessageCircle, Instagram, Facebook,
@@ -12,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { useRestaurantDetails } from '@/hooks/useRestaurantDetails';
 import { useBusinessHours } from '@/hooks/useBusinessHours';
 import { useFeaturedProducts } from '@/hooks/useFeaturedProducts';
+import { useRestaurantOpenStatus } from '@/hooks/useRestaurantOpenStatus';
 import { formatWhatsAppLink } from '@/lib/phoneUtils';
 import { GallerySection } from '@/components/restaurant/GallerySection';
 import { BusinessHoursSection } from '@/components/restaurant/BusinessHoursSection';
@@ -54,7 +54,8 @@ export default function RestaurantDetails() {
     );
   }
 
-  const isOpen = restaurant.settings?.is_open ?? true;
+  // Use the automatic open status hook
+  const { isOpen, nextOpenTime } = useRestaurantOpenStatus(restaurant.id, restaurant.settings);
   const whatsappLink = formatWhatsAppLink(restaurant.whatsapp);
   const acceptedPayments = restaurant.accepted_payments || ['pix', 'dinheiro', 'credito', 'debito'];
 
@@ -103,7 +104,7 @@ export default function RestaurantDetails() {
             </h1>
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant={isOpen ? 'default' : 'secondary'} className={isOpen ? 'bg-green-500' : ''}>
-                {isOpen ? 'Aberto agora' : 'Fechado'}
+                {isOpen ? 'Aberto agora' : nextOpenTime || 'Fechado'}
               </Badge>
               <div className="flex items-center gap-1 text-amber-500">
                 <Star className="w-4 h-4 fill-current" />

@@ -36,7 +36,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function RestaurantCard({ restaurant }: RestaurantCardProps) {
-  const { isOpen, isLoading: statusLoading } = useRestaurantOpenStatus(
+  const { isOpen, isLoading: statusLoading, nextOpenTime } = useRestaurantOpenStatus(
     restaurant.id,
     restaurant.settings
   );
@@ -77,7 +77,7 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
                   : 'bg-muted text-muted-foreground'
               }`}
             >
-              {isOpen ? 'Aberto' : 'Fechado'}
+              {isOpen ? 'Aberto' : nextOpenTime || 'Fechado'}
             </Badge>
           )}
 
