@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, User, MapPin, CreditCard, Check } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { classifyCustomerType } from "@/lib/customerClassification";
 import { useKdsEvents } from "@/hooks/useKdsEvents";
 import { useRestaurantContext } from "@/contexts/RestaurantContext";
+import { useIsRestaurantOpen } from "@/hooks/useIsRestaurantOpen";
 
 type PaymentMethod = "pix" | "card" | "cash";
 
@@ -35,6 +35,7 @@ export default function Checkout() {
   const { logOrderReceived } = useKdsEvents();
   const loyaltyRedemption = useLoyaltyRedemption();
   const { restaurantId, slug } = useRestaurantContext();
+  const { isOpen: restaurantIsOpen, nextOpenTime } = useIsRestaurantOpen();
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -324,8 +325,8 @@ export default function Checkout() {
     return null;
   }
 
-  // Block checkout if restaurant is closed
-  if (!config?.restaurant_open) {
+  // Block checkout if restaurant is closed (automatic validation based on business_hours)
+  if (!restaurantIsOpen) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <div className="text-center">
@@ -333,7 +334,10 @@ export default function Checkout() {
             <span className="text-3xl">🔒</span>
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">Restaurante Fechado</h1>
-          <p className="text-muted-foreground mb-6">No momento não estamos aceitando pedidos. Volte mais tarde!</p>
+          <p className="text-muted-foreground mb-4">No momento não estamos aceitando pedidos.</p>
+          {nextOpenTime && (
+            <p className="text-sm text-primary font-medium mb-6">{nextOpenTime}</p>
+          )}
           <Button onClick={() => navigate(`/${slug}/menu`)}>Voltar ao Cardápio</Button>
         </div>
       </div>
@@ -609,13 +613,13 @@ export default function Checkout() {
           <div className="space-y-3">
             <p className="text-xs text-center text-muted-foreground">
               Ao confirmar, você concorda com nossos{" "}
-              <Link to="/termos" className="underline hover:text-foreground">
+              <a href={`/${slug}/termos`} className="underline hover:text-foreground">
                 Termos de Uso
-              </Link>{" "}
+              </a>{" "}
               e{" "}
-              <Link to="/privacidade" className="underline hover:text-foreground">
+              <a href={`/${slug}/privacidade`} className="underline hover:text-foreground">
                 Política de Privacidade
-              </Link>
+              </a>
             </p>
             <Button
               onClick={handleSubmitOrder}

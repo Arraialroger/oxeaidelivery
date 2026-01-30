@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
 import { useConfig } from '@/hooks/useConfig';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useIsRestaurantOpen } from '@/hooks/useIsRestaurantOpen';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { data: config } = useConfig();
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
+  const { isOpen: restaurantIsOpen, nextOpenTime } = useIsRestaurantOpen();
 
   const deliveryFee = config?.delivery_fee ?? 0;
   const total = subtotal + deliveryFee;
@@ -198,14 +200,16 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </div>
             </div>
 
-            {!config?.restaurant_open ? (
+            {!restaurantIsOpen ? (
               <div className="text-center">
                 <p className="text-destructive font-medium mb-1">
                   Restaurante fechado no momento
                 </p>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Abrimos às 18h
-                </p>
+                {nextOpenTime && (
+                  <p className="text-xs text-muted-foreground mb-3">
+                    {nextOpenTime}
+                  </p>
+                )}
                 <Button disabled className="w-full h-12 text-base font-semibold opacity-50">
                   Finalizar Pedido
                 </Button>
