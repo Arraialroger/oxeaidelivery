@@ -102,7 +102,7 @@ export default function Index() {
       {/* Footer */}
       <footer className="border-t border-border/50 bg-card/50 py-6 mt-auto">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-sm text-muted-foreground">© 2024 OxeAí Delivery. Todos os direitos reservados.</p>
+          <p className="text-sm text-muted-foreground">© 2024 Arraial Delivery. Todos os direitos reservados.</p>
         </div>
       </footer>
     </div>
