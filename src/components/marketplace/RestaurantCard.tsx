@@ -36,7 +36,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function RestaurantCard({ restaurant }: RestaurantCardProps) {
-  const { isOpen, isLoading: statusLoading, nextOpenTime } = useRestaurantOpenStatus(
+  const { isOpen, isLoading: statusLoading, nextOpenTime, nextCloseTime } = useRestaurantOpenStatus(
     restaurant.id,
     restaurant.settings
   );
@@ -77,7 +77,10 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
                   : 'bg-muted text-muted-foreground'
               }`}
             >
-              {isOpen ? 'Aberto' : nextOpenTime || 'Fechado'}
+              {isOpen 
+                ? (nextCloseTime?.includes('min') ? nextCloseTime : 'Aberto')
+                : (nextOpenTime || 'Fechado')
+              }
             </Badge>
           )}
 
