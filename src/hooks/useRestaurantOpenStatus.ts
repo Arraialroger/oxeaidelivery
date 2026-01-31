@@ -109,10 +109,16 @@ export function useRestaurantOpenStatus(
       if (isWithinHours) {
         return { isOpen: true, isLoading: false, nextOpenTime: null };
       } else if (currentTime < openTime) {
+        // Calculate minutes until opening
+        const minutesUntilOpen = getMinutesUntil(now, openTime);
+        const nextOpenMessage = minutesUntilOpen <= 60 
+          ? `Abre em ${minutesUntilOpen} min`
+          : `Abre às ${formatTime(openTime)}`;
+        
         return {
           isOpen: false,
           isLoading: false,
-          nextOpenTime: `Abre às ${formatTime(openTime)}`,
+          nextOpenTime: nextOpenMessage,
         };
       } else {
         const nextOpen = findNextOpenDay(businessHours, currentDayOfWeek);
@@ -166,4 +172,13 @@ function formatTime(time: string | null): string {
     return `${parseInt(hours)}h`;
   }
   return `${hours}:${minutes}`;
+}
+
+function getMinutesUntil(now: Date, targetTime: string): number {
+  const [hours, minutes] = targetTime.split(':').map(Number);
+  const target = new Date(now);
+  target.setHours(hours, minutes, 0, 0);
+  
+  const diffMs = target.getTime() - now.getTime();
+  return Math.max(1, Math.ceil(diffMs / (1000 * 60)));
 }
