@@ -36,7 +36,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function RestaurantCard({ restaurant }: RestaurantCardProps) {
-  const { isOpen, isLoading: statusLoading, nextOpenTime, nextCloseTime } = useRestaurantOpenStatus(
+  const { isOpen, isLoading: statusLoading, nextOpenTime, nextCloseTime, closingSoon } = useRestaurantOpenStatus(
     restaurant.id,
     restaurant.settings
   );
@@ -73,7 +73,9 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
               variant={isOpen ? 'default' : 'secondary'}
               className={`absolute top-2 right-2 ${
                 isOpen 
-                  ? 'bg-green-500/90 text-white border-0' 
+                  ? closingSoon
+                    ? 'bg-amber-500/90 text-white border-0'
+                    : 'bg-green-500/90 text-white border-0'
                   : 'bg-muted text-muted-foreground'
               }`}
             >

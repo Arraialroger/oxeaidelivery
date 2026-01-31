@@ -19,6 +19,7 @@ interface OpenStatusResult {
   isLoading: boolean;
   nextOpenTime: string | null;
   nextCloseTime: string | null;
+  closingSoon: boolean;
 }
 
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -67,7 +68,7 @@ export function useRestaurantOpenStatus(
 
   return useMemo(() => {
     if (isLoading) {
-      return { isOpen: false, isLoading: true, nextOpenTime: null, nextCloseTime: null };
+      return { isOpen: false, isLoading: true, nextOpenTime: null, nextCloseTime: null, closingSoon: false };
     }
 
     // Check schedule mode - if manual, use is_open directly
@@ -79,6 +80,7 @@ export function useRestaurantOpenStatus(
         isLoading: false,
         nextOpenTime: null,
         nextCloseTime: null,
+        closingSoon: false,
       };
     }
 
@@ -90,6 +92,7 @@ export function useRestaurantOpenStatus(
         isLoading: false,
         nextOpenTime: null,
         nextCloseTime: null,
+        closingSoon: false,
       };
     }
 
@@ -112,6 +115,7 @@ export function useRestaurantOpenStatus(
         isLoading: false,
         nextOpenTime: nextOpen ? formatNextOpen(nextOpen, currentDayOfWeek) : null,
         nextCloseTime: null,
+        closingSoon: false,
       };
     }
 
@@ -124,6 +128,7 @@ export function useRestaurantOpenStatus(
       if (isWithinHours) {
         // Calculate minutes until closing
         const minutesUntilClose = getMinutesUntil(now, closeTime);
+        const closingSoon = minutesUntilClose <= 30;
         const nextCloseMessage = minutesUntilClose <= 60 
           ? `Fecha em ${minutesUntilClose} min`
           : `Fecha às ${formatTime(closeTime)}`;
@@ -133,6 +138,7 @@ export function useRestaurantOpenStatus(
           isLoading: false, 
           nextOpenTime: null,
           nextCloseTime: nextCloseMessage,
+          closingSoon,
         };
       } else if (currentTime < openTime) {
         // Calculate minutes until opening
@@ -146,6 +152,7 @@ export function useRestaurantOpenStatus(
           isLoading: false,
           nextOpenTime: nextOpenMessage,
           nextCloseTime: null,
+          closingSoon: false,
         };
       } else {
         const nextOpen = findNextOpenDay(businessHours, currentDayOfWeek);
@@ -154,6 +161,7 @@ export function useRestaurantOpenStatus(
           isLoading: false,
           nextOpenTime: nextOpen ? formatNextOpen(nextOpen, currentDayOfWeek) : null,
           nextCloseTime: null,
+          closingSoon: false,
         };
       }
     }
@@ -164,6 +172,7 @@ export function useRestaurantOpenStatus(
       isLoading: false,
       nextOpenTime: null,
       nextCloseTime: null,
+      closingSoon: false,
     };
   }, [businessHours, isLoading, settings?.is_open, settings?.schedule_mode, tick]);
 }
