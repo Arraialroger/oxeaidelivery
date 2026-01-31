@@ -4,37 +4,28 @@ import { useRestaurants } from "@/hooks/useRestaurants";
 import { RestaurantCard } from "@/components/marketplace/RestaurantCard";
 import { CategoryFilter } from "@/components/marketplace/CategoryFilter";
 import { SearchBar, LocationHeader } from "@/components/marketplace/SearchBar";
-
 export default function Index() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const { data: restaurants, isLoading, isError } = useRestaurants(activeCategory);
+  const {
+    data: restaurants,
+    isLoading,
+    isError
+  } = useRestaurants(activeCategory);
 
   // Filter restaurants by search query
   const filteredRestaurants = useMemo(() => {
     if (!restaurants) return [];
     if (!searchQuery.trim()) return restaurants;
-
     const query = searchQuery.toLowerCase();
-    return restaurants.filter(
-      (r) =>
-        r.name.toLowerCase().includes(query) ||
-        r.category?.toLowerCase().includes(query) ||
-        r.address?.toLowerCase().includes(query),
-    );
+    return restaurants.filter(r => r.name.toLowerCase().includes(query) || r.category?.toLowerCase().includes(query) || r.address?.toLowerCase().includes(query));
   }, [restaurants, searchQuery]);
-
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+    return <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -45,7 +36,7 @@ export default function Index() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-foreground">Arraial Delivery</h1>
-                <p className="text-xs text-muted-foreground">Peça e receba em casa</p>
+                <p className="text-xs text-muted-foreground">O delivery de Arraial d’Ajuda</p>
               </div>
             </div>
             <LocationHeader />
@@ -72,16 +63,13 @@ export default function Index() {
           </span>
         </div>
 
-        {isError ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+        {isError ? <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
               <Store className="w-8 h-8 text-destructive" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">Erro ao carregar restaurantes</h3>
             <p className="text-muted-foreground">Por favor, tente novamente mais tarde.</p>
-          </div>
-        ) : filteredRestaurants.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          </div> : filteredRestaurants.length === 0 ? <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
               <Store className="w-8 h-8 text-muted-foreground" />
             </div>
@@ -89,14 +77,9 @@ export default function Index() {
             <p className="text-muted-foreground">
               {searchQuery ? "Tente buscar por outro termo." : "Não há restaurantes disponíveis nesta categoria."}
             </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredRestaurants.map((restaurant) => (
-              <RestaurantCard key={restaurant.id} restaurant={restaurant} />
-            ))}
-          </div>
-        )}
+          </div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredRestaurants.map(restaurant => <RestaurantCard key={restaurant.id} restaurant={restaurant} />)}
+          </div>}
       </main>
 
       {/* Footer */}
@@ -105,6 +88,5 @@ export default function Index() {
           <p className="text-sm text-muted-foreground">© 2024 Arraial Delivery. Todos os direitos reservados.</p>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 }
