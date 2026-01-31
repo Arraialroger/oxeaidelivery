@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -52,6 +52,17 @@ export function useRestaurantOpenStatus(
     enabled: !!restaurantId,
     staleTime: 5 * 60 * 1000, // 5 minutes cache for marketplace
   });
+
+  // Force re-render every minute for real-time countdown
+  const [tick, setTick] = useState(0);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 60 * 1000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, []);
 
   return useMemo(() => {
     if (isLoading) {
@@ -136,7 +147,7 @@ export function useRestaurantOpenStatus(
       isLoading: false,
       nextOpenTime: null,
     };
-  }, [businessHours, isLoading, settings?.is_open, settings?.schedule_mode]);
+  }, [businessHours, isLoading, settings?.is_open, settings?.schedule_mode, tick]);
 }
 
 function findNextOpenDay(
