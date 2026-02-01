@@ -20,6 +20,7 @@ interface OpenStatusResult {
   nextOpenTime: string | null;
   nextCloseTime: string | null;
   closingSoon: boolean;
+  closingVerySoon: boolean;
 }
 
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -68,7 +69,7 @@ export function useRestaurantOpenStatus(
 
   return useMemo(() => {
     if (isLoading) {
-      return { isOpen: false, isLoading: true, nextOpenTime: null, nextCloseTime: null, closingSoon: false };
+      return { isOpen: false, isLoading: true, nextOpenTime: null, nextCloseTime: null, closingSoon: false, closingVerySoon: false };
     }
 
     // Check schedule mode - if manual, use is_open directly
@@ -81,6 +82,7 @@ export function useRestaurantOpenStatus(
         nextOpenTime: null,
         nextCloseTime: null,
         closingSoon: false,
+        closingVerySoon: false,
       };
     }
 
@@ -93,6 +95,7 @@ export function useRestaurantOpenStatus(
         nextOpenTime: null,
         nextCloseTime: null,
         closingSoon: false,
+        closingVerySoon: false,
       };
     }
 
@@ -116,6 +119,7 @@ export function useRestaurantOpenStatus(
         nextOpenTime: nextOpen ? formatNextOpen(nextOpen, currentDayOfWeek) : null,
         nextCloseTime: null,
         closingSoon: false,
+        closingVerySoon: false,
       };
     }
 
@@ -129,6 +133,7 @@ export function useRestaurantOpenStatus(
         // Calculate minutes until closing
         const minutesUntilClose = getMinutesUntil(now, closeTime);
         const closingSoon = minutesUntilClose <= 30;
+        const closingVerySoon = minutesUntilClose <= 15;
         const nextCloseMessage = minutesUntilClose <= 60 
           ? `Fecha em ${minutesUntilClose} min`
           : `Fecha às ${formatTime(closeTime)}`;
@@ -139,6 +144,7 @@ export function useRestaurantOpenStatus(
           nextOpenTime: null,
           nextCloseTime: nextCloseMessage,
           closingSoon,
+          closingVerySoon,
         };
       } else if (currentTime < openTime) {
         // Calculate minutes until opening
@@ -153,6 +159,7 @@ export function useRestaurantOpenStatus(
           nextOpenTime: nextOpenMessage,
           nextCloseTime: null,
           closingSoon: false,
+          closingVerySoon: false,
         };
       } else {
         const nextOpen = findNextOpenDay(businessHours, currentDayOfWeek);
@@ -162,6 +169,7 @@ export function useRestaurantOpenStatus(
           nextOpenTime: nextOpen ? formatNextOpen(nextOpen, currentDayOfWeek) : null,
           nextCloseTime: null,
           closingSoon: false,
+          closingVerySoon: false,
         };
       }
     }
@@ -173,6 +181,7 @@ export function useRestaurantOpenStatus(
       nextOpenTime: null,
       nextCloseTime: null,
       closingSoon: false,
+      closingVerySoon: false,
     };
   }, [businessHours, isLoading, settings?.is_open, settings?.schedule_mode, tick]);
 }
