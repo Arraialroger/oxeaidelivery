@@ -31,7 +31,7 @@ export default function RestaurantDetails() {
   const { data: featuredProducts } = useFeaturedProducts(restaurant?.id, 4);
   
   // All hooks must be called before any conditional returns
-  const { isOpen, nextOpenTime, nextCloseTime, closingSoon } = useRestaurantOpenStatus(restaurant?.id, restaurant?.settings ?? null);
+  const { isOpen, nextOpenTime, nextCloseTime, closingSoon, closingVerySoon } = useRestaurantOpenStatus(restaurant?.id, restaurant?.settings ?? null);
 
   if (isLoading) {
     return (
@@ -106,7 +106,7 @@ export default function RestaurantDetails() {
             <div className="flex items-center gap-2 flex-wrap">
               <Badge 
                 variant={isOpen ? 'default' : 'secondary'} 
-                className={isOpen ? (closingSoon ? 'bg-amber-500' : 'bg-green-500') : ''}
+                className={isOpen ? (closingSoon ? `bg-amber-500 ${closingVerySoon ? 'animate-pulse' : ''}` : 'bg-green-500') : ''}
               >
                 {isOpen 
                   ? (nextCloseTime?.includes('min') ? nextCloseTime : 'Aberto agora')
