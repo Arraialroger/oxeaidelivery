@@ -12,7 +12,8 @@ import { ConfigForm } from '@/components/admin/ConfigForm';
 import { StampTransactionsList } from '@/components/admin/StampTransactionsList';
 import { RestaurantProfileForm } from '@/components/admin/RestaurantProfileForm';
 import { BusinessHoursForm } from '@/components/admin/BusinessHoursForm';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock } from 'lucide-react';
+import { DashboardPanel } from '@/components/admin/DashboardPanel';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -82,8 +83,12 @@ export default function Admin() {
 
       {/* Content */}
       <main className="container max-w-2xl mx-auto px-4 py-6">
-        <Tabs defaultValue="products" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-7">
+            <TabsTrigger value="dashboard" className="gap-2">
+              <LayoutDashboard className="w-4 h-4" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
             <TabsTrigger value="products" className="gap-2">
               <Package className="w-4 h-4" />
               <span className="hidden sm:inline">Produtos</span>
@@ -109,6 +114,14 @@ export default function Admin() {
               <span className="hidden sm:inline">Config</span>
             </TabsTrigger>
           </TabsList>
+
+          {/* Dashboard Tab */}
+          <TabsContent value="dashboard" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Dashboard de Vendas</h2>
+            </div>
+            <DashboardPanel />
+          </TabsContent>
 
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-4">
