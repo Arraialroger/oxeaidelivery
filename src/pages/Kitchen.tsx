@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ChefHat, Check, Truck, RefreshCw, CreditCard, Banknote, QrCode, Volume2, VolumeX, Printer, X, History, XCircle, Search, CalendarIcon, TrendingUp, ShoppingBag, DollarSign, Download, FileText, PieChartIcon, Loader2, BarChart3, MessageCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -1013,18 +1013,13 @@ export default function Kitchen() {
                     className="pl-9"
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-sm text-muted-foreground">Período:</span>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-[140px] justify-start text-left font-normal",
-                          !startDate && "text-muted-foreground"
-                        )}
-                      >
+                      <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {startDate ? format(startDate, "dd/MM/yyyy") : "De"}
+                        {startDate ? format(startDate, "dd/MM/yyyy") : "dd/mm/aaaa"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -1033,22 +1028,18 @@ export default function Kitchen() {
                         selected={startDate}
                         onSelect={setStartDate}
                         locale={ptBR}
+                        disabled={(date) => date > new Date()}
                         initialFocus
                         className={cn("p-3 pointer-events-auto")}
                       />
                     </PopoverContent>
                   </Popover>
+                  <span className="text-muted-foreground">até</span>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-[140px] justify-start text-left font-normal",
-                          !endDate && "text-muted-foreground"
-                        )}
-                      >
+                      <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {endDate ? format(endDate, "dd/MM/yyyy") : "Até"}
+                        {endDate ? format(endDate, "dd/MM/yyyy") : "dd/mm/aaaa"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -1057,24 +1048,47 @@ export default function Kitchen() {
                         selected={endDate}
                         onSelect={setEndDate}
                         locale={ptBR}
+                        disabled={(date) => date > new Date() || (startDate ? date < startDate : false)}
                         initialFocus
                         className={cn("p-3 pointer-events-auto")}
                       />
                     </PopoverContent>
                   </Popover>
-                  {(startDate || endDate) && (
+                  <div className="flex gap-1 ml-2">
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="sm"
                       onClick={() => {
-                        setStartDate(undefined);
-                        setEndDate(undefined);
+                        const now = new Date();
+                        setStartDate(startOfDay(now));
+                        setEndDate(endOfDay(now));
                       }}
-                      title="Limpar datas"
                     >
-                      <X className="h-4 w-4" />
+                      Hoje
                     </Button>
-                  )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const now = new Date();
+                        setStartDate(startOfDay(subDays(now, 6)));
+                        setEndDate(endOfDay(now));
+                      }}
+                    >
+                      7 dias
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const now = new Date();
+                        setStartDate(startOfDay(subDays(now, 29)));
+                        setEndDate(endOfDay(now));
+                      }}
+                    >
+                      30 dias
+                    </Button>
+                  </div>
                   <Button
                     variant="outline"
                     onClick={() => {
