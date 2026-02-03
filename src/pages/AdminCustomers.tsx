@@ -115,7 +115,7 @@ export default function AdminCustomers() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="container max-w-4xl mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-4 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link to={`/${slug}/admin`}>
@@ -136,7 +136,7 @@ export default function AdminCustomers() {
       </header>
 
       {/* Content */}
-      <main className="container max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-4 py-6 lg:px-8 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-4">
           <Card>

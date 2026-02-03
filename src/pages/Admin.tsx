@@ -50,7 +50,7 @@ export default function Admin() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="container max-w-2xl mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-4 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <a href={`/${slug}/menu`} target="_blank" rel="noopener noreferrer">
@@ -82,7 +82,7 @@ export default function Admin() {
       </header>
 
       {/* Content */}
-      <main className="container max-w-2xl mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-6 lg:px-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
           <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="dashboard" className="gap-2">

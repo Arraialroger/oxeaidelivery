@@ -3,6 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { TrendingUp, TrendingDown, Users, UserPlus, UserCheck, DollarSign, ShoppingBag, Receipt } from 'lucide-react';
 import { formatPrice } from '@/lib/formatUtils';
+import { OrdersChart } from './OrdersChart';
 
 function MetricCard({
   title,
@@ -204,7 +205,7 @@ export function DashboardPanel() {
   return (
     <div className="space-y-4">
       {/* Revenue & Orders KPIs */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Faturamento Hoje"
           value={metrics.revenue.today}
@@ -238,6 +239,9 @@ export function DashboardPanel() {
           subtitle="Este mês"
         />
       </div>
+
+      {/* Orders Chart */}
+      <OrdersChart />
 
       {/* Customer Breakdown */}
       <CustomerBreakdown
