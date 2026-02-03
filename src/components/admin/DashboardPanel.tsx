@@ -191,10 +191,7 @@ export function DashboardPanel() {
   return (
     <div className="space-y-4">
       {/* Date Filter */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Dashboard de Vendas</h2>
-        <DashboardDateFilter value={dateRange} onChange={setDateRange} />
-      </div>
+      <DashboardDateFilter value={dateRange} onChange={setDateRange} />
 
       {isLoading ? (
         <LoadingSkeleton />
