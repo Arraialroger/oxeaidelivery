@@ -1,7 +1,6 @@
-import { useState } from 'react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, ChevronDown } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -9,12 +8,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 export interface DateRange {
@@ -23,22 +16,12 @@ export interface DateRange {
   label: string;
 }
 
-const presetRanges = [
-  { label: 'Últimos 7 dias', days: 7 },
-  { label: 'Últimos 30 dias', days: 30 },
-  { label: 'Últimos 90 dias', days: 90 },
-];
-
 interface DashboardDateFilterProps {
   value: DateRange;
   onChange: (range: DateRange) => void;
 }
 
 export function DashboardDateFilter({ value, onChange }: DashboardDateFilterProps) {
-  const [isCustomOpen, setIsCustomOpen] = useState(false);
-  const [customFrom, setCustomFrom] = useState<Date | undefined>(value.from);
-  const [customTo, setCustomTo] = useState<Date | undefined>(value.to);
-
   const handlePresetSelect = (days: number, label: string) => {
     const now = new Date();
     onChange({
@@ -48,118 +31,79 @@ export function DashboardDateFilter({ value, onChange }: DashboardDateFilterProp
     });
   };
 
-  const handleCustomApply = () => {
-    if (customFrom && customTo) {
+  const handleStartDateChange = (date: Date | undefined) => {
+    if (date) {
       onChange({
-        from: startOfDay(customFrom),
-        to: endOfDay(customTo),
-        label: `${format(customFrom, 'dd/MM', { locale: ptBR })} - ${format(customTo, 'dd/MM', { locale: ptBR })}`,
+        from: startOfDay(date),
+        to: value.to,
+        label: `${format(date, 'dd/MM', { locale: ptBR })} - ${format(value.to, 'dd/MM', { locale: ptBR })}`,
       });
-      setIsCustomOpen(false);
+    }
+  };
+
+  const handleEndDateChange = (date: Date | undefined) => {
+    if (date) {
+      onChange({
+        from: value.from,
+        to: endOfDay(date),
+        label: `${format(value.from, 'dd/MM', { locale: ptBR })} - ${format(date, 'dd/MM', { locale: ptBR })}`,
+      });
     }
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <CalendarIcon className="h-4 w-4" />
-            {value.label}
-            <ChevronDown className="h-3 w-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {presetRanges.map((preset) => (
-            <DropdownMenuItem
-              key={preset.days}
-              onClick={() => handlePresetSelect(preset.days, preset.label)}
-            >
-              {preset.label}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuItem onClick={() => setIsCustomOpen(true)}>
-            Período customizado
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Popover open={isCustomOpen} onOpenChange={setIsCustomOpen}>
+    <div className="flex flex-wrap gap-2 items-center">
+      <span className="text-sm text-muted-foreground">Período:</span>
+      <Popover>
         <PopoverTrigger asChild>
-          <span />
+          <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal")}>
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {format(value.from, "dd/MM/yyyy")}
+          </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-4" align="end">
-          <div className="space-y-4">
-            <div className="text-sm font-medium">Selecione o período</div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">De</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !customFrom && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customFrom ? format(customFrom, 'dd/MM/yyyy', { locale: ptBR }) : 'Início'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={customFrom}
-                      onSelect={setCustomFrom}
-                      disabled={(date) => date > new Date()}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Até</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !customTo && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customTo ? format(customTo, 'dd/MM/yyyy', { locale: ptBR }) : 'Fim'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={customTo}
-                      onSelect={setCustomTo}
-                      disabled={(date) => date > new Date() || (customFrom && date < customFrom)}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            <Button 
-              size="sm" 
-              className="w-full" 
-              onClick={handleCustomApply}
-              disabled={!customFrom || !customTo}
-            >
-              Aplicar
-            </Button>
-          </div>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={value.from}
+            onSelect={handleStartDateChange}
+            locale={ptBR}
+            disabled={(date) => date > new Date()}
+            initialFocus
+            className="p-3 pointer-events-auto"
+          />
         </PopoverContent>
       </Popover>
+      <span className="text-muted-foreground">até</span>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal")}>
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {format(value.to, "dd/MM/yyyy")}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={value.to}
+            onSelect={handleEndDateChange}
+            locale={ptBR}
+            disabled={(date) => date > new Date() || date < value.from}
+            initialFocus
+            className="p-3 pointer-events-auto"
+          />
+        </PopoverContent>
+      </Popover>
+      <div className="flex gap-1 ml-2">
+        <Button variant="ghost" size="sm" onClick={() => handlePresetSelect(1, 'Hoje')}>
+          Hoje
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => handlePresetSelect(7, '7 dias')}>
+          7 dias
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => handlePresetSelect(30, '30 dias')}>
+          30 dias
+        </Button>
+      </div>
     </div>
   );
 }
@@ -169,6 +113,6 @@ export function getDefaultDateRange(): DateRange {
   return {
     from: startOfDay(subDays(now, 29)),
     to: endOfDay(now),
-    label: 'Últimos 30 dias',
+    label: '30 dias',
   };
 }
