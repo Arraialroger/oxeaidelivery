@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
-import { subDays, format, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay, eachDayOfInterval, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TrendingUp } from 'lucide-react';
@@ -14,39 +14,51 @@ interface DailyOrders {
   orders: number;
 }
 
-export function OrdersChart() {
+interface OrdersChartProps {
+  dateRange: {
+    from: Date;
+    to: Date;
+  };
+}
+
+export function OrdersChart({ dateRange }: OrdersChartProps) {
   const { restaurantId } = useRestaurantContext();
 
   const { data: chartData, isLoading } = useQuery({
-    queryKey: ['orders-chart', restaurantId],
+    queryKey: ['orders-chart', restaurantId, dateRange.from.toISOString(), dateRange.to.toISOString()],
     queryFn: async (): Promise<DailyOrders[]> => {
       if (!restaurantId) return [];
 
-      const now = new Date();
-      const days: DailyOrders[] = [];
+      const { from, to } = dateRange;
+      const days = eachDayOfInterval({ start: from, end: to });
+      const periodDays = differenceInDays(to, from) + 1;
 
-      // Generate last 7 days
-      for (let i = 6; i >= 0; i--) {
-        const date = subDays(now, i);
-        const dayStart = startOfDay(date);
-        const dayEnd = endOfDay(date);
+      // Fetch all orders in the period at once
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select('created_at')
+        .eq('restaurant_id', restaurantId)
+        .neq('status', 'cancelled')
+        .gte('created_at', startOfDay(from).toISOString())
+        .lte('created_at', endOfDay(to).toISOString());
 
-        const { count } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('restaurant_id', restaurantId)
-          .neq('status', 'cancelled')
-          .gte('created_at', dayStart.toISOString())
-          .lte('created_at', dayEnd.toISOString());
+      if (error) throw error;
 
-        days.push({
-          date: format(date, 'yyyy-MM-dd'),
-          label: format(date, 'EEE', { locale: ptBR }),
-          orders: count || 0,
-        });
-      }
+      // Group orders by date
+      const ordersByDate = new Map<string, number>();
+      (orders || []).forEach(order => {
+        const dateKey = format(new Date(order.created_at || ''), 'yyyy-MM-dd');
+        ordersByDate.set(dateKey, (ordersByDate.get(dateKey) || 0) + 1);
+      });
 
-      return days;
+      // Use shorter label format if more than 14 days
+      const labelFormat = periodDays > 14 ? 'dd/MM' : 'EEE dd';
+
+      return days.map(date => ({
+        date: format(date, 'yyyy-MM-dd'),
+        label: format(date, labelFormat, { locale: ptBR }),
+        orders: ordersByDate.get(format(date, 'yyyy-MM-dd')) || 0,
+      }));
     },
     enabled: !!restaurantId,
     staleTime: 1000 * 60 * 5,
@@ -66,13 +78,14 @@ export function OrdersChart() {
   }
 
   const totalOrders = chartData?.reduce((sum, day) => sum + day.orders, 0) || 0;
+  const periodDays = differenceInDays(dateRange.to, dateRange.from) + 1;
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <TrendingUp className="h-4 w-4" />
-          Pedidos nos Últimos 7 Dias
+          Pedidos no Período ({periodDays} dias)
         </CardTitle>
         <p className="text-sm text-muted-foreground">
           Total: {totalOrders} pedidos
@@ -85,8 +98,9 @@ export function OrdersChart() {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis 
                 dataKey="label" 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10 }}
                 className="text-muted-foreground"
+                interval={periodDays > 14 ? Math.floor(periodDays / 7) : 0}
               />
               <YAxis 
                 allowDecimals={false}
@@ -108,7 +122,7 @@ export function OrdersChart() {
                 name="Pedidos"
                 stroke="hsl(var(--primary))" 
                 strokeWidth={2}
-                dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2 }}
+                dot={periodDays <= 14}
                 activeDot={{ r: 6, fill: 'hsl(var(--primary))' }}
               />
             </LineChart>

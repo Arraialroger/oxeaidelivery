@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
-import { startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from 'date-fns';
+import { differenceInDays, subDays, startOfDay, endOfDay } from 'date-fns';
 
 export interface CustomerMetrics {
   newCustomers: number;
@@ -12,18 +12,10 @@ export interface CustomerMetrics {
 }
 
 export interface RevenueMetrics {
-  today: number;
-  todayPrevious: number;
-  week: number;
-  weekPrevious: number;
-  month: number;
-  monthPrevious: number;
-  ordersToday: number;
-  ordersTodayPrevious: number;
-  ordersWeek: number;
-  ordersWeekPrevious: number;
-  ordersMonth: number;
-  ordersMonthPrevious: number;
+  current: number;
+  previous: number;
+  ordersCurrent: number;
+  ordersPrevious: number;
 }
 
 export interface DashboardMetrics {
@@ -35,31 +27,25 @@ export interface DashboardMetrics {
   };
 }
 
-export function useDashboardMetrics() {
+interface DateRange {
+  from: Date;
+  to: Date;
+}
+
+export function useDashboardMetrics(dateRange: DateRange) {
   const { restaurantId } = useRestaurantContext();
 
   return useQuery({
-    queryKey: ['dashboard-metrics', restaurantId],
+    queryKey: ['dashboard-metrics', restaurantId, dateRange.from.toISOString(), dateRange.to.toISOString()],
     queryFn: async (): Promise<DashboardMetrics> => {
       if (!restaurantId) throw new Error('Restaurant ID required');
 
-      const now = new Date();
+      const { from, to } = dateRange;
+      const periodDays = differenceInDays(to, from) + 1;
       
-      // Current periods
-      const todayStart = startOfDay(now);
-      const todayEnd = endOfDay(now);
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
-      
-      // Previous periods (for comparison)
-      const yesterdayStart = startOfDay(subDays(now, 1));
-      const yesterdayEnd = endOfDay(subDays(now, 1));
-      const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
-      const lastWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
-      const lastMonthStart = startOfMonth(subMonths(now, 1));
-      const lastMonthEnd = endOfMonth(subMonths(now, 1));
+      // Previous period (same duration, immediately before)
+      const previousFrom = startOfDay(subDays(from, periodDays));
+      const previousTo = endOfDay(subDays(from, 1));
 
       // Fetch all orders for this restaurant (not cancelled)
       const { data: orders, error: ordersError } = await supabase
@@ -92,77 +78,63 @@ export function useDashboardMetrics() {
       };
 
       // Current period orders
-      const todayOrders = filterOrdersByDate(todayStart, todayEnd);
-      const weekOrders = filterOrdersByDate(weekStart, weekEnd);
-      const monthOrders = filterOrdersByDate(monthStart, monthEnd);
-
-      // Previous period orders
-      const yesterdayOrders = filterOrdersByDate(yesterdayStart, yesterdayEnd);
-      const lastWeekOrders = filterOrdersByDate(lastWeekStart, lastWeekEnd);
-      const lastMonthOrders = filterOrdersByDate(lastMonthStart, lastMonthEnd);
+      const currentOrders = filterOrdersByDate(from, to);
+      const previousOrders = filterOrdersByDate(previousFrom, previousTo);
 
       // Revenue calculations
       const revenue: RevenueMetrics = {
-        today: calculateRevenue(todayOrders),
-        todayPrevious: calculateRevenue(yesterdayOrders),
-        week: calculateRevenue(weekOrders),
-        weekPrevious: calculateRevenue(lastWeekOrders),
-        month: calculateRevenue(monthOrders),
-        monthPrevious: calculateRevenue(lastMonthOrders),
-        ordersToday: todayOrders.length,
-        ordersTodayPrevious: yesterdayOrders.length,
-        ordersWeek: weekOrders.length,
-        ordersWeekPrevious: lastWeekOrders.length,
-        ordersMonth: monthOrders.length,
-        ordersMonthPrevious: lastMonthOrders.length,
+        current: calculateRevenue(currentOrders),
+        previous: calculateRevenue(previousOrders),
+        ordersCurrent: currentOrders.length,
+        ordersPrevious: previousOrders.length,
       };
 
-      // Customer analysis - new vs returning this month
-      const monthCustomerIds = new Set(monthOrders.map(o => o.customer_id).filter(Boolean));
+      // Customer analysis - new vs returning in current period
+      const currentCustomerIds = new Set(currentOrders.map(o => o.customer_id).filter(Boolean));
       
-      // New customers = created this month
-      const newCustomersThisMonth = (customers || []).filter(c => {
+      // New customers = created in current period
+      const newCustomersCurrent = (customers || []).filter(c => {
         const createdAt = new Date(c.created_at || '');
-        return createdAt >= monthStart && createdAt <= monthEnd;
+        return createdAt >= from && createdAt <= to;
       });
 
-      // Returning = ordered this month but created before
-      const returningCustomersThisMonth = (customers || []).filter(c => {
+      // Returning = ordered in current period but created before
+      const returningCustomersCurrent = (customers || []).filter(c => {
         const createdAt = new Date(c.created_at || '');
-        const isOld = createdAt < monthStart;
-        const orderedThisMonth = monthCustomerIds.has(c.id);
-        return isOld && orderedThisMonth;
+        const isOld = createdAt < from;
+        const orderedInPeriod = currentCustomerIds.has(c.id);
+        return isOld && orderedInPeriod;
       });
 
-      // Previous month comparison
-      const lastMonthCustomerIds = new Set(lastMonthOrders.map(o => o.customer_id).filter(Boolean));
+      // Previous period comparison
+      const previousCustomerIds = new Set(previousOrders.map(o => o.customer_id).filter(Boolean));
       
-      const newCustomersLastMonth = (customers || []).filter(c => {
+      const newCustomersPrevious = (customers || []).filter(c => {
         const createdAt = new Date(c.created_at || '');
-        return createdAt >= lastMonthStart && createdAt <= lastMonthEnd;
+        return createdAt >= previousFrom && createdAt <= previousTo;
       });
 
-      const returningCustomersLastMonth = (customers || []).filter(c => {
+      const returningCustomersPrevious = (customers || []).filter(c => {
         const createdAt = new Date(c.created_at || '');
-        const isOld = createdAt < lastMonthStart;
-        const orderedLastMonth = lastMonthCustomerIds.has(c.id);
-        return isOld && orderedLastMonth;
+        const isOld = createdAt < previousFrom;
+        const orderedInPeriod = previousCustomerIds.has(c.id);
+        return isOld && orderedInPeriod;
       });
 
       const customerMetrics: CustomerMetrics = {
-        newCustomers: newCustomersThisMonth.length,
-        returningCustomers: returningCustomersThisMonth.length,
+        newCustomers: newCustomersCurrent.length,
+        returningCustomers: returningCustomersCurrent.length,
         totalCustomers: customers?.length || 0,
-        newCustomersPrevious: newCustomersLastMonth.length,
-        returningCustomersPrevious: returningCustomersLastMonth.length,
+        newCustomersPrevious: newCustomersPrevious.length,
+        returningCustomersPrevious: returningCustomersPrevious.length,
       };
 
       // Average ticket
-      const avgTicketCurrent = monthOrders.length > 0 
-        ? revenue.month / monthOrders.length 
+      const avgTicketCurrent = currentOrders.length > 0 
+        ? revenue.current / currentOrders.length 
         : 0;
-      const avgTicketPrevious = lastMonthOrders.length > 0 
-        ? revenue.monthPrevious / lastMonthOrders.length 
+      const avgTicketPrevious = previousOrders.length > 0 
+        ? revenue.previous / previousOrders.length 
         : 0;
 
       return {
