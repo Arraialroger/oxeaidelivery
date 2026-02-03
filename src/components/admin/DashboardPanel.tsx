@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
-import { TrendingUp, TrendingDown, Users, UserPlus, UserCheck, DollarSign, ShoppingBag, Receipt } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, UserPlus, UserCheck, DollarSign, ShoppingBag } from 'lucide-react';
 import { formatPrice } from '@/lib/formatUtils';
 import { OrdersChart } from './OrdersChart';
+import { DashboardDateFilter, getDefaultDateRange, type DateRange } from './DashboardDateFilter';
 
 function MetricCard({
   title,
@@ -76,7 +78,7 @@ function CustomerBreakdown({
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Users className="h-4 w-4" />
-          Clientes Este Mês: Novos vs Recorrentes
+          Clientes no Período: Novos vs Recorrentes
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -98,7 +100,7 @@ function CustomerBreakdown({
               <span>{newPercent.toFixed(0)}% do total</span>
               {newPrevious > 0 && (
                 <span className={newCustomers >= newPrevious ? 'text-green-600' : 'text-red-600'}>
-                  {newCustomers >= newPrevious ? '↑' : '↓'} {Math.abs(newCustomers - newPrevious)} vs mês anterior
+                  {newCustomers >= newPrevious ? '↑' : '↓'} {Math.abs(newCustomers - newPrevious)} vs anterior
                 </span>
               )}
             </div>
@@ -121,7 +123,7 @@ function CustomerBreakdown({
               <span>{returningPercent.toFixed(0)}% do total</span>
               {returningPrevious > 0 && (
                 <span className={returningCustomers >= returningPrevious ? 'text-green-600' : 'text-red-600'}>
-                  {returningCustomers >= returningPrevious ? '↑' : '↓'} {Math.abs(returningCustomers - returningPrevious)} vs mês anterior
+                  {returningCustomers >= returningPrevious ? '↑' : '↓'} {Math.abs(returningCustomers - returningPrevious)} vs anterior
                 </span>
               )}
             </div>
@@ -147,8 +149,8 @@ function CustomerBreakdown({
 function LoadingSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
           <Card key={i}>
             <CardHeader className="pb-2">
               <Skeleton className="h-4 w-24" />
@@ -165,10 +167,7 @@ function LoadingSkeleton() {
           <Skeleton className="h-5 w-48" />
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
-          </div>
+          <Skeleton className="h-[200px]" />
         </CardContent>
       </Card>
     </div>
@@ -176,11 +175,8 @@ function LoadingSkeleton() {
 }
 
 export function DashboardPanel() {
-  const { data: metrics, isLoading, error } = useDashboardMetrics();
-
-  if (isLoading) {
-    return <LoadingSkeleton />;
-  }
+  const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange);
+  const { data: metrics, isLoading, error } = useDashboardMetrics(dateRange);
 
   if (error) {
     return (
@@ -192,80 +188,78 @@ export function DashboardPanel() {
     );
   }
 
-  if (!metrics) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center text-muted-foreground">
-          Nenhum dado disponível ainda.
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {/* Revenue & Orders KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Faturamento Hoje"
-          value={metrics.revenue.today}
-          previousValue={metrics.revenue.todayPrevious}
-          icon={DollarSign}
-          format="currency"
-          subtitle={`${metrics.revenue.ordersToday} pedidos`}
-        />
-        <MetricCard
-          title="Faturamento Semana"
-          value={metrics.revenue.week}
-          previousValue={metrics.revenue.weekPrevious}
-          icon={Receipt}
-          format="currency"
-          subtitle={`${metrics.revenue.ordersWeek} pedidos`}
-        />
-        <MetricCard
-          title="Faturamento Mês"
-          value={metrics.revenue.month}
-          previousValue={metrics.revenue.monthPrevious}
-          icon={ShoppingBag}
-          format="currency"
-          subtitle={`${metrics.revenue.ordersMonth} pedidos`}
-        />
-        <MetricCard
-          title="Ticket Médio"
-          value={metrics.avgTicket.current}
-          previousValue={metrics.avgTicket.previous}
-          icon={TrendingUp}
-          format="currency"
-          subtitle="Este mês"
-        />
+      {/* Date Filter */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold">Dashboard de Vendas</h2>
+        <DashboardDateFilter value={dateRange} onChange={setDateRange} />
       </div>
 
-      {/* Orders Chart */}
-      <OrdersChart />
+      {isLoading ? (
+        <LoadingSkeleton />
+      ) : !metrics ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Nenhum dado disponível ainda.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Revenue & Orders KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <MetricCard
+              title="Faturamento no Período"
+              value={metrics.revenue.current}
+              previousValue={metrics.revenue.previous}
+              icon={DollarSign}
+              format="currency"
+              subtitle={`${metrics.revenue.ordersCurrent} pedidos`}
+            />
+            <MetricCard
+              title="Ticket Médio"
+              value={metrics.avgTicket.current}
+              previousValue={metrics.avgTicket.previous}
+              icon={TrendingUp}
+              format="currency"
+            />
+            <MetricCard
+              title="Total de Pedidos"
+              value={metrics.revenue.ordersCurrent}
+              previousValue={metrics.revenue.ordersPrevious}
+              icon={ShoppingBag}
+              format="number"
+            />
+          </div>
 
-      {/* Customer Breakdown */}
-      <CustomerBreakdown
-        newCustomers={metrics.customers.newCustomers}
-        returningCustomers={metrics.customers.returningCustomers}
-        newPrevious={metrics.customers.newCustomersPrevious}
-        returningPrevious={metrics.customers.returningCustomersPrevious}
-      />
+          {/* Orders Chart */}
+          <OrdersChart dateRange={dateRange} />
 
-      {/* Total Customers */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Base Total de Clientes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold">{metrics.customers.totalCustomers}</div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Clientes cadastrados no sistema
-          </p>
-        </CardContent>
-      </Card>
+          {/* Customer Breakdown */}
+          <CustomerBreakdown
+            newCustomers={metrics.customers.newCustomers}
+            returningCustomers={metrics.customers.returningCustomers}
+            newPrevious={metrics.customers.newCustomersPrevious}
+            returningPrevious={metrics.customers.returningCustomersPrevious}
+          />
+
+          {/* Total Customers */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Base Total de Clientes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{metrics.customers.totalCustomers}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Clientes cadastrados no sistema
+              </p>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
