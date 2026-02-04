@@ -330,8 +330,8 @@ export default function Kitchen() {
   const [cancelling, setCancelling] = useState(false);
   const [detailsOrder, setDetailsOrder] = useState<OrderWithDetails | null>(null);
   const [historySearch, setHistorySearch] = useState('');
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [startDate, setStartDate] = useState<Date | undefined>(startOfDay(new Date()));
+  const [endDate, setEndDate] = useState<Date | undefined>(endOfDay(new Date()));
   const previousOrderIdsRef = useRef<Set<string>>(new Set());
   const isInitialLoadRef = useRef(true);
   const { toast } = useToast();

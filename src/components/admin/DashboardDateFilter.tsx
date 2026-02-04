@@ -111,8 +111,8 @@ export function DashboardDateFilter({ value, onChange }: DashboardDateFilterProp
 export function getDefaultDateRange(): DateRange {
   const now = new Date();
   return {
-    from: startOfDay(subDays(now, 29)),
+    from: startOfDay(now),
     to: endOfDay(now),
-    label: '30 dias',
+    label: 'Hoje',
   };
 }
