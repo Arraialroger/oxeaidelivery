@@ -26,8 +26,8 @@ const STATUS_COLORS: Record<string, string> = {
 export function KdsPerformanceReport() {
   const { restaurantId } = useRestaurantContext();
   const { metrics, loading, error, fetchMetrics } = useKdsMetrics();
-  const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 7));
-  const [endDate, setEndDate] = useState<Date>(new Date());
+  const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
+  const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
 
   useEffect(() => {
     fetchMetrics(restaurantId, {
@@ -103,7 +103,7 @@ export function KdsPerformanceReport() {
           </PopoverContent>
         </Popover>
         <div className="flex gap-1 ml-2">
-          <Button variant="ghost" size="sm" onClick={() => { setStartDate(subDays(new Date(), 1)); setEndDate(new Date()); }}>
+          <Button variant="ghost" size="sm" onClick={() => { setStartDate(startOfDay(new Date())); setEndDate(endOfDay(new Date())); }}>
             Hoje
           </Button>
           <Button variant="ghost" size="sm" onClick={() => { setStartDate(subDays(new Date(), 7)); setEndDate(new Date()); }}>
