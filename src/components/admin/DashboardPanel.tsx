@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
-import { TrendingUp, TrendingDown, Users, UserPlus, UserCheck, DollarSign, ShoppingBag } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, UserPlus, UserCheck, DollarSign, ShoppingBag, FileDown } from 'lucide-react';
 import { formatPrice } from '@/lib/formatUtils';
 import { OrdersChart } from './OrdersChart';
 import { DashboardDateFilter, getDefaultDateRange, type DateRange } from './DashboardDateFilter';
-
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import jsPDF from 'jspdf';
 function MetricCard({
   title,
   value,
@@ -178,6 +181,88 @@ export function DashboardPanel() {
   const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange);
   const { data: metrics, isLoading, error } = useDashboardMetrics(dateRange);
 
+  const handleExportPDF = () => {
+    if (!metrics) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Relatório Dashboard de Vendas', pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    // Period
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const periodText = `Período: ${format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} a ${format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}`;
+    doc.text(periodText, pageWidth / 2, y, { align: 'center' });
+    y += 15;
+
+    // Revenue Section
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Faturamento', 20, y);
+    y += 8;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Faturamento no Período: ${formatPrice(metrics.revenue.current)}`, 25, y);
+    y += 6;
+    doc.text(`Total de Pedidos: ${metrics.revenue.ordersCurrent}`, 25, y);
+    y += 6;
+    doc.text(`Ticket Médio: ${formatPrice(metrics.avgTicket.current)}`, 25, y);
+    y += 12;
+
+    // Comparison with previous period
+    if (metrics.revenue.previous > 0) {
+      const revenueChange = ((metrics.revenue.current - metrics.revenue.previous) / metrics.revenue.previous) * 100;
+      const ticketChange = ((metrics.avgTicket.current - metrics.avgTicket.previous) / metrics.avgTicket.previous) * 100;
+      
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Comparação com Período Anterior', 20, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Variação Faturamento: ${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}%`, 25, y);
+      y += 6;
+      doc.text(`Variação Ticket Médio: ${ticketChange >= 0 ? '+' : ''}${ticketChange.toFixed(1)}%`, 25, y);
+      y += 12;
+    }
+
+    // Customers Section
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Clientes', 20, y);
+    y += 8;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    const totalPeriod = metrics.customers.newCustomers + metrics.customers.returningCustomers;
+    const newPercent = totalPeriod > 0 ? (metrics.customers.newCustomers / totalPeriod) * 100 : 0;
+    const returningPercent = totalPeriod > 0 ? (metrics.customers.returningCustomers / totalPeriod) * 100 : 0;
+
+    doc.text(`Novos Clientes: ${metrics.customers.newCustomers} (${newPercent.toFixed(0)}%)`, 25, y);
+    y += 6;
+    doc.text(`Clientes Recorrentes: ${metrics.customers.returningCustomers} (${returningPercent.toFixed(0)}%)`, 25, y);
+    y += 6;
+    doc.text(`Base Total de Clientes: ${metrics.customers.totalCustomers}`, 25, y);
+    y += 15;
+
+    // Footer
+    doc.setFontSize(9);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, pageWidth / 2, 280, { align: 'center' });
+
+    // Save
+    const fileName = `dashboard-vendas-${format(dateRange.from, 'yyyy-MM-dd')}-${format(dateRange.to, 'yyyy-MM-dd')}.pdf`;
+    doc.save(fileName);
+  };
+
   if (error) {
     return (
       <Card>
@@ -190,8 +275,20 @@ export function DashboardPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Date Filter */}
-      <DashboardDateFilter value={dateRange} onChange={setDateRange} />
+      {/* Date Filter + Export */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <DashboardDateFilter value={dateRange} onChange={setDateRange} />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportPDF}
+          disabled={isLoading || !metrics}
+          className="gap-2"
+        >
+          <FileDown className="h-4 w-4" />
+          Exportar PDF
+        </Button>
+      </div>
 
       {isLoading ? (
         <LoadingSkeleton />
