@@ -13,6 +13,9 @@ export const formatPrice = (price: number): string => {
   }).format(price);
 };
 
+// Alias for formatPrice (used in checkout components)
+export const formatCurrency = formatPrice;
+
 /**
  * Format date to Brazilian format with time
  */

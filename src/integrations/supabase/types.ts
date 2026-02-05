@@ -16,14 +16,20 @@ export type Database = {
     Tables: {
       addresses: {
         Row: {
+          address_source: string | null
           complement: string | null
           complement_point: string | null
           complemento: string | null
           created_at: string | null
           customer_id: string | null
+          delivery_zone_id: string | null
+          formatted_address: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
           neighborhood: string
           number: string
+          place_id: string | null
           ponto_referencia: string | null
           reference: string | null
           reference_point: string | null
@@ -31,14 +37,20 @@ export type Database = {
           street: string
         }
         Insert: {
+          address_source?: string | null
           complement?: string | null
           complement_point?: string | null
           complemento?: string | null
           created_at?: string | null
           customer_id?: string | null
+          delivery_zone_id?: string | null
+          formatted_address?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           neighborhood: string
           number: string
+          place_id?: string | null
           ponto_referencia?: string | null
           reference?: string | null
           reference_point?: string | null
@@ -46,14 +58,20 @@ export type Database = {
           street: string
         }
         Update: {
+          address_source?: string | null
           complement?: string | null
           complement_point?: string | null
           complemento?: string | null
           created_at?: string | null
           customer_id?: string | null
+          delivery_zone_id?: string | null
+          formatted_address?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           neighborhood?: string
           number?: string
+          place_id?: string | null
           ponto_referencia?: string | null
           reference?: string | null
           reference_point?: string | null
@@ -66,6 +84,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addresses_delivery_zone_id_fkey"
+            columns: ["delivery_zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
             referencedColumns: ["id"]
           },
           {
@@ -137,6 +162,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "categories_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkout_events: {
+        Row: {
+          created_at: string | null
+          customer_phone: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          restaurant_id: string
+          session_id: string | null
+          step_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_phone?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          restaurant_id: string
+          session_id?: string | null
+          step_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_phone?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          restaurant_id?: string
+          session_id?: string | null
+          step_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_events_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
@@ -317,32 +383,107 @@ export type Database = {
           },
         ]
       }
-      delivery_zones: {
+      delivery_attempts_log: {
         Row: {
-          cep_prefix: string | null
           created_at: string | null
-          delivery_fee_override: number | null
+          customer_phone: string | null
           id: string
-          is_active: boolean | null
-          neighborhood: string
+          latitude: number | null
+          longitude: number | null
+          nearest_zone_id: string | null
+          rejection_reason: string | null
+          requested_address: string | null
           restaurant_id: string
         }
         Insert: {
-          cep_prefix?: string | null
           created_at?: string | null
-          delivery_fee_override?: number | null
+          customer_phone?: string | null
           id?: string
-          is_active?: boolean | null
-          neighborhood: string
+          latitude?: number | null
+          longitude?: number | null
+          nearest_zone_id?: string | null
+          rejection_reason?: string | null
+          requested_address?: string | null
           restaurant_id: string
         }
         Update: {
+          created_at?: string | null
+          customer_phone?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nearest_zone_id?: string | null
+          rejection_reason?: string | null
+          requested_address?: string | null
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_attempts_log_nearest_zone_id_fkey"
+            columns: ["nearest_zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_attempts_log_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_zones: {
+        Row: {
+          center_lat: number | null
+          center_lng: number | null
+          cep_prefix: string | null
+          created_at: string | null
+          delivery_fee_override: number | null
+          estimated_delivery_time: number | null
+          free_delivery_above: number | null
+          id: string
+          is_active: boolean | null
+          is_polygon: boolean | null
+          min_order_value: number | null
+          neighborhood: string
+          polygon_coords: Json | null
+          radius_km: number | null
+          restaurant_id: string
+        }
+        Insert: {
+          center_lat?: number | null
+          center_lng?: number | null
           cep_prefix?: string | null
           created_at?: string | null
           delivery_fee_override?: number | null
+          estimated_delivery_time?: number | null
+          free_delivery_above?: number | null
           id?: string
           is_active?: boolean | null
+          is_polygon?: boolean | null
+          min_order_value?: number | null
+          neighborhood: string
+          polygon_coords?: Json | null
+          radius_km?: number | null
+          restaurant_id: string
+        }
+        Update: {
+          center_lat?: number | null
+          center_lng?: number | null
+          cep_prefix?: string | null
+          created_at?: string | null
+          delivery_fee_override?: number | null
+          estimated_delivery_time?: number | null
+          free_delivery_above?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_polygon?: boolean | null
+          min_order_value?: number | null
           neighborhood?: string
+          polygon_coords?: Json | null
+          radius_km?: number | null
           restaurant_id?: string
         }
         Relationships: [
