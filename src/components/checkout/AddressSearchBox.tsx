@@ -70,10 +70,10 @@ export function AddressSearchBox({
 
   // Sync external value
   useEffect(() => {
-    if (value !== undefined && value !== inputValue) {
+    if (value !== undefined) {
       setInputValue(value);
     }
-  }, [value, inputValue]);
+  }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
