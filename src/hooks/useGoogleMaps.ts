@@ -1,5 +1,5 @@
 /// <reference types="@types/google.maps" />
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -24,9 +24,14 @@ let isScriptLoaded = false;
 let loadPromise: Promise<void> | null = null;
 
 export function useGoogleMaps(options: UseGoogleMapsOptions = {}): UseGoogleMapsReturn {
-  const { libraries = ['places'] } = options;
   const [isLoaded, setIsLoaded] = useState(isScriptLoaded);
   const [loadError, setLoadError] = useState<Error | null>(null);
+
+  // Memoize libraries to avoid infinite loop from array recreation
+  const librariesKey = useMemo(
+    () => (options.libraries || ['places']).join(','),
+    [options.libraries]
+  );
 
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY) {
@@ -58,8 +63,7 @@ export function useGoogleMaps(options: UseGoogleMapsOptions = {}): UseGoogleMaps
       }
 
       const script = document.createElement('script');
-      const librariesParam = libraries.join(',');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=${librariesParam}&language=pt-BR&region=BR`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=${librariesKey}&language=pt-BR&region=BR`;
       script.async = true;
       script.defer = true;
 
@@ -81,7 +85,7 @@ export function useGoogleMaps(options: UseGoogleMapsOptions = {}): UseGoogleMaps
     loadPromise
       .then(() => setIsLoaded(true))
       .catch((err) => setLoadError(err));
-  }, [libraries]);
+  }, [librariesKey]);
 
   return {
     isLoaded,
