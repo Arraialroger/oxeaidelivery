@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, ReactNode } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Map, Edit3, AlertTriangle } from 'lucide-react';
 import { AddressMapPicker } from './AddressMapPicker';
@@ -6,6 +6,8 @@ import { AddressSearchBox } from './AddressSearchBox';
 import { AddressManualForm, type ManualAddressData } from './AddressManualForm';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useGoogleMaps } from '@/hooks/useGoogleMaps';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type AddressMode = 'map' | 'manual';
 
@@ -25,6 +27,12 @@ interface AddressSectionProps {
   selectedLocation?: { lat: number; lng: number } | null;
   onModeChange?: (mode: AddressMode) => void;
   initialMode?: AddressMode;
+  /** Content to show after map (e.g., zone indicator, detected address) */
+  mapExtraContent?: ReactNode;
+  /** Current formatted address for search box */
+  formattedAddress?: string;
+  /** Callback when formatted address changes */
+  onFormattedAddressChange?: (value: string) => void;
 }
 
 export function AddressSection({
@@ -35,6 +43,9 @@ export function AddressSection({
   selectedLocation,
   onModeChange,
   initialMode = 'map',
+  mapExtraContent,
+  formattedAddress,
+  onFormattedAddressChange,
 }: AddressSectionProps) {
   const { isLoaded, loadError } = useGoogleMaps();
   const [mode, setMode] = useState<AddressMode>(initialMode);
@@ -69,8 +80,8 @@ export function AddressSection({
   if (mapFailed) {
     return (
       <div className="space-y-4">
-        <Alert variant="default" className="border-warning/50 bg-warning/10">
-          <AlertTriangle className="h-4 w-4 text-warning" />
+        <Alert variant="default" className="border-yellow-500/50 bg-yellow-500/10">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-sm">
             O mapa não está disponível no momento. Por favor, preencha o endereço manualmente.
           </AlertDescription>
@@ -95,7 +106,7 @@ export function AddressSection({
           </TabsTrigger>
           <TabsTrigger value="manual" className="gap-2">
             <Edit3 className="w-4 h-4" />
-            Manual
+            Digitar
           </TabsTrigger>
         </TabsList>
 
@@ -104,6 +115,8 @@ export function AddressSection({
           <AddressSearchBox
             onPlaceSelect={handleLocationSelect}
             placeholder="Busque seu endereço..."
+            value={formattedAddress}
+            onChange={onFormattedAddressChange}
           />
 
           {/* Map Picker */}
@@ -112,48 +125,39 @@ export function AddressSection({
             selectedLocation={selectedLocation}
           />
 
-          {/* Manual fields for complement/reference even in map mode */}
-          {selectedLocation && (
-            <div className="space-y-3 pt-2 border-t">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label htmlFor="map-complement" className="text-sm font-medium">
-                    Complemento
-                  </label>
-                  <input
-                    id="map-complement"
-                    type="text"
-                    value={manualData.complement}
-                    onChange={(e) =>
-                      onManualDataChange({ ...manualData, complement: e.target.value })
-                    }
-                    placeholder="Apto, bloco..."
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="map-reference" className="text-sm font-medium">
-                    Referência *
-                  </label>
-                  <input
-                    id="map-reference"
-                    type="text"
-                    value={manualData.reference}
-                    onChange={(e) =>
-                      onManualDataChange({ ...manualData, reference: e.target.value })
-                    }
-                    placeholder="Próximo a..."
-                    className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                      manualErrors?.reference ? 'border-destructive' : 'border-input'
-                    }`}
-                  />
-                  {manualErrors?.reference && (
-                    <p className="text-xs text-destructive">{manualErrors.reference}</p>
-                  )}
-                </div>
-              </div>
+          {/* Extra content (zone indicator, detected address, etc.) */}
+          {mapExtraContent}
+
+          {/* Complement and reference fields in map mode */}
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="complement-map">Complemento</Label>
+              <Input
+                id="complement-map"
+                value={manualData.complement}
+                onChange={(e) =>
+                  onManualDataChange({ ...manualData, complement: e.target.value })
+                }
+                placeholder="Apto, bloco, casa..."
+                className="mt-1"
+              />
             </div>
-          )}
+            <div>
+              <Label htmlFor="reference-map">Ponto de Referência *</Label>
+              <Input
+                id="reference-map"
+                value={manualData.reference}
+                onChange={(e) =>
+                  onManualDataChange({ ...manualData, reference: e.target.value })
+                }
+                placeholder="Ex: Próximo ao mercado, portão azul..."
+                className={`mt-1 ${manualErrors?.reference ? 'border-destructive' : ''}`}
+              />
+              {manualErrors?.reference && (
+                <p className="text-xs text-destructive mt-1">{manualErrors.reference}</p>
+              )}
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="manual" className="mt-4">
@@ -162,6 +166,9 @@ export function AddressSection({
             onChange={onManualDataChange}
             errors={manualErrors}
           />
+          <p className="text-xs text-muted-foreground mt-3 text-center">
+            Digite o endereço completo para entrega
+          </p>
         </TabsContent>
       </Tabs>
     </div>
