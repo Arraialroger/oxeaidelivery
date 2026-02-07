@@ -13,7 +13,8 @@ import { StampTransactionsList } from '@/components/admin/StampTransactionsList'
 import { RestaurantProfileForm } from '@/components/admin/RestaurantProfileForm';
 import { BusinessHoursForm } from '@/components/admin/BusinessHoursForm';
 import { DashboardPanel } from '@/components/admin/DashboardPanel';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard } from 'lucide-react';
+import { DeliveryZonesManager } from '@/components/admin/DeliveryZonesManager';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -84,7 +85,7 @@ export default function Admin() {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 lg:px-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8">
             <TabsTrigger value="dashboard" className="gap-2">
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -96,6 +97,10 @@ export default function Admin() {
             <TabsTrigger value="categories" className="gap-2">
               <Layers className="w-4 h-4" />
               <span className="hidden sm:inline">Categorias</span>
+            </TabsTrigger>
+            <TabsTrigger value="delivery" className="gap-2">
+              <MapPin className="w-4 h-4" />
+              <span className="hidden sm:inline">Entrega</span>
             </TabsTrigger>
             <TabsTrigger value="loyalty" className="gap-2">
               <Gift className="w-4 h-4" />
@@ -165,6 +170,11 @@ export default function Admin() {
               </Dialog>
             </div>
             <CategoryList />
+          </TabsContent>
+
+          {/* Delivery Zones Tab */}
+          <TabsContent value="delivery">
+            <DeliveryZonesManager />
           </TabsContent>
 
           {/* Loyalty Tab */}

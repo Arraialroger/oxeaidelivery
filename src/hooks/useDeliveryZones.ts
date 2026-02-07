@@ -32,19 +32,30 @@ function parsePolygonCoords(coords: Json | null): Array<{ lat: number; lng: numb
   return null;
 }
 
-export function useDeliveryZones() {
+interface UseDeliveryZonesOptions {
+  includeInactive?: boolean;
+}
+
+export function useDeliveryZones(options: UseDeliveryZonesOptions = {}) {
   const { restaurantId } = useRestaurantContext();
+  const { includeInactive = false } = options;
 
   return useQuery({
-    queryKey: ['delivery-zones', restaurantId],
+    queryKey: ['delivery-zones', restaurantId, includeInactive],
     queryFn: async () => {
       if (!restaurantId) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('delivery_zones')
         .select('*')
-        .eq('restaurant_id', restaurantId)
-        .eq('is_active', true);
+        .eq('restaurant_id', restaurantId);
+
+      // Only filter by active if not including inactive
+      if (!includeInactive) {
+        query = query.eq('is_active', true);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
