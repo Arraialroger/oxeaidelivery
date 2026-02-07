@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, User, MapPin, CreditCard, Check, Map, Edit3 } from "lucide-react";
+import { ArrowLeft, User, MapPin, CreditCard, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+// Tabs moved to AddressSection component
 import { useCart } from "@/contexts/CartContext";
 import { useConfig } from "@/hooks/useConfig";
 import { useCustomerStamps } from "@/hooks/useCustomerStamps";
@@ -21,7 +21,7 @@ import { classifyCustomerType } from "@/lib/customerClassification";
 import { useKdsEvents } from "@/hooks/useKdsEvents";
 import { useRestaurantContext } from "@/contexts/RestaurantContext";
 import { useIsRestaurantOpen } from "@/hooks/useIsRestaurantOpen";
-import { AddressMapPicker, AddressSearchBox, AddressManualForm, DeliveryZoneIndicator, type ManualAddressData } from "@/components/checkout";
+import { AddressSection, DeliveryZoneIndicator, type ManualAddressData } from "@/components/checkout";
 import { useDeliveryZoneCheck } from "@/hooks/useDeliveryZones";
 import { useCheckoutEvents } from "@/hooks/useCheckoutEvents";
 
@@ -514,88 +514,38 @@ export default function Checkout() {
               <h2 className="font-semibold text-lg">Endereço de Entrega</h2>
             </div>
 
-            {/* Toggle between map and manual */}
-            <Tabs value={addressMode} onValueChange={(v) => setAddressMode(v as AddressMode)}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="map" className="gap-2">
-                  <Map className="w-4 h-4" />
-                  Mapa
-                </TabsTrigger>
-                <TabsTrigger value="manual" className="gap-2">
-                  <Edit3 className="w-4 h-4" />
-                  Digitar
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="map" className="space-y-4 mt-4">
-                {/* Search box */}
-                <AddressSearchBox
-                  onPlaceSelect={handleLocationSelect}
-                  placeholder="Busque seu endereço..."
-                  value={formattedAddress}
-                  onChange={setFormattedAddress}
-                />
-
-                {/* Map picker */}
-                <AddressMapPicker
-                  onLocationSelect={handleLocationSelect}
-                  selectedLocation={addressLocation}
-                />
-
-                {/* Zone indicator */}
-                {zoneCheckResult && (
-                  <DeliveryZoneIndicator
-                    result={zoneCheckResult}
-                    subtotal={subtotal}
-                  />
-                )}
-
-                {/* Show extracted address info */}
-                {addressLocation && (street || neighborhood) && (
-                  <div className="p-3 bg-secondary rounded-lg text-sm space-y-1">
-                    <p className="font-medium text-foreground">Endereço detectado:</p>
-                    {street && <p className="text-muted-foreground">{street}{number ? `, ${number}` : ""}</p>}
-                    {neighborhood && <p className="text-muted-foreground">{neighborhood}</p>}
-                  </div>
-                )}
-
-                {/* Complement and reference (always needed) */}
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="complement-map">Complemento</Label>
-                    <Input
-                      id="complement-map"
-                      value={complement}
-                      onChange={(e) => setComplement(e.target.value)}
-                      placeholder="Apto, bloco, casa..."
-                      className="mt-1"
+            {/* Address Section with automatic fallback */}
+            <AddressSection
+              onLocationSelect={handleLocationSelect}
+              onManualDataChange={handleManualFormChange}
+              manualData={{ street, number, neighborhood, complement, reference }}
+              manualErrors={manualFormErrors}
+              selectedLocation={addressLocation}
+              onModeChange={(mode) => setAddressMode(mode)}
+              initialMode={addressMode}
+              formattedAddress={formattedAddress}
+              onFormattedAddressChange={setFormattedAddress}
+              mapExtraContent={
+                <>
+                  {/* Zone indicator */}
+                  {zoneCheckResult && (
+                    <DeliveryZoneIndicator
+                      result={zoneCheckResult}
+                      subtotal={subtotal}
                     />
-                  </div>
+                  )}
 
-                  <div>
-                    <Label htmlFor="reference-map">Ponto de Referência *</Label>
-                    <Input
-                      id="reference-map"
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
-                      placeholder="Ex: Próximo ao mercado, portão azul..."
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="manual" className="mt-4">
-                <AddressManualForm
-                  data={{ street, number, neighborhood, complement, reference }}
-                  onChange={handleManualFormChange}
-                  errors={manualFormErrors}
-                />
-                <p className="text-xs text-muted-foreground mt-3 text-center">
-                  Digite o endereço completo para entrega
-                </p>
-              </TabsContent>
-            </Tabs>
+                  {/* Show extracted address info */}
+                  {addressLocation && (street || neighborhood) && (
+                    <div className="p-3 bg-secondary rounded-lg text-sm space-y-1">
+                      <p className="font-medium text-foreground">Endereço detectado:</p>
+                      {street && <p className="text-muted-foreground">{street}{number ? `, ${number}` : ""}</p>}
+                      {neighborhood && <p className="text-muted-foreground">{neighborhood}</p>}
+                    </div>
+                  )}
+                </>
+              }
+            />
           </div>
         )}
 
