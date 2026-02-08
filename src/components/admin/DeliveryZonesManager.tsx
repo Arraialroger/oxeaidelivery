@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Plus, MapPin } from 'lucide-react';
 import { DeliveryZoneList } from './DeliveryZoneList';
 import { DeliveryZoneForm } from './DeliveryZoneForm';
+import { DeliveryZoneSimulator } from './DeliveryZoneSimulator';
 import type { DeliveryZone } from '@/hooks/useDeliveryZones';
 
 export function DeliveryZonesManager() {
@@ -36,7 +37,11 @@ export function DeliveryZonesManager() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Simulator Card */}
+      <DeliveryZoneSimulator />
+
+      {/* Zones List Card */}
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
