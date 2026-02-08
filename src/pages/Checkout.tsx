@@ -21,9 +21,10 @@ import { classifyCustomerType } from "@/lib/customerClassification";
 import { useKdsEvents } from "@/hooks/useKdsEvents";
 import { useRestaurantContext } from "@/contexts/RestaurantContext";
 import { useIsRestaurantOpen } from "@/hooks/useIsRestaurantOpen";
-import { AddressSection, DeliveryZoneIndicator, type ManualAddressData } from "@/components/checkout";
+import { AddressSection, DeliveryZoneIndicator, SavedAddressList, type ManualAddressData } from "@/components/checkout";
 import { useDeliveryZoneCheck } from "@/hooks/useDeliveryZones";
 import { useCheckoutEvents } from "@/hooks/useCheckoutEvents";
+import { useSavedAddresses, type SavedAddress } from "@/hooks/useSavedAddresses";
 
 type PaymentMethod = "pix" | "card" | "cash";
 type AddressMode = "map" | "manual";
@@ -92,6 +93,15 @@ export default function Checkout() {
   const [formattedAddress, setFormattedAddress] = useState("");
   const [placeId, setPlaceId] = useState<string | undefined>(undefined);
   const [manualFormErrors, setManualFormErrors] = useState<Partial<Record<keyof ManualAddressData, string>>>({});
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
+
+  // Saved addresses for returning customers
+  const phoneDigitsForAddresses = getPhoneDigits(phone);
+  const { data: savedAddresses = [], isLoading: savedAddressesLoading } = useSavedAddresses({
+    phone: phoneDigitsForAddresses.length >= 10 ? phoneDigitsForAddresses : null,
+    enabled: step >= 2, // Only fetch when on address step or beyond
+  });
 
   // Delivery zone validation
   const { checkZone, zones: deliveryZones, isLoading: zonesLoading } = useDeliveryZoneCheck();
@@ -217,6 +227,50 @@ export default function Checkout() {
     setReference(data.reference);
     setManualFormErrors({});
   }, []);
+
+  // Handle saved address selection
+  const handleSavedAddressSelect = useCallback((address: SavedAddress) => {
+    setSelectedSavedAddressId(address.id);
+    setStreet(address.street);
+    setNumber(address.number);
+    setNeighborhood(address.neighborhood);
+    setComplement(address.complement || "");
+    setReference(address.reference || "");
+    setFormattedAddress(address.formatted_address || "");
+    setPlaceId(address.place_id || undefined);
+    
+    // Set location if available
+    if (address.latitude && address.longitude) {
+      const coords = { lat: address.latitude, lng: address.longitude };
+      setAddressLocation(coords);
+      
+      // Check delivery zone for saved address
+      const result = checkZone(coords);
+      setZoneCheckResult(result);
+    } else {
+      setAddressLocation(null);
+      setZoneCheckResult(null);
+    }
+    
+    setShowNewAddressForm(false);
+    trackEvent("saved_address_selected", "address", { address_id: address.id });
+  }, [checkZone, trackEvent]);
+
+  // Handle new address button click
+  const handleNewAddressClick = useCallback(() => {
+    setSelectedSavedAddressId(null);
+    setShowNewAddressForm(true);
+    setStreet("");
+    setNumber("");
+    setNeighborhood("");
+    setComplement("");
+    setReference("");
+    setFormattedAddress("");
+    setPlaceId(undefined);
+    setAddressLocation(null);
+    setZoneCheckResult(null);
+    trackEvent("new_address_started", "address");
+  }, [trackEvent]);
 
   // Validate manual form
   const validateManualForm = useCallback((): boolean => {
@@ -514,38 +568,75 @@ export default function Checkout() {
               <h2 className="font-semibold text-lg">Endereço de Entrega</h2>
             </div>
 
-            {/* Address Section with automatic fallback */}
-            <AddressSection
-              onLocationSelect={handleLocationSelect}
-              onManualDataChange={handleManualFormChange}
-              manualData={{ street, number, neighborhood, complement, reference }}
-              manualErrors={manualFormErrors}
-              selectedLocation={addressLocation}
-              onModeChange={(mode) => setAddressMode(mode)}
-              initialMode={addressMode}
-              formattedAddress={formattedAddress}
-              onFormattedAddressChange={setFormattedAddress}
-              mapExtraContent={
-                <>
-                  {/* Zone indicator */}
-                  {zoneCheckResult && (
-                    <DeliveryZoneIndicator
-                      result={zoneCheckResult}
-                      subtotal={subtotal}
-                    />
-                  )}
+            {/* Show saved addresses if customer has any */}
+            {savedAddresses.length > 0 && !showNewAddressForm ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Selecione um endereço salvo ou cadastre um novo:
+                </p>
+                <SavedAddressList
+                  addresses={savedAddresses}
+                  isLoading={savedAddressesLoading}
+                  onSelect={handleSavedAddressSelect}
+                  onNewAddress={handleNewAddressClick}
+                  selectedId={selectedSavedAddressId}
+                />
 
-                  {/* Show extracted address info */}
-                  {addressLocation && (street || neighborhood) && (
-                    <div className="p-3 bg-secondary rounded-lg text-sm space-y-1">
-                      <p className="font-medium text-foreground">Endereço detectado:</p>
-                      {street && <p className="text-muted-foreground">{street}{number ? `, ${number}` : ""}</p>}
-                      {neighborhood && <p className="text-muted-foreground">{neighborhood}</p>}
-                    </div>
-                  )}
-                </>
-              }
-            />
+                {/* Zone indicator for selected saved address */}
+                {selectedSavedAddressId && zoneCheckResult && (
+                  <DeliveryZoneIndicator
+                    result={zoneCheckResult}
+                    subtotal={subtotal}
+                  />
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Back to saved addresses button */}
+                {savedAddresses.length > 0 && showNewAddressForm && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNewAddressForm(false)}
+                    className="text-sm text-primary hover:underline mb-2"
+                  >
+                    ← Voltar para endereços salvos
+                  </button>
+                )}
+
+                {/* Address Section with automatic fallback */}
+                <AddressSection
+                  onLocationSelect={handleLocationSelect}
+                  onManualDataChange={handleManualFormChange}
+                  manualData={{ street, number, neighborhood, complement, reference }}
+                  manualErrors={manualFormErrors}
+                  selectedLocation={addressLocation}
+                  onModeChange={(mode) => setAddressMode(mode)}
+                  initialMode={addressMode}
+                  formattedAddress={formattedAddress}
+                  onFormattedAddressChange={setFormattedAddress}
+                  mapExtraContent={
+                    <>
+                      {/* Zone indicator */}
+                      {zoneCheckResult && (
+                        <DeliveryZoneIndicator
+                          result={zoneCheckResult}
+                          subtotal={subtotal}
+                        />
+                      )}
+
+                      {/* Show extracted address info */}
+                      {addressLocation && (street || neighborhood) && (
+                        <div className="p-3 bg-secondary rounded-lg text-sm space-y-1">
+                          <p className="font-medium text-foreground">Endereço detectado:</p>
+                          {street && <p className="text-muted-foreground">{street}{number ? `, ${number}` : ""}</p>}
+                          {neighborhood && <p className="text-muted-foreground">{neighborhood}</p>}
+                        </div>
+                      )}
+                    </>
+                  }
+                />
+              </>
+            )}
           </div>
         )}
 

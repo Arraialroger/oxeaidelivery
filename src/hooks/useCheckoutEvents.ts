@@ -12,6 +12,8 @@ type CheckoutEventType =
   | 'address_gps_used'
   | 'address_map_clicked'
   | 'address_autocomplete_used'
+  | 'saved_address_selected'
+  | 'new_address_started'
   | 'payment_step_started'
   | 'payment_step_completed'
   | 'order_completed'
