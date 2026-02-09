@@ -28,6 +28,7 @@ interface DeliveryZoneMapProps {
   onZoneGeometryUpdate: (data: { id: string } & Partial<NewZoneData>) => void;
   drawingMode: 'radius' | 'polygon' | null;
   onDrawingModeChange: (mode: 'radius' | 'polygon' | null) => void;
+  isCreatingNew: boolean;
 }
 
 const DEFAULT_CENTER = { lat: -16.4544, lng: -39.0644 };
@@ -51,6 +52,7 @@ export function DeliveryZoneMap({
   onZoneGeometryUpdate,
   drawingMode,
   onDrawingModeChange,
+  isCreatingNew,
 }: DeliveryZoneMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
@@ -387,24 +389,28 @@ export function DeliveryZoneMap({
             onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
-        <Button
-          variant={drawingMode === 'radius' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => onDrawingModeChange(drawingMode === 'radius' ? null : 'radius')}
-          className="gap-1.5"
-        >
-          <Circle className="w-4 h-4" />
-          Raio
-        </Button>
-        <Button
-          variant={drawingMode === 'polygon' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => onDrawingModeChange(drawingMode === 'polygon' ? null : 'polygon')}
-          className="gap-1.5"
-        >
-          <Pencil className="w-4 h-4" />
-          Polígono
-        </Button>
+        {isCreatingNew && (
+          <>
+            <Button
+              variant={drawingMode === 'radius' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onDrawingModeChange(drawingMode === 'radius' ? null : 'radius')}
+              className="gap-1.5"
+            >
+              <Circle className="w-4 h-4" />
+              Raio
+            </Button>
+            <Button
+              variant={drawingMode === 'polygon' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onDrawingModeChange(drawingMode === 'polygon' ? null : 'polygon')}
+              className="gap-1.5"
+            >
+              <Pencil className="w-4 h-4" />
+              Polígono
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Map */}

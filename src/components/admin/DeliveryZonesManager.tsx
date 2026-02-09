@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MapPin, Plus, CheckCircle2 } from 'lucide-react';
 import { DeliveryZoneMap, type NewZoneData } from './DeliveryZoneMap';
 import { DeliveryZoneForm } from './DeliveryZoneForm';
 import { DeliveryZoneList } from './DeliveryZoneList';
@@ -14,14 +15,30 @@ export function DeliveryZonesManager() {
   const [newZoneData, setNewZoneData] = useState<NewZoneData | null>(null);
   const [drawingMode, setDrawingMode] = useState<'radius' | 'polygon' | null>(null);
   const [geometryUpdate, setGeometryUpdate] = useState<Partial<NewZoneData> | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   const selectedZone = zones.find(z => z.id === selectedZoneId) || null;
+
+  const handleStartCreating = useCallback(() => {
+    setIsCreatingNew(true);
+    setSelectedZoneId(null);
+    setNewZoneData(null);
+    setGeometryUpdate(null);
+  }, []);
+
+  const handleFinishCreating = useCallback(() => {
+    setIsCreatingNew(false);
+    setDrawingMode(null);
+    setNewZoneData(null);
+    setGeometryUpdate(null);
+  }, []);
 
   const handleZoneSelect = useCallback((id: string) => {
     setSelectedZoneId(id);
     setNewZoneData(null);
     setDrawingMode(null);
     setGeometryUpdate(null);
+    setIsCreatingNew(false);
   }, []);
 
   const handleNewZoneDrawn = useCallback((data: NewZoneData) => {
@@ -48,13 +65,17 @@ export function DeliveryZonesManager() {
     setNewZoneData(null);
     setDrawingMode(null);
     setGeometryUpdate(null);
-  }, []);
+    if (isCreatingNew) {
+      setIsCreatingNew(false);
+    }
+  }, [isCreatingNew]);
 
+  // After save: keep creation mode active for continuous flow
   const handleSuccess = useCallback(() => {
-    setSelectedZoneId(null);
     setNewZoneData(null);
-    setDrawingMode(null);
     setGeometryUpdate(null);
+    setSelectedZoneId(null);
+    // Keep isCreatingNew and drawingMode so user can draw the next zone immediately
   }, []);
 
   return (
@@ -65,13 +86,29 @@ export function DeliveryZonesManager() {
       {/* Unified Map + Form Card */}
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
-            Zonas de Entrega
-          </CardTitle>
-          <CardDescription>
-            Visualize todas as zonas no mapa. Clique em uma para editar ou desenhe uma nova.
-          </CardDescription>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Zonas de Entrega
+              </CardTitle>
+              <CardDescription>
+                Visualize todas as zonas no mapa. Clique em uma para editar ou crie uma nova.
+              </CardDescription>
+            </div>
+            {!isCreatingNew && !selectedZoneId && (
+              <Button onClick={handleStartCreating} className="gap-1.5">
+                <Plus className="w-4 h-4" />
+                Criar Nova Zona
+              </Button>
+            )}
+            {isCreatingNew && (
+              <Button variant="outline" onClick={handleFinishCreating} className="gap-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                Finalizar Criação
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {isLoading ? (
@@ -88,6 +125,7 @@ export function DeliveryZonesManager() {
                 onZoneGeometryUpdate={handleZoneGeometryUpdate}
                 drawingMode={drawingMode}
                 onDrawingModeChange={handleDrawingModeChange}
+                isCreatingNew={isCreatingNew}
               />
 
               <DeliveryZoneForm
@@ -96,6 +134,8 @@ export function DeliveryZonesManager() {
                 geometryUpdate={geometryUpdate}
                 onCancel={handleCancel}
                 onSuccess={handleSuccess}
+                isCreatingNew={isCreatingNew}
+                onStartCreating={handleStartCreating}
               />
             </>
           )}

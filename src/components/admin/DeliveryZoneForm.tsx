@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useDeliveryZonesMutations } from '@/hooks/useDeliveryZonesMutations';
 import type { DeliveryZone } from '@/hooks/useDeliveryZones';
 import type { NewZoneData } from './DeliveryZoneMap';
-import { Save, X, MapPin } from 'lucide-react';
+import { Save, X, MapPin, Plus } from 'lucide-react';
 
 const formSchema = z.object({
   neighborhood: z.string().min(1, 'Nome da zona é obrigatório'),
@@ -30,9 +30,13 @@ interface DeliveryZoneFormProps {
   geometryUpdate?: Partial<NewZoneData> | null;
   onCancel: () => void;
   onSuccess: () => void;
+  /** Whether the user is in continuous creation mode */
+  isCreatingNew?: boolean;
+  /** Callback to enter creation mode */
+  onStartCreating?: () => void;
 }
 
-export function DeliveryZoneForm({ zone, newZoneData, geometryUpdate, onCancel, onSuccess }: DeliveryZoneFormProps) {
+export function DeliveryZoneForm({ zone, newZoneData, geometryUpdate, onCancel, onSuccess, isCreatingNew, onStartCreating }: DeliveryZoneFormProps) {
   const { createZone, updateZone } = useDeliveryZonesMutations();
   const isEditing = !!zone;
 
@@ -133,12 +137,30 @@ export function DeliveryZoneForm({ zone, newZoneData, geometryUpdate, onCancel, 
 
   // Empty state
   if (!zone && !newZoneData) {
+    if (isCreatingNew) {
+      return (
+        <Card>
+          <CardContent className="py-6 text-center text-muted-foreground">
+            <MapPin className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="font-medium">Desenhe a área no mapa</p>
+            <p className="text-sm mt-1">Use os botões "Raio" ou "Polígono" acima e clique no mapa para definir a zona.</p>
+          </CardContent>
+        </Card>
+      );
+    }
+
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground">
           <MapPin className="w-10 h-10 mx-auto mb-3 opacity-40" />
           <p className="font-medium">Selecione uma zona no mapa ou lista</p>
-          <p className="text-sm mt-1">Ou use os botões "Raio" / "Polígono" para desenhar uma nova zona.</p>
+          <p className="text-sm mt-1">Ou clique em "Criar Nova Zona" para começar.</p>
+          {onStartCreating && (
+            <Button onClick={onStartCreating} className="mt-4 gap-1.5">
+              <Plus className="w-4 h-4" />
+              Criar Nova Zona de Entrega
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
