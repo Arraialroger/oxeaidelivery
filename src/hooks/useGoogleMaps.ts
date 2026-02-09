@@ -1,5 +1,5 @@
 /// <reference types="@types/google.maps" />
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -29,7 +29,7 @@ export function useGoogleMaps(options: UseGoogleMapsOptions = {}): UseGoogleMaps
 
   // Memoize libraries to avoid infinite loop from array recreation
   const librariesKey = useMemo(
-    () => (options.libraries || ['places']).join(','),
+    () => (options.libraries || ['places', 'drawing']).join(','),
     [options.libraries]
   );
 
@@ -131,14 +131,19 @@ export function useGeolocation() {
     );
   }, []);
 
+  const coords = useMemo(
+    () => position?.coords
+      ? { lat: position.coords.latitude, lng: position.coords.longitude }
+      : null,
+    [position?.coords?.latitude, position?.coords?.longitude]
+  );
+
   return {
     position,
     error,
     isLoading,
     requestLocation,
-    coords: position?.coords
-      ? { lat: position.coords.latitude, lng: position.coords.longitude }
-      : null,
+    coords,
   };
 }
 

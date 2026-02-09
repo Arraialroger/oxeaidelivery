@@ -188,8 +188,13 @@ export default function Checkout() {
 
         const route = getComponent("route");
         const streetNumber = getComponent("street_number");
-        const sublocality = getComponent("sublocality_level_1") || getComponent("sublocality");
-        const neighborhoodValue = getComponent("neighborhood") || sublocality;
+        const neighborhoodValue =
+          getComponent("neighborhood") ||
+          getComponent("sublocality_level_1") ||
+          getComponent("sublocality") ||
+          getComponent("administrative_area_level_4") ||
+          getComponent("administrative_area_level_3") ||
+          getComponent("political");
 
         if (route) setStreet(route);
         if (streetNumber) setNumber(streetNumber);

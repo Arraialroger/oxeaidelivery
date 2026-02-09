@@ -1,5 +1,5 @@
 /// <reference types="@types/google.maps" />
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { MapPin, Navigation, Loader2 } from 'lucide-react';
 import { useGoogleMaps, useGeolocation, useReverseGeocode } from '@/hooks/useGoogleMaps';
@@ -140,9 +140,16 @@ export function AddressMapPicker({
     requestLocation();
   }, [requestLocation]);
 
+  // Track processed GPS coordinates to avoid infinite loops
+  const gpsProcessedRef = useRef<string | null>(null);
+
   // When GPS coords are received
   useEffect(() => {
     if (gpsCoords && mapInstanceRef.current) {
+      const key = `${gpsCoords.lat},${gpsCoords.lng}`;
+      if (gpsProcessedRef.current === key) return;
+      gpsProcessedRef.current = key;
+
       updateMarker(gpsCoords.lat, gpsCoords.lng);
       handleLocationSelect(gpsCoords.lat, gpsCoords.lng);
       mapInstanceRef.current.setCenter(gpsCoords);
