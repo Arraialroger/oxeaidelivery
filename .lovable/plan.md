@@ -1,109 +1,128 @@
 
+# Correcao dos 3 Bugs Identificados
 
-# Painel Unificado de Zonas de Entrega com Mapa Unico
+## Bug 1: Poligono desaparece ao ser selecionado
 
-## Problema Atual
+**Causa raiz:** O hook `useGoogleMaps` usa um singleton global (`isScriptLoaded`). Se o script do Google Maps for carregado primeiro por um componente que pede apenas `['places']` (ex: `AddressSearchBox`), o script e marcado como carregado e nunca mais recarrega. Quando o `DeliveryZoneMap` pede `['places', 'drawing']`, o script ja esta carregado SEM a biblioteca `drawing`. Resultado: `google.maps.drawing.DrawingManager` e `undefined`, causando um erro silencioso que "some" com tudo.
 
-A implementacao atual funciona no modelo "uma zona por vez":
-- Clicar em "Nova Zona" substitui toda a tela pela `DeliveryZoneForm`, que carrega seu proprio mapa isolado.
-- Para criar outra zona, voce precisa salvar, voltar a lista e clicar "Nova Zona" novamente, o que abre um novo mapa do zero.
-- Nao e possivel visualizar todas as zonas simultaneamente no mapa.
+**Correcao:** Modificar `useGoogleMaps.ts` para acumular todas as bibliotecas requisitadas globalmente. Se uma nova chamada pede bibliotecas que ainda nao foram carregadas, o hook deve recarregar o script com todas as bibliotecas combinadas. Alternativa mais simples: forcar que o script SEMPRE carregue com `['places', 'drawing']` como padrao, ja que ambas sao usadas na aplicacao.
 
-```text
-Fluxo Atual (fragmentado):
-[Lista de Zonas] --clica "Nova Zona"--> [Form + Mapa isolado (zona 1)]
-     salva e volta
-[Lista de Zonas] --clica "Nova Zona"--> [Form + Mapa isolado (zona 2)]
-```
+**Arquivo:** `src/hooks/useGoogleMaps.ts`
+- Alterar a lista padrao de bibliotecas de `['places']` para `['places', 'drawing']` (linha 32)
 
-## Solucao Proposta
+---
 
-Substituir o fluxo por uma interface unificada com um unico mapa permanente que exibe todas as zonas, e um painel lateral/inferior para configurar a zona selecionada.
+## Bug 2: "Usar minha localizacao atual" fica carregando infinitamente
 
-```text
-Novo Fluxo (unificado):
-+-----------------------------------------------+
-|  [Mapa unico com TODAS as zonas visiveis]     |
-|   - Zonas existentes renderizadas (cinza)     |
-|   - Zona selecionada (destaque colorido)      |
-|   - Botao "Desenhar nova zona" no mapa        |
-+-----------------------------------------------+
-|  [Painel de configuracao da zona selecionada]  |
-|   Nome | Taxa | Tempo | Pedido min | Salvar   |
-+-----------------------------------------------+
-|  [Lista compacta de todas as zonas]            |
-|   Zona 1 [editar] | Zona 2 [editar] | ...     |
-+-----------------------------------------------+
-```
+**Causa raiz:** Loop infinito no `AddressMapPicker.tsx`. O hook `useGeolocation()` retorna `coords` como um objeto novo a cada render (`{ lat: ..., lng: ... }`). O `useEffect` na linha 119 depende de `gpsCoords`, que muda de referencia a cada re-render, mesmo com valores identicos. O fluxo:
 
-## Plano de Implementacao
+1. GPS retorna coordenadas
+2. `gpsCoords` e um novo objeto -> effect dispara
+3. `handleLocationSelect` e chamado -> atualiza estado no pai
+4. Pai re-renderiza -> `onLocationSelect` prop muda de referencia
+5. `handleLocationSelect` e recriado -> `gpsCoords` tambem e novo objeto
+6. Effect dispara novamente -> volta ao passo 3 -> loop infinito
 
-### Passo 1 - Reescrever `DeliveryZoneMap.tsx` para modo multi-zona
+**Correcao:** No `useGeolocation()`, memoizar o objeto `coords` com `useMemo` para manter referencia estavel. No `AddressMapPicker`, usar um `useRef` para rastrear se o GPS ja foi processado, evitando re-execucoes.
 
-O mapa passa a receber a lista completa de zonas ja salvas e renderiza todas simultaneamente (circulos e poligonos).
+**Arquivos:**
+- `src/hooks/useGoogleMaps.ts` (funcao `useGeolocation`): Memoizar `coords` com `useMemo`
+- `src/components/checkout/AddressMapPicker.tsx`: Adicionar `ref` de controle (`gpsProcessedRef`) para executar o efeito GPS apenas uma vez por requisicao
 
-- Cada zona salva aparece com cor neutra (cinza/transparente).
-- A zona atualmente selecionada aparece com cor primaria e destaque.
-- Clicar em uma zona no mapa dispara um evento `onZoneSelect(zone)`.
-- Um botao "Desenhar nova zona" ativa o DrawingManager para raio ou poligono.
-- Ao completar o desenho, dispara `onNewZoneDrawn(coords, type)`.
+---
 
-Props do novo componente:
-```text
-zones: DeliveryZone[]           -- todas as zonas existentes
-selectedZoneId: string | null   -- zona selecionada
-onZoneSelect(id): void          -- ao clicar em zona existente
-onNewZoneDrawn(data): void      -- ao completar desenho
-onZoneGeometryUpdate(data): void -- ao arrastar/editar geometria
-```
+## Bug 3: Bairro nao detectado e botao "Continuar" bloqueado
 
-### Passo 2 - Criar painel de configuracao inline
+**Causa raiz:** O Google Geocoder nem sempre retorna os componentes `neighborhood` ou `sublocality` no endereço. Em areas como Arraial d'Ajuda, esses campos podem vir vazios. O `handleLocationSelect` no `Checkout.tsx` (linha 196) so preenche `neighborhood` se o valor existir. Como o campo fica vazio e o botao "Continuar" (linha 777) exige `neighborhood` preenchido, o usuario fica bloqueado.
 
-Substituir o `DeliveryZoneForm` por um formulario compacto que aparece abaixo do mapa (nao em tela cheia).
+**Correcao em duas partes:**
 
-- Quando nenhuma zona esta selecionada: exibe mensagem "Selecione uma zona ou desenhe uma nova".
-- Quando uma zona e selecionada ou recem-desenhada: exibe os campos (Nome, Taxa, Tempo estimado, Pedido minimo, Frete gratis acima de) com botao Salvar.
-- Botao "Cancelar" desmarca a zona e limpa o formulario.
+1. **Ampliar a busca de bairro no geocoding** (`Checkout.tsx`): Adicionar fallbacks para extrair o bairro de outros campos do Google (`administrative_area_level_4`, `administrative_area_level_3`, `political`, ou ate extrair do `formatted_address`).
 
-### Passo 3 - Reescrever `DeliveryZonesManager.tsx` como orquestrador
+2. **Exibir campo bairro editavel no modo mapa** (`AddressSection.tsx`): Quando o bairro nao for detectado automaticamente, mostrar o campo "Bairro" no modo mapa para preenchimento manual, junto com complemento e referencia. Isso garante que o usuario nunca fique bloqueado.
 
-Este componente passa a ser o centro de controle:
+**Arquivos:**
+- `src/pages/Checkout.tsx` (funcao `handleLocationSelect`): Adicionar fallbacks na extracao do bairro
+- `src/components/checkout/AddressSection.tsx`: Adicionar campo "Bairro" editavel no modo mapa, visivel quando o bairro esta vazio ou sempre como campo editavel
 
-1. Carrega todas as zonas via `useDeliveryZones({ includeInactive: true })`.
-2. Gerencia o estado: `selectedZoneId`, `newZoneData` (geometria recem-desenhada), `drawingMode`.
-3. Renderiza em ordem:
-   - Simulador (mantido como esta)
-   - Mapa unificado (todas as zonas + controles de desenho)
-   - Formulario inline (da zona selecionada ou nova)
-   - Lista compacta de zonas (com acoes de ativar/desativar e excluir)
+---
 
-### Passo 4 - Atualizar `DeliveryZoneList.tsx`
+## Resumo das Alteracoes
 
-Adicionar prop `selectedZoneId` para destacar visualmente a zona selecionada na lista. Clicar em uma zona na lista tambem seleciona no mapa (scroll to + zoom).
+| Arquivo | Bug | Alteracao |
+|---------|-----|----------|
+| `src/hooks/useGoogleMaps.ts` | 1 e 2 | Carregar `drawing` por padrao; memoizar `coords` no `useGeolocation` |
+| `src/components/checkout/AddressMapPicker.tsx` | 2 | Adicionar controle `gpsProcessedRef` para evitar loop |
+| `src/pages/Checkout.tsx` | 3 | Ampliar fallbacks de extracao de bairro |
+| `src/components/checkout/AddressSection.tsx` | 3 | Adicionar campo "Bairro" editavel no modo mapa |
 
-### Passo 5 - Adicionar cores distintas por zona
+## Detalhes Tecnicos
 
-Atribuir cores diferentes para cada zona no mapa usando um array de cores predefinido, facilitando a distincao visual quando varias zonas se sobrepoe.
+### useGoogleMaps.ts - Correcao da biblioteca drawing
 
 ```text
-Cores: azul, verde, laranja, roxo, vermelho, ciano...
-Zona selecionada: cor cheia + borda grossa
-Zonas inativas: padrao tracejado
+Antes:  (options.libraries || ['places']).join(',')
+Depois: (options.libraries || ['places', 'drawing']).join(',')
 ```
 
-## Arquivos Impactados
+### useGeolocation - Memoizar coords
 
-| Arquivo | Acao |
-|---------|------|
-| `src/components/admin/DeliveryZoneMap.tsx` | Reescrever para modo multi-zona |
-| `src/components/admin/DeliveryZoneForm.tsx` | Simplificar para painel inline (sem Card/tela cheia) |
-| `src/components/admin/DeliveryZonesManager.tsx` | Reescrever como orquestrador unificado |
-| `src/components/admin/DeliveryZoneList.tsx` | Adicionar destaque de zona selecionada |
+```text
+Antes:
+  coords: position?.coords
+    ? { lat: position.coords.latitude, lng: position.coords.longitude }
+    : null,
 
-## Resultado Esperado
+Depois:
+  const coords = useMemo(
+    () => position?.coords
+      ? { lat: position.coords.latitude, lng: position.coords.longitude }
+      : null,
+    [position?.coords?.latitude, position?.coords?.longitude]
+  );
+  return { ..., coords };
+```
 
-- Um unico mapa permanente mostra todas as zonas configuradas.
-- O lojista desenha uma zona (raio ou poligono), preenche taxa/tempo/minimo, salva e imediatamente pode desenhar a proxima.
-- Clicar em qualquer zona (no mapa ou na lista) abre seus dados para edicao.
-- Fluxo continuo sem recarregar o mapa.
+### AddressMapPicker - Evitar loop GPS
 
+```text
+Adicionar:
+  const gpsProcessedRef = useRef<string | null>(null);
+
+No useEffect do GPS:
+  const key = `${gpsCoords.lat},${gpsCoords.lng}`;
+  if (gpsProcessedRef.current === key) return; // ja processado
+  gpsProcessedRef.current = key;
+  // ... continuar com updateMarker e handleLocationSelect
+```
+
+### Checkout.tsx - Fallbacks de bairro
+
+```text
+Antes:
+  const sublocality = getComponent("sublocality_level_1") || getComponent("sublocality");
+  const neighborhoodValue = getComponent("neighborhood") || sublocality;
+
+Depois:
+  const neighborhoodValue =
+    getComponent("neighborhood") ||
+    getComponent("sublocality_level_1") ||
+    getComponent("sublocality") ||
+    getComponent("administrative_area_level_4") ||
+    getComponent("administrative_area_level_3") ||
+    getComponent("political");
+```
+
+### AddressSection.tsx - Campo bairro no modo mapa
+
+```text
+Adicionar ao TabsContent "map", junto com complemento e referencia:
+  <div>
+    <Label>Bairro *</Label>
+    <Input
+      value={manualData.neighborhood}
+      onChange={(e) => onManualDataChange({...manualData, neighborhood: e.target.value})}
+      placeholder="Nome do bairro"
+    />
+  </div>
+```
