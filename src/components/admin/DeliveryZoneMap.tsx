@@ -4,61 +4,85 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { AlertCircle, MapPin, Trash2 } from 'lucide-react';
+import { AlertCircle, MapPin, Plus, Circle, Pencil } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import type { DeliveryZone } from '@/hooks/useDeliveryZones';
 
 interface Coords {
   lat: number;
   lng: number;
 }
 
-interface DeliveryZoneMapProps {
-  mode: 'radius' | 'polygon';
-  center: Coords | null;
-  radius: number;
-  polygonCoords: Coords[];
-  onCenterChange: (coords: Coords) => void;
-  onRadiusChange: (radius: number) => void;
-  onPolygonChange: (coords: Coords[]) => void;
+export interface NewZoneData {
+  type: 'radius' | 'polygon';
+  center?: Coords;
+  radius?: number;
+  polygonCoords?: Coords[];
 }
 
-const DEFAULT_CENTER = { lat: -16.4544, lng: -39.0644 }; // Porto Seguro, BA
+interface DeliveryZoneMapProps {
+  zones: DeliveryZone[];
+  selectedZoneId: string | null;
+  onZoneSelect: (id: string) => void;
+  onNewZoneDrawn: (data: NewZoneData) => void;
+  onZoneGeometryUpdate: (data: { id: string } & Partial<NewZoneData>) => void;
+  drawingMode: 'radius' | 'polygon' | null;
+  onDrawingModeChange: (mode: 'radius' | 'polygon' | null) => void;
+}
+
+const DEFAULT_CENTER = { lat: -16.4544, lng: -39.0644 };
+
+const ZONE_COLORS = [
+  '#3B82F6', // blue
+  '#10B981', // green
+  '#F59E0B', // amber
+  '#8B5CF6', // purple
+  '#EF4444', // red
+  '#06B6D4', // cyan
+  '#EC4899', // pink
+  '#14B8A6', // teal
+];
 
 export function DeliveryZoneMap({
-  mode,
-  center,
-  radius,
-  polygonCoords,
-  onCenterChange,
-  onRadiusChange,
-  onPolygonChange,
+  zones,
+  selectedZoneId,
+  onZoneSelect,
+  onNewZoneDrawn,
+  onZoneGeometryUpdate,
+  drawingMode,
+  onDrawingModeChange,
 }: DeliveryZoneMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.Marker | null>(null);
-  const circleRef = useRef<google.maps.Circle | null>(null);
-  const polygonRef = useRef<google.maps.Polygon | null>(null);
+  const overlaysRef = useRef<Map<string, google.maps.Circle | google.maps.Polygon>>(new Map());
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
-  
+  const newCircleRef = useRef<google.maps.Circle | null>(null);
+  const newMarkerRef = useRef<google.maps.Marker | null>(null);
+
   const { isLoaded, loadError, google } = useGoogleMaps({ libraries: ['places', 'drawing'] });
   const [searchInput, setSearchInput] = useState('');
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [newRadius, setNewRadius] = useState(3);
 
-  // Initialize map
+  // Initialize map once
   useEffect(() => {
     if (!isLoaded || !google || !mapRef.current || mapInstanceRef.current) return;
 
-    const mapCenter = center || DEFAULT_CENTER;
-    
+    // Find a center from existing zones or use default
+    const firstZone = zones.find(z => z.center_lat && z.center_lng);
+    const mapCenter = firstZone
+      ? { lat: firstZone.center_lat!, lng: firstZone.center_lng! }
+      : DEFAULT_CENTER;
+
     mapInstanceRef.current = new google.maps.Map(mapRef.current, {
       center: mapCenter,
-      zoom: 14,
+      zoom: 13,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
     });
-  }, [isLoaded, google, center]);
+  }, [isLoaded, google]);
 
   // Setup autocomplete
   useEffect(() => {
@@ -72,185 +96,262 @@ export function DeliveryZoneMap({
     autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current?.getPlace();
       if (place?.geometry?.location) {
-        const newCenter = {
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-        };
-        onCenterChange(newCenter);
-        mapInstanceRef.current?.panTo(newCenter);
+        mapInstanceRef.current?.panTo(place.geometry.location);
         mapInstanceRef.current?.setZoom(15);
       }
     });
-  }, [isLoaded, google, onCenterChange]);
+  }, [isLoaded, google]);
 
-  // Handle radius mode
+  // Render all zones on the map
   useEffect(() => {
-    if (!google || !mapInstanceRef.current || mode !== 'radius') {
-      // Clean up circle and marker if not in radius mode
-      circleRef.current?.setMap(null);
-      markerRef.current?.setMap(null);
-      return;
-    }
+    if (!google || !mapInstanceRef.current) return;
 
-    const mapCenter = center || DEFAULT_CENTER;
+    // Clear existing overlays
+    overlaysRef.current.forEach(overlay => overlay.setMap(null));
+    overlaysRef.current.clear();
 
-    // Create or update marker
-    if (!markerRef.current) {
-      markerRef.current = new google.maps.Marker({
-        position: mapCenter,
-        map: mapInstanceRef.current,
-        draggable: true,
-        title: 'Arraste para definir o centro',
-      });
+    zones.forEach((zone, index) => {
+      const color = ZONE_COLORS[index % ZONE_COLORS.length];
+      const isSelected = zone.id === selectedZoneId;
+      const isInactive = !zone.is_active;
 
-      markerRef.current.addListener('dragend', () => {
-        const pos = markerRef.current?.getPosition();
-        if (pos) {
-          onCenterChange({ lat: pos.lat(), lng: pos.lng() });
-        }
-      });
-    } else {
-      markerRef.current.setPosition(mapCenter);
-      markerRef.current.setMap(mapInstanceRef.current);
-    }
-
-    // Create or update circle
-    if (!circleRef.current) {
-      circleRef.current = new google.maps.Circle({
-        map: mapInstanceRef.current,
-        center: mapCenter,
-        radius: radius * 1000, // Convert km to meters
-        fillColor: 'hsl(var(--primary))',
-        fillOpacity: 0.2,
-        strokeColor: 'hsl(var(--primary))',
-        strokeWeight: 2,
-        editable: true,
-      });
-
-      circleRef.current.addListener('radius_changed', () => {
-        const newRadius = circleRef.current?.getRadius();
-        if (newRadius) {
-          onRadiusChange(newRadius / 1000); // Convert meters to km
-        }
-      });
-
-      circleRef.current.addListener('center_changed', () => {
-        const newCenter = circleRef.current?.getCenter();
-        if (newCenter) {
-          onCenterChange({ lat: newCenter.lat(), lng: newCenter.lng() });
-          markerRef.current?.setPosition(newCenter);
-        }
-      });
-    } else {
-      circleRef.current.setCenter(mapCenter);
-      circleRef.current.setRadius(radius * 1000);
-      circleRef.current.setMap(mapInstanceRef.current);
-    }
-
-    // Fit bounds to circle
-    const bounds = circleRef.current.getBounds();
-    if (bounds) {
-      mapInstanceRef.current.fitBounds(bounds);
-    }
-  }, [google, mode, center, radius, onCenterChange, onRadiusChange]);
-
-  // Handle polygon mode
-  useEffect(() => {
-    if (!google || !mapInstanceRef.current || mode !== 'polygon') {
-      // Clean up polygon and drawing manager if not in polygon mode
-      polygonRef.current?.setMap(null);
-      drawingManagerRef.current?.setMap(null);
-      return;
-    }
-
-    // Create or update polygon if we have coords
-    if (polygonCoords.length >= 3) {
-      if (!polygonRef.current) {
-        polygonRef.current = new google.maps.Polygon({
-          paths: polygonCoords,
-          map: mapInstanceRef.current,
-          fillColor: 'hsl(var(--primary))',
-          fillOpacity: 0.2,
-          strokeColor: 'hsl(var(--primary))',
-          strokeWeight: 2,
-          editable: true,
-          draggable: true,
+      if (zone.is_polygon && zone.polygon_coords && zone.polygon_coords.length >= 3) {
+        const polygon = new google.maps.Polygon({
+          paths: zone.polygon_coords,
+          map: mapInstanceRef.current!,
+          fillColor: color,
+          fillOpacity: isSelected ? 0.35 : 0.15,
+          strokeColor: color,
+          strokeWeight: isSelected ? 3 : 1.5,
+          strokeOpacity: isInactive ? 0.4 : 1,
+          editable: isSelected,
+          draggable: isSelected,
+          clickable: true,
+          zIndex: isSelected ? 10 : 1,
         });
 
-        const updatePolygonCoords = () => {
-          const path = polygonRef.current?.getPath();
-          if (path) {
-            const newCoords: Coords[] = [];
+        if (isInactive) {
+          polygon.setOptions({
+            fillOpacity: 0.05,
+            strokeOpacity: 0.3,
+          });
+        }
+
+        polygon.addListener('click', () => onZoneSelect(zone.id));
+
+        if (isSelected) {
+          const updateCoords = () => {
+            const path = polygon.getPath();
+            const coords: Coords[] = [];
             for (let i = 0; i < path.getLength(); i++) {
-              const point = path.getAt(i);
-              newCoords.push({ lat: point.lat(), lng: point.lng() });
+              const pt = path.getAt(i);
+              coords.push({ lat: pt.lat(), lng: pt.lng() });
             }
-            onPolygonChange(newCoords);
+            onZoneGeometryUpdate({ id: zone.id, type: 'polygon', polygonCoords: coords });
+          };
+          google.maps.event.addListener(polygon.getPath(), 'set_at', updateCoords);
+          google.maps.event.addListener(polygon.getPath(), 'insert_at', updateCoords);
+          google.maps.event.addListener(polygon.getPath(), 'remove_at', updateCoords);
+        }
+
+        overlaysRef.current.set(zone.id, polygon);
+      } else if (!zone.is_polygon && zone.center_lat && zone.center_lng && zone.radius_km) {
+        const circle = new google.maps.Circle({
+          map: mapInstanceRef.current!,
+          center: { lat: zone.center_lat, lng: zone.center_lng },
+          radius: zone.radius_km * 1000,
+          fillColor: color,
+          fillOpacity: isSelected ? 0.35 : 0.15,
+          strokeColor: color,
+          strokeWeight: isSelected ? 3 : 1.5,
+          strokeOpacity: isInactive ? 0.4 : 1,
+          editable: isSelected,
+          draggable: isSelected,
+          clickable: true,
+          zIndex: isSelected ? 10 : 1,
+        });
+
+        if (isInactive) {
+          circle.setOptions({
+            fillOpacity: 0.05,
+            strokeOpacity: 0.3,
+          });
+        }
+
+        circle.addListener('click', () => onZoneSelect(zone.id));
+
+        if (isSelected) {
+          circle.addListener('radius_changed', () => {
+            onZoneGeometryUpdate({
+              id: zone.id,
+              type: 'radius',
+              radius: (circle.getRadius() || 0) / 1000,
+            });
+          });
+          circle.addListener('center_changed', () => {
+            const c = circle.getCenter();
+            if (c) {
+              onZoneGeometryUpdate({
+                id: zone.id,
+                type: 'radius',
+                center: { lat: c.lat(), lng: c.lng() },
+              });
+            }
+          });
+        }
+
+        overlaysRef.current.set(zone.id, circle);
+      }
+    });
+
+    // Fit bounds to all zones if no zone is selected
+    if (!selectedZoneId && zones.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      let hasPoints = false;
+      zones.forEach(z => {
+        if (z.is_polygon && z.polygon_coords) {
+          z.polygon_coords.forEach(c => { bounds.extend(c); hasPoints = true; });
+        } else if (z.center_lat && z.center_lng) {
+          bounds.extend({ lat: z.center_lat, lng: z.center_lng });
+          hasPoints = true;
+        }
+      });
+      if (hasPoints) {
+        mapInstanceRef.current!.fitBounds(bounds, 50);
+      }
+    }
+  }, [google, zones, selectedZoneId, onZoneSelect, onZoneGeometryUpdate]);
+
+  // Fit bounds to selected zone
+  useEffect(() => {
+    if (!google || !mapInstanceRef.current || !selectedZoneId) return;
+    const overlay = overlaysRef.current.get(selectedZoneId);
+    if (!overlay) return;
+
+    if (overlay instanceof google.maps.Circle) {
+      const bounds = overlay.getBounds();
+      if (bounds) mapInstanceRef.current.fitBounds(bounds);
+    } else if (overlay instanceof google.maps.Polygon) {
+      const bounds = new google.maps.LatLngBounds();
+      overlay.getPath().forEach(p => bounds.extend(p));
+      mapInstanceRef.current.fitBounds(bounds);
+    }
+  }, [google, selectedZoneId]);
+
+  // Handle drawing mode for NEW zones
+  useEffect(() => {
+    if (!google || !mapInstanceRef.current) return;
+
+    // Cleanup previous drawing tools
+    drawingManagerRef.current?.setMap(null);
+    drawingManagerRef.current = null;
+    newCircleRef.current?.setMap(null);
+    newCircleRef.current = null;
+    newMarkerRef.current?.setMap(null);
+    newMarkerRef.current = null;
+
+    if (!drawingMode) return;
+
+    if (drawingMode === 'polygon') {
+      const dm = new google.maps.drawing.DrawingManager({
+        drawingMode: google.maps.drawing.OverlayType.POLYGON,
+        drawingControl: false,
+        polygonOptions: {
+          fillColor: '#3B82F6',
+          fillOpacity: 0.25,
+          strokeColor: '#3B82F6',
+          strokeWeight: 2,
+          editable: true,
+        },
+      });
+
+      google.maps.event.addListener(dm, 'polygoncomplete', (polygon: google.maps.Polygon) => {
+        const path = polygon.getPath();
+        const coords: Coords[] = [];
+        for (let i = 0; i < path.getLength(); i++) {
+          const pt = path.getAt(i);
+          coords.push({ lat: pt.lat(), lng: pt.lng() });
+        }
+        polygon.setMap(null);
+        dm.setMap(null);
+        onNewZoneDrawn({ type: 'polygon', polygonCoords: coords });
+        onDrawingModeChange(null);
+      });
+
+      dm.setMap(mapInstanceRef.current);
+      drawingManagerRef.current = dm;
+    }
+
+    if (drawingMode === 'radius') {
+      // Click on map to place center
+      const clickListener = mapInstanceRef.current.addListener('click', (e: google.maps.MapMouseEvent) => {
+        if (!e.latLng) return;
+        const center = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+
+        // Remove old preview
+        newCircleRef.current?.setMap(null);
+        newMarkerRef.current?.setMap(null);
+
+        newMarkerRef.current = new google.maps.Marker({
+          position: center,
+          map: mapInstanceRef.current!,
+          draggable: true,
+          title: 'Arraste para ajustar o centro',
+        });
+
+        newCircleRef.current = new google.maps.Circle({
+          map: mapInstanceRef.current!,
+          center,
+          radius: newRadius * 1000,
+          fillColor: '#3B82F6',
+          fillOpacity: 0.25,
+          strokeColor: '#3B82F6',
+          strokeWeight: 2,
+          editable: true,
+        });
+
+        const emitData = () => {
+          const c = newCircleRef.current?.getCenter();
+          const r = newCircleRef.current?.getRadius();
+          if (c && r) {
+            onNewZoneDrawn({ type: 'radius', center: { lat: c.lat(), lng: c.lng() }, radius: r / 1000 });
           }
         };
 
-        google.maps.event.addListener(polygonRef.current.getPath(), 'set_at', updatePolygonCoords);
-        google.maps.event.addListener(polygonRef.current.getPath(), 'insert_at', updatePolygonCoords);
-        google.maps.event.addListener(polygonRef.current.getPath(), 'remove_at', updatePolygonCoords);
-      } else {
-        polygonRef.current.setPath(polygonCoords);
-        polygonRef.current.setMap(mapInstanceRef.current);
-      }
-
-      // Fit bounds to polygon
-      const bounds = new google.maps.LatLngBounds();
-      polygonCoords.forEach((coord) => bounds.extend(coord));
-      mapInstanceRef.current.fitBounds(bounds);
-    } else {
-      // No polygon yet, enable drawing
-      if (!drawingManagerRef.current) {
-        drawingManagerRef.current = new google.maps.drawing.DrawingManager({
-          drawingMode: google.maps.drawing.OverlayType.POLYGON,
-          drawingControl: true,
-          drawingControlOptions: {
-            position: google.maps.ControlPosition.TOP_CENTER,
-            drawingModes: [google.maps.drawing.OverlayType.POLYGON],
-          },
-          polygonOptions: {
-            fillColor: 'hsl(var(--primary))',
-            fillOpacity: 0.2,
-            strokeColor: 'hsl(var(--primary))',
-            strokeWeight: 2,
-            editable: true,
-          },
+        newCircleRef.current.addListener('radius_changed', emitData);
+        newCircleRef.current.addListener('center_changed', () => {
+          const c = newCircleRef.current?.getCenter();
+          if (c) newMarkerRef.current?.setPosition(c);
+          emitData();
+        });
+        newMarkerRef.current.addListener('dragend', () => {
+          const pos = newMarkerRef.current?.getPosition();
+          if (pos) newCircleRef.current?.setCenter(pos);
+          emitData();
         });
 
-        google.maps.event.addListener(drawingManagerRef.current, 'polygoncomplete', (polygon: google.maps.Polygon) => {
-          const path = polygon.getPath();
-          const coords: Coords[] = [];
-          for (let i = 0; i < path.getLength(); i++) {
-            const point = path.getAt(i);
-            coords.push({ lat: point.lat(), lng: point.lng() });
-          }
-          onPolygonChange(coords);
-          
-          // Remove the drawn polygon (we'll use our own)
-          polygon.setMap(null);
-          drawingManagerRef.current?.setMap(null);
-        });
-      }
-      
-      drawingManagerRef.current.setMap(mapInstanceRef.current);
+        // Emit initial
+        onNewZoneDrawn({ type: 'radius', center, radius: newRadius });
+
+        // Remove the click listener after first click
+        google.maps.event.removeListener(clickListener);
+      });
+
+      return () => {
+        google.maps.event.removeListener(clickListener);
+      };
     }
-  }, [google, mode, polygonCoords, onPolygonChange]);
+  }, [google, drawingMode, newRadius, onNewZoneDrawn, onDrawingModeChange]);
 
-  // Update map center when center prop changes
+  // Cleanup new zone overlays when drawing mode is cleared externally
   useEffect(() => {
-    if (center && mapInstanceRef.current) {
-      mapInstanceRef.current.panTo(center);
+    if (!drawingMode) {
+      newCircleRef.current?.setMap(null);
+      newCircleRef.current = null;
+      newMarkerRef.current?.setMap(null);
+      newMarkerRef.current = null;
     }
-  }, [center]);
-
-  const handleClearPolygon = useCallback(() => {
-    polygonRef.current?.setMap(null);
-    polygonRef.current = null;
-    onPolygonChange([]);
-  }, [onPolygonChange]);
+  }, [drawingMode]);
 
   if (loadError) {
     return (
@@ -272,41 +373,73 @@ export function DeliveryZoneMap({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <Label htmlFor="search" className="sr-only">Buscar endereço</Label>
+    <div className="space-y-3">
+      {/* Search + Drawing controls */}
+      <div className="flex gap-2 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <Label htmlFor="map-search" className="sr-only">Buscar endereço</Label>
           <Input
-            id="search"
+            id="map-search"
             ref={searchInputRef}
             type="text"
-            placeholder="Buscar endereço para centralizar o mapa..."
+            placeholder="Buscar endereço para centralizar..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
-        {mode === 'polygon' && polygonCoords.length > 0 && (
-          <Button variant="outline" onClick={handleClearPolygon}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Limpar
-          </Button>
-        )}
+        <Button
+          variant={drawingMode === 'radius' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onDrawingModeChange(drawingMode === 'radius' ? null : 'radius')}
+          className="gap-1.5"
+        >
+          <Circle className="w-4 h-4" />
+          Raio
+        </Button>
+        <Button
+          variant={drawingMode === 'polygon' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onDrawingModeChange(drawingMode === 'polygon' ? null : 'polygon')}
+          className="gap-1.5"
+        >
+          <Pencil className="w-4 h-4" />
+          Polígono
+        </Button>
       </div>
 
+      {/* Map */}
       <div
         ref={mapRef}
-        className="w-full h-64 md:h-80 rounded-lg border border-border"
+        className="w-full h-[350px] md:h-[450px] rounded-lg border border-border"
       />
 
-      {mode === 'radius' && (
+      {/* Drawing instructions */}
+      {drawingMode === 'radius' && (
         <div className="space-y-2">
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
+            <MapPin className="w-4 h-4 shrink-0" />
+            Clique no mapa para definir o centro da zona de raio.
+          </p>
           <div className="flex items-center justify-between">
-            <Label>Raio de entrega</Label>
-            <span className="text-sm font-medium">{radius.toFixed(1)} km</span>
+            <Label>Raio</Label>
+            <span className="text-sm font-medium">{newRadius.toFixed(1)} km</span>
           </div>
           <Slider
-            value={[radius]}
-            onValueChange={([value]) => onRadiusChange(value)}
+            value={[newRadius]}
+            onValueChange={([v]) => {
+              setNewRadius(v);
+              if (newCircleRef.current) {
+                newCircleRef.current.setRadius(v * 1000);
+                onNewZoneDrawn({
+                  type: 'radius',
+                  center: (() => {
+                    const c = newCircleRef.current?.getCenter();
+                    return c ? { lat: c.lat(), lng: c.lng() } : undefined;
+                  })(),
+                  radius: v,
+                });
+              }
+            }}
             min={0.5}
             max={20}
             step={0.5}
@@ -314,17 +447,32 @@ export function DeliveryZoneMap({
         </div>
       )}
 
-      {mode === 'polygon' && polygonCoords.length === 0 && (
+      {drawingMode === 'polygon' && (
         <p className="text-sm text-muted-foreground flex items-center gap-2">
-          <MapPin className="w-4 h-4" />
-          Use as ferramentas de desenho no mapa para definir a área de entrega.
+          <MapPin className="w-4 h-4 shrink-0" />
+          Desenhe a área clicando no mapa para criar os vértices do polígono.
         </p>
       )}
 
-      {mode === 'polygon' && polygonCoords.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          {polygonCoords.length} pontos definidos. Arraste os vértices para ajustar.
-        </p>
+      {/* Legend */}
+      {zones.length > 0 && !drawingMode && (
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          {zones.map((zone, i) => (
+            <button
+              key={zone.id}
+              onClick={() => onZoneSelect(zone.id)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors hover:bg-accent ${
+                zone.id === selectedZoneId ? 'bg-accent font-medium' : ''
+              }`}
+            >
+              <span
+                className="w-3 h-3 rounded-sm shrink-0"
+                style={{ backgroundColor: ZONE_COLORS[i % ZONE_COLORS.length], opacity: zone.is_active ? 1 : 0.4 }}
+              />
+              {zone.neighborhood}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
