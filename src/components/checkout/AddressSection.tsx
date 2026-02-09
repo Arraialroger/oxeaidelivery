@@ -128,8 +128,23 @@ export function AddressSection({
           {/* Extra content (zone indicator, detected address, etc.) */}
           {mapExtraContent}
 
-          {/* Complement and reference fields in map mode */}
+          {/* Neighborhood, complement and reference fields in map mode */}
           <div className="space-y-3">
+            <div>
+              <Label htmlFor="neighborhood-map">Bairro *</Label>
+              <Input
+                id="neighborhood-map"
+                value={manualData.neighborhood}
+                onChange={(e) =>
+                  onManualDataChange({ ...manualData, neighborhood: e.target.value })
+                }
+                placeholder="Nome do bairro"
+                className={`mt-1 ${manualErrors?.neighborhood ? 'border-destructive' : ''}`}
+              />
+              {manualErrors?.neighborhood && (
+                <p className="text-xs text-destructive mt-1">{manualErrors.neighborhood}</p>
+              )}
+            </div>
             <div>
               <Label htmlFor="complement-map">Complemento</Label>
               <Input
