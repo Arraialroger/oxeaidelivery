@@ -60,6 +60,7 @@ export function DeliveryZoneMap({
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
   const newCircleRef = useRef<google.maps.Circle | null>(null);
   const newMarkerRef = useRef<google.maps.Marker | null>(null);
+  const newPolygonRef = useRef<google.maps.Polygon | null>(null);
 
   const { isLoaded, loadError, google } = useGoogleMaps({ libraries: ['places', 'drawing'] });
   const [searchInput, setSearchInput] = useState('');
@@ -251,6 +252,8 @@ export function DeliveryZoneMap({
     newCircleRef.current = null;
     newMarkerRef.current?.setMap(null);
     newMarkerRef.current = null;
+    newPolygonRef.current?.setMap(null);
+    newPolygonRef.current = null;
 
     if (!drawingMode) return;
 
@@ -278,10 +281,29 @@ export function DeliveryZoneMap({
           const pt = path.getAt(i);
           coords.push({ lat: pt.lat(), lng: pt.lng() });
         }
-        polygon.setMap(null);
+        // Keep the polygon visible as a preview; remove the drawing manager only
+        dm.setDrawingMode(null);
         dm.setMap(null);
+        // Store ref so it's cleaned up when drawingMode resets
+        newPolygonRef.current?.setMap(null);
+        newPolygonRef.current = polygon;
+        polygon.setEditable(true);
+
+        // Listen for edits on the preview polygon
+        const emitUpdatedCoords = () => {
+          const p = polygon.getPath();
+          const updated: Coords[] = [];
+          for (let i = 0; i < p.getLength(); i++) {
+            const pt = p.getAt(i);
+            updated.push({ lat: pt.lat(), lng: pt.lng() });
+          }
+          onNewZoneDrawn({ type: 'polygon', polygonCoords: updated });
+        };
+        google.maps.event.addListener(polygon.getPath(), 'set_at', emitUpdatedCoords);
+        google.maps.event.addListener(polygon.getPath(), 'insert_at', emitUpdatedCoords);
+
         onNewZoneDrawn({ type: 'polygon', polygonCoords: coords });
-        onDrawingModeChange(null);
+        // Don't call onDrawingModeChange(null) here — it would trigger cleanup and remove the preview polygon
       });
 
       dm.setMap(mapInstanceRef.current);
@@ -356,6 +378,8 @@ export function DeliveryZoneMap({
       newCircleRef.current = null;
       newMarkerRef.current?.setMap(null);
       newMarkerRef.current = null;
+      newPolygonRef.current?.setMap(null);
+      newPolygonRef.current = null;
     }
   }, [drawingMode]);
 
