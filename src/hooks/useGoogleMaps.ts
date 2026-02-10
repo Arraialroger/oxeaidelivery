@@ -40,8 +40,14 @@ export function useGoogleMaps(options: UseGoogleMapsOptions = {}): UseGoogleMaps
     }
 
     if (isScriptLoaded) {
-      setIsLoaded(true);
-      return;
+      const needsDrawing = librariesKey.includes('drawing');
+      const drawingAvailable = !!window.google?.maps?.drawing;
+      if (!needsDrawing || drawingAvailable) {
+        setIsLoaded(true);
+        return;
+      }
+      // Drawing is needed but missing - fall through to reload logic
+      isScriptLoaded = false;
     }
 
     if (isScriptLoading && loadPromise) {
@@ -61,8 +67,9 @@ export function useGoogleMaps(options: UseGoogleMapsOptions = {}): UseGoogleMaps
         const drawingMissing = needsDrawing && (!window.google?.maps?.drawing);
 
         if (drawingMissing) {
-          // Remove old script and reload with all libraries
+          // Remove old script and clear google namespace, then reload with all libraries
           existingScript.remove();
+          delete (window as any).google;
           isScriptLoaded = false;
         } else {
           isScriptLoaded = true;
