@@ -30,7 +30,7 @@ export function DeliveryZoneSimulator() {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   
   const { data: zones = [] } = useDeliveryZones({ includeInactive: false });
-  const { isLoaded, google } = useGoogleMaps({ libraries: ['places'] });
+  const { isLoaded, google } = useGoogleMaps({ libraries: ['places', 'drawing'] });
   const { requestLocation, coords: geoCoords, isLoading: isGeoLoading } = useGeolocation();
   const { settings } = useRestaurantContext();
 
