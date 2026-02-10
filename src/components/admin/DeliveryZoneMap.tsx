@@ -255,6 +255,10 @@ export function DeliveryZoneMap({
     if (!drawingMode) return;
 
     if (drawingMode === 'polygon') {
+      if (!google.maps.drawing) {
+        console.error('Google Maps Drawing library not available');
+        return;
+      }
       const dm = new google.maps.drawing.DrawingManager({
         drawingMode: google.maps.drawing.OverlayType.POLYGON,
         drawingControl: false,
