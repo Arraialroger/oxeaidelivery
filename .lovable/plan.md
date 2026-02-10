@@ -1,38 +1,75 @@
 
 
-# Correcao de 2 Problemas Pendentes
+# Correcao Definitiva do Bug de Poligono
 
-## Problema 1: Poligono faz a tela inteira desaparecer
+## Causa Raiz
 
-**Causa raiz identificada:** O singleton do Google Maps pode ter sido carregado SEM a biblioteca `drawing` em uma sessao anterior ou por outro componente. A verificacao na linha 57 do `useGoogleMaps.ts` detecta o script existente e marca como carregado, sem verificar se a biblioteca `drawing` esta disponivel. Quando o codigo tenta criar `new google.maps.drawing.DrawingManager(...)`, o namespace `google.maps.drawing` esta `undefined`, gerando um erro nao tratado que crasha todo o React e deixa a tela em branco.
+Ha dois problemas que se combinam:
 
-**Correcao em dois pontos:**
+1. **O `DeliveryZoneSimulator.tsx` carrega o Google Maps apenas com `['places']`** (linha 33), sem incluir `drawing`. Se este componente renderiza antes do mapa de zonas, o script e carregado sem a biblioteca de desenho.
 
-### `src/hooks/useGoogleMaps.ts`
-- Na verificacao de script existente (linha 57-63), ao encontrar um script ja carregado, verificar se as bibliotecas necessarias estao realmente disponiveis. Se `drawing` foi solicitada mas `google.maps.drawing` nao existe, remover o script antigo e recarregar com as bibliotecas corretas.
+2. **O hook `useGoogleMaps` tem um curto-circuito na linha 42** que impede a correcao: quando `isScriptLoaded` e `true`, o hook retorna imediatamente sem nunca verificar se as bibliotecas necessarias estao presentes. A logica de "recarregar se drawing estiver faltando" (linhas 57-73) NUNCA e alcancada porque o `return` na linha 44 acontece antes.
 
-### `src/components/admin/DeliveryZoneMap.tsx`
-- No bloco de criacao do DrawingManager (linha 257-284), adicionar uma verificacao defensiva: se `google.maps.drawing` nao existir, exibir mensagem de erro orientando o usuario a atualizar a pagina, em vez de crashar silenciosamente.
+```text
+Fluxo do bug:
+  Simulator carrega -> useGoogleMaps(['places']) -> script carrega -> isScriptLoaded = true
+  DeliveryZoneMap carrega -> useGoogleMaps(['places','drawing']) -> isScriptLoaded ja e true -> return (linha 44)
+  -> google.maps.drawing = undefined -> crash ao clicar Poligono
+```
 
----
+## Correcoes
 
-## Problema 2: Bairro vem incorreto ao usar localizacao atual
+### 1. `src/components/admin/DeliveryZoneSimulator.tsx` (linha 33)
+Alterar a chamada para incluir ambas as bibliotecas, padronizando com o restante do app:
 
-**O que o usuario quer:** Ao usar "Usar minha localizacao atual", trazer APENAS rua e numero. O campo bairro deve ficar vazio para preenchimento manual, pois o Google frequentemente retorna bairros incorretos na regiao.
+```text
+Antes:  useGoogleMaps({ libraries: ['places'] })
+Depois: useGoogleMaps({ libraries: ['places', 'drawing'] })
+```
 
-**Correcao:**
+Isso resolve a causa primaria: todos os componentes passam a solicitar as mesmas bibliotecas.
 
-### `src/pages/Checkout.tsx`
-- Na funcao `handleLocationSelect` (linha 191-201), remover completamente a logica de auto-preenchimento do bairro. Manter apenas a extracao de `route` (rua) e `street_number` (numero).
-- Isso garante que o campo bairro sempre fique vazio, forcando o preenchimento manual pelo campo editavel que ja foi adicionado no `AddressSection.tsx`.
+### 2. `src/hooks/useGoogleMaps.ts` (linhas 42-44)
+Adicionar verificacao de bibliotecas no curto-circuito para prevenir regressoes futuras. Se `isScriptLoaded` e `true` mas a biblioteca `drawing` esta faltando, nao fazer return e prosseguir para a logica de reload:
 
----
+```text
+Antes:
+  if (isScriptLoaded) {
+    setIsLoaded(true);
+    return;
+  }
 
-## Resumo das Alteracoes
+Depois:
+  if (isScriptLoaded) {
+    const needsDrawing = librariesKey.includes('drawing');
+    const drawingAvailable = !!window.google?.maps?.drawing;
+    if (!needsDrawing || drawingAvailable) {
+      setIsLoaded(true);
+      return;
+    }
+    // Drawing is needed but missing - fall through to reload logic
+    isScriptLoaded = false;
+  }
+```
+
+### 3. `src/hooks/useGoogleMaps.ts` (logica de reload, linhas 63-66)
+Ao remover o script antigo para recarregar, tambem limpar `window.google` para evitar conflitos:
+
+```text
+if (drawingMissing) {
+  existingScript.remove();
+  delete (window as any).google;
+  isScriptLoaded = false;
+}
+```
+
+## Resumo
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/hooks/useGoogleMaps.ts` | Recarregar script se biblioteca `drawing` estiver ausente |
-| `src/components/admin/DeliveryZoneMap.tsx` | Guard defensivo antes de criar DrawingManager |
-| `src/pages/Checkout.tsx` | Remover auto-preenchimento de bairro |
+| `DeliveryZoneSimulator.tsx` | Solicitar `['places', 'drawing']` em vez de `['places']` |
+| `useGoogleMaps.ts` linha 42-44 | Verificar se drawing esta disponivel antes do curto-circuito |
+| `useGoogleMaps.ts` linha 63-66 | Limpar `window.google` ao recarregar script |
+
+Essas tres alteracoes resolvem o bug de forma definitiva e previnem regressoes futuras caso algum novo componente solicite bibliotecas parciais.
 
