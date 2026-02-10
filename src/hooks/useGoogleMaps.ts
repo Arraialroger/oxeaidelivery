@@ -56,10 +56,20 @@ export function useGoogleMaps(options: UseGoogleMapsOptions = {}): UseGoogleMaps
     loadPromise = new Promise<void>((resolve, reject) => {
       const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
       if (existingScript) {
-        isScriptLoaded = true;
-        isScriptLoading = false;
-        resolve();
-        return;
+        // Check if required libraries are actually available
+        const needsDrawing = librariesKey.includes('drawing');
+        const drawingMissing = needsDrawing && (!window.google?.maps?.drawing);
+
+        if (drawingMissing) {
+          // Remove old script and reload with all libraries
+          existingScript.remove();
+          isScriptLoaded = false;
+        } else {
+          isScriptLoaded = true;
+          isScriptLoading = false;
+          resolve();
+          return;
+        }
       }
 
       const script = document.createElement('script');
