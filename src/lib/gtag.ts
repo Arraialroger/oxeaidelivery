@@ -105,3 +105,11 @@ export const trackPurchase = (
     })),
   });
 };
+
+// Address mode tracking
+export const trackAddressMode = (mode: 'map' | 'manual', step: 'selected' | 'completed') => {
+  trackEvent('address_mode', {
+    address_mode: mode,
+    interaction_step: step,
+  });
+};

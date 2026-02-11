@@ -76,3 +76,13 @@ export const fbTrackPurchase = (
     currency: 'BRL',
   });
 };
+
+// Address mode tracking
+export const fbTrackAddressMode = (mode: 'map' | 'manual', step: 'selected' | 'completed') => {
+  if (typeof window !== 'undefined' && window.fbq) {
+    window.fbq('trackCustom', 'AddressMode', {
+      address_mode: mode,
+      interaction_step: step,
+    });
+  }
+};
