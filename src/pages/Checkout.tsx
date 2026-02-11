@@ -14,8 +14,8 @@ import { LoyaltyRewardBanner } from "@/components/loyalty/LoyaltyRewardBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { trackBeginCheckout, trackPurchase } from "@/lib/gtag";
-import { fbTrackInitiateCheckout, fbTrackPurchase } from "@/lib/fbpixel";
+import { trackBeginCheckout, trackPurchase, trackAddressMode } from "@/lib/gtag";
+import { fbTrackInitiateCheckout, fbTrackPurchase, fbTrackAddressMode } from "@/lib/fbpixel";
 import { useAuth } from "@/hooks/useAuth";
 import { classifyCustomerType } from "@/lib/customerClassification";
 import { useKdsEvents } from "@/hooks/useKdsEvents";
@@ -448,6 +448,8 @@ export default function Checkout() {
       }));
       trackPurchase(order.id, purchaseItems, total, deliveryFee);
       fbTrackPurchase(order.id, purchaseItems, total);
+      trackAddressMode(addressMode, 'completed');
+      fbTrackAddressMode(addressMode, 'completed');
 
       clearCart();
 
@@ -608,7 +610,11 @@ export default function Checkout() {
                   manualData={{ street, number, neighborhood, complement, reference }}
                   manualErrors={manualFormErrors}
                   selectedLocation={addressLocation}
-                  onModeChange={(mode) => setAddressMode(mode)}
+                  onModeChange={(mode) => {
+                    setAddressMode(mode);
+                    trackAddressMode(mode, 'selected');
+                    fbTrackAddressMode(mode, 'selected');
+                  }}
                   initialMode={addressMode}
                   formattedAddress={formattedAddress}
                   onFormattedAddressChange={setFormattedAddress}
