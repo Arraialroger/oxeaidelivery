@@ -23,8 +23,17 @@ export interface DeliveryZone {
 // Helper to parse polygon_coords from Json
 function parsePolygonCoords(coords: Json | null): Array<{ lat: number; lng: number }> | null {
   if (!coords) return null;
-  if (Array.isArray(coords)) {
-    return coords.map((c) => {
+  // Handle both proper JSONB arrays and legacy string-encoded values
+  let parsed = coords;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(parsed)) {
+    return parsed.map((c) => {
       const coord = c as { lat: number; lng: number };
       return { lat: Number(coord.lat), lng: Number(coord.lng) };
     });

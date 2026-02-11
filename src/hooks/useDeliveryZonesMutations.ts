@@ -20,7 +20,6 @@ export function useDeliveryZonesMutations() {
         .insert({
           ...zone,
           restaurant_id: restaurantId,
-          polygon_coords: zone.polygon_coords ? JSON.stringify(zone.polygon_coords) : null,
         })
         .select()
         .single();
@@ -42,10 +41,7 @@ export function useDeliveryZonesMutations() {
     mutationFn: async ({ id, ...zone }: DeliveryZoneUpdate) => {
       const updateData: Record<string, unknown> = { ...zone };
       
-      // Convert polygon_coords to JSON if present
-      if (zone.polygon_coords !== undefined) {
-        updateData.polygon_coords = zone.polygon_coords ? JSON.stringify(zone.polygon_coords) : null;
-      }
+      // polygon_coords is passed as-is; Supabase handles JSONB serialization
 
       const { data, error } = await supabase
         .from('delivery_zones')
