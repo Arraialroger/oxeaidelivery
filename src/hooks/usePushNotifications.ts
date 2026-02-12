@@ -56,7 +56,7 @@ export function usePushNotifications(orderId: string | undefined): UsePushNotifi
 
       try {
         const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
+        const subscription = await (registration as any).pushManager.getSubscription();
 
         if (subscription) {
           // Verificar se já existe no banco para este pedido
@@ -102,7 +102,7 @@ export function usePushNotifications(orderId: string | undefined): UsePushNotifi
 
       // SEMPRE limpar subscription antiga primeiro (resolver erro de applicationServerKey)
       try {
-        const existingSubscription = await registration.pushManager.getSubscription();
+        const existingSubscription = await (registration as any).pushManager.getSubscription();
         if (existingSubscription) {
           console.log("[Push] Removendo subscription antiga...");
           
@@ -128,7 +128,7 @@ export function usePushNotifications(orderId: string | undefined): UsePushNotifi
       let subscription: PushSubscription;
       
       try {
-        subscription = await registration.pushManager.subscribe({
+        subscription = await (registration as any).pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
         });
