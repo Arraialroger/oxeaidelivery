@@ -333,6 +333,121 @@ export type Database = {
         }
         Relationships: []
       }
+      coupon_uses: {
+        Row: {
+          coupon_id: string
+          created_at: string
+          customer_id: string | null
+          discount_applied: number
+          id: string
+          order_id: string
+          restaurant_id: string
+        }
+        Insert: {
+          coupon_id: string
+          created_at?: string
+          customer_id?: string | null
+          discount_applied?: number
+          id?: string
+          order_id: string
+          restaurant_id: string
+        }
+        Update: {
+          coupon_id?: string
+          created_at?: string
+          customer_id?: string | null
+          discount_applied?: number
+          id?: string
+          order_id?: string
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_uses_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_uses_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_uses_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_uses_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          current_uses: number
+          description: string | null
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          first_purchase_only: boolean
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          min_order_value: number
+          restaurant_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_uses?: number
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          first_purchase_only?: boolean
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          min_order_value?: number
+          restaurant_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_uses?: number
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          first_purchase_only?: boolean
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          min_order_value?: number
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string | null
@@ -611,6 +726,8 @@ export type Database = {
           address_id: string | null
           cancellation_reason: string | null
           change: string | null
+          coupon_discount: number | null
+          coupon_id: string | null
           created_at: string | null
           customer_id: string | null
           delivery_fee: number | null
@@ -630,6 +747,8 @@ export type Database = {
           address_id?: string | null
           cancellation_reason?: string | null
           change?: string | null
+          coupon_discount?: number | null
+          coupon_id?: string | null
           created_at?: string | null
           customer_id?: string | null
           delivery_fee?: number | null
@@ -649,6 +768,8 @@ export type Database = {
           address_id?: string | null
           cancellation_reason?: string | null
           change?: string | null
+          coupon_discount?: number | null
+          coupon_id?: string | null
           created_at?: string | null
           customer_id?: string | null
           delivery_fee?: number | null
@@ -670,6 +791,13 @@ export type Database = {
             columns: ["address_id"]
             isOneToOne: false
             referencedRelation: "addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
             referencedColumns: ["id"]
           },
           {

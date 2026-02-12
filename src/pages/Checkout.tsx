@@ -25,6 +25,8 @@ import { AddressSection, DeliveryZoneIndicator, SavedAddressList, type ManualAdd
 import { useDeliveryZoneCheck } from "@/hooks/useDeliveryZones";
 import { useCheckoutEvents } from "@/hooks/useCheckoutEvents";
 import { useSavedAddresses, type SavedAddress } from "@/hooks/useSavedAddresses";
+import { CouponInput } from "@/components/checkout/CouponInput";
+import type { Coupon } from "@/hooks/useCoupons";
 
 type PaymentMethod = "pix" | "card" | "cash";
 type AddressMode = "map" | "manual";
@@ -47,6 +49,8 @@ export default function Checkout() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [useReward, setUseReward] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
 
   // Step 1: Customer Info
   const [name, setName] = useState("");
@@ -133,7 +137,7 @@ export default function Checkout() {
     : 0;
 
   const deliveryFee = config?.delivery_fee ?? 0;
-  const total = subtotal + deliveryFee - loyaltyDiscount;
+  const total = Math.max(0, subtotal + deliveryFee - loyaltyDiscount - couponDiscount);
 
   // Track begin_checkout event when entering checkout (Google Analytics + Meta Pixel)
   useEffect(() => {
@@ -389,6 +393,8 @@ export default function Checkout() {
           stamp_redeemed: useReward && canUseReward,
           status: "pending",
           restaurant_id: restaurantId,
+          coupon_id: appliedCoupon?.id || null,
+          coupon_discount: couponDiscount,
         })
         .select()
         .single();
@@ -405,6 +411,25 @@ export default function Checkout() {
             currentStamps: stamps.stamps_count || 0,
             rewardValue: config?.loyalty_reward_value || 50,
           });
+        } catch {
+          // Silent fail - order was created successfully
+        }
+      }
+
+      // Record coupon usage
+      if (appliedCoupon && couponDiscount > 0) {
+        try {
+          await supabase.from('coupon_uses').insert({
+            coupon_id: appliedCoupon.id,
+            order_id: order.id,
+            customer_id: customerId,
+            restaurant_id: restaurantId,
+            discount_applied: couponDiscount,
+          });
+          await supabase
+            .from('coupons')
+            .update({ current_uses: appliedCoupon.current_uses + 1 })
+            .eq('id', appliedCoupon.id);
         } catch {
           // Silent fail - order was created successfully
         }
@@ -688,6 +713,22 @@ export default function Checkout() {
               />
             )}
 
+            {/* Coupon Input */}
+            <CouponInput
+              subtotal={subtotal}
+              customerPhone={phoneDigits}
+              onApply={(coupon, discount) => {
+                setAppliedCoupon(coupon);
+                setCouponDiscount(discount);
+              }}
+              onRemove={() => {
+                setAppliedCoupon(null);
+                setCouponDiscount(0);
+              }}
+              appliedCoupon={appliedCoupon}
+              appliedDiscount={couponDiscount}
+            />
+
             {paymentMethod === "cash" && (
               <div className="mt-4">
                 <Label htmlFor="change">Troco para quanto?</Label>
@@ -759,6 +800,12 @@ export default function Checkout() {
                   <div className="flex justify-between text-sm text-primary">
                     <span>🎁 Brinde Fidelidade</span>
                     <span>-{formatPrice(loyaltyDiscount)}</span>
+                  </div>
+                )}
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-primary">
+                    <span>🏷️ Cupom {appliedCoupon?.code}</span>
+                    <span>-{formatPrice(couponDiscount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-lg mt-2">
