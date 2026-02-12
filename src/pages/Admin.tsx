@@ -14,7 +14,9 @@ import { RestaurantProfileForm } from '@/components/admin/RestaurantProfileForm'
 import { BusinessHoursForm } from '@/components/admin/BusinessHoursForm';
 import { DashboardPanel } from '@/components/admin/DashboardPanel';
 import { DeliveryZonesManager } from '@/components/admin/DeliveryZonesManager';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin } from 'lucide-react';
+import { CouponList } from '@/components/admin/CouponList';
+import { CouponForm } from '@/components/admin/CouponForm';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -23,6 +25,7 @@ export default function Admin() {
   const { user, isAdmin, loading, signOut } = useAuth();
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [couponDialogOpen, setCouponDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -85,7 +88,7 @@ export default function Admin() {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 lg:px-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8">
+          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-9">
             <TabsTrigger value="dashboard" className="gap-2">
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -101,6 +104,10 @@ export default function Admin() {
             <TabsTrigger value="delivery" className="gap-2">
               <MapPin className="w-4 h-4" />
               <span className="hidden sm:inline">Entrega</span>
+            </TabsTrigger>
+            <TabsTrigger value="coupons" className="gap-2">
+              <Tag className="w-4 h-4" />
+              <span className="hidden sm:inline">Cupons</span>
             </TabsTrigger>
             <TabsTrigger value="loyalty" className="gap-2">
               <Gift className="w-4 h-4" />
@@ -175,6 +182,28 @@ export default function Admin() {
           {/* Delivery Zones Tab */}
           <TabsContent value="delivery">
             <DeliveryZonesManager />
+          </TabsContent>
+
+          {/* Coupons Tab */}
+          <TabsContent value="coupons" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Cupons de Desconto</h2>
+              <Dialog open={couponDialogOpen} onOpenChange={setCouponDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Novo
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Novo Cupom</DialogTitle>
+                  </DialogHeader>
+                  <CouponForm onSuccess={() => setCouponDialogOpen(false)} />
+                </DialogContent>
+              </Dialog>
+            </div>
+            <CouponList />
           </TabsContent>
 
           {/* Loyalty Tab */}
