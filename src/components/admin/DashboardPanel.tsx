@@ -6,6 +6,7 @@ import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { TrendingUp, TrendingDown, Users, UserPlus, UserCheck, DollarSign, ShoppingBag, FileDown } from 'lucide-react';
 import { formatPrice } from '@/lib/formatUtils';
 import { OrdersChart } from './OrdersChart';
+import { AddressModeChart } from './AddressModeChart';
 import { DashboardDateFilter, getDefaultDateRange, type DateRange } from './DashboardDateFilter';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -336,6 +337,9 @@ export function DashboardPanel() {
             newPrevious={metrics.customers.newCustomersPrevious}
             returningPrevious={metrics.customers.returningCustomersPrevious}
           />
+
+          {/* Address Mode Chart */}
+          <AddressModeChart dateRange={dateRange} />
 
           {/* Total Customers */}
           <Card>
