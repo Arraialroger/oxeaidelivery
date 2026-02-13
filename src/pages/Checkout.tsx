@@ -26,6 +26,7 @@ import { useDeliveryZoneCheck } from "@/hooks/useDeliveryZones";
 import { useCheckoutEvents } from "@/hooks/useCheckoutEvents";
 import { useSavedAddresses, type SavedAddress } from "@/hooks/useSavedAddresses";
 import { CouponInput } from "@/components/checkout/CouponInput";
+import { UpsellSection } from "@/components/checkout/UpsellSection";
 import type { Coupon } from "@/hooks/useCoupons";
 
 type PaymentMethod = "pix" | "card" | "cash";
@@ -748,6 +749,9 @@ export default function Checkout() {
                 )}
               </div>
             )}
+
+            {/* Upsell Suggestions */}
+            <UpsellSection cartItems={items} />
 
             {/* Order Summary */}
             <div className="mt-6 p-4 bg-secondary rounded-xl">
