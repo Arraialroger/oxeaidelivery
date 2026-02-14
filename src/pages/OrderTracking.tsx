@@ -98,14 +98,42 @@ export default function OrderTracking() {
   const { canShowInstallUI, promptInstall, dismissInstall } = usePWAInstall();
   const { isSupported: pushSupported, permission, isSubscribed, isLoading: pushLoading, subscribe, error: pushError } = usePushNotifications(orderId);
   
+  const isNewOrder = searchParams.get('new') === 'true';
+
+  // Auto-subscribe push notifications para pedidos novos
+  useEffect(() => {
+    const orderFinished = order?.status === 'delivered' || order?.status === 'cancelled';
+    if (!isNewOrder || !pushSupported || isSubscribed || permission === 'denied' || loading || orderFinished) return;
+
+    const timer = setTimeout(async () => {
+      const success = await subscribe();
+      if (success) {
+        toast({
+          title: '🔔 Notificações ativadas!',
+          description: 'Você será notificado sobre cada atualização do seu pedido.',
+        });
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [isNewOrder, pushSupported, isSubscribed, permission, loading, order?.status, subscribe, toast]);
+
+  // Re-subscribe silencioso: permissão já concedida em pedido anterior
+  useEffect(() => {
+    const orderFinished = order?.status === 'delivered' || order?.status === 'cancelled';
+    if (isNewOrder || !pushSupported || isSubscribed || permission !== 'granted' || loading || orderFinished) return;
+
+    // Inscrever silenciosamente sem toast
+    subscribe();
+  }, [isNewOrder, pushSupported, isSubscribed, permission, loading, order?.status, subscribe]);
+
   // Show PWA modal after order (when coming from checkout with ?new=true)
   useEffect(() => {
-    const isNewOrder = searchParams.get('new') === 'true';
     if (isNewOrder && canShowInstallUI && !loading) {
       const timer = setTimeout(() => setShowPWAModal(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [searchParams, canShowInstallUI, loading]);
+  }, [isNewOrder, canShowInstallUI, loading]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
