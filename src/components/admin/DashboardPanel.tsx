@@ -9,6 +9,7 @@ import { OrdersChart } from './OrdersChart';
 import { AddressModeChart } from './AddressModeChart';
 import { InactiveCustomersPanel } from './InactiveCustomersPanel';
 import { PeakHoursChart } from './PeakHoursChart';
+import { DemandHeatmap } from './DemandHeatmap';
 import { DashboardDateFilter, getDefaultDateRange, type DateRange } from './DashboardDateFilter';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -342,6 +343,9 @@ export function DashboardPanel() {
 
           {/* Peak Hours Chart */}
           <PeakHoursChart dateRange={dateRange} />
+
+          {/* Demand Heatmap */}
+          <DemandHeatmap dateRange={dateRange} />
 
           {/* Address Mode Chart */}
           <AddressModeChart dateRange={dateRange} />
