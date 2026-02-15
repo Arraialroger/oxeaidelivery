@@ -804,8 +804,24 @@ export default function Checkout() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Entrega</span>
-                  <span>{formatPrice(deliveryFee)}</span>
+                  <span>{deliveryFee === 0 && zoneCheckResult?.freeDeliveryAbove ? (
+                    <span className="text-primary font-medium">Grátis 🎉</span>
+                  ) : formatPrice(deliveryFee)}</span>
                 </div>
+                {/* Free delivery nudge */}
+                {zoneCheckResult?.isValid && zoneCheckResult.freeDeliveryAbove && deliveryFee > 0 && (() => {
+                  const remaining = zoneCheckResult.freeDeliveryAbove - subtotal;
+                  const threshold = zoneCheckResult.freeDeliveryAbove * 0.4; // show when within 40%
+                  if (remaining > 0 && remaining <= threshold) {
+                    return (
+                      <div className="flex items-center gap-2 bg-primary/10 text-primary text-xs font-medium px-3 py-2 rounded-lg animate-pulse">
+                        <span>🚚</span>
+                        <span>Faltam {formatPrice(remaining)} para entrega grátis!</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 {loyaltyDiscount > 0 && (
                   <div className="flex justify-between text-sm text-primary">
                     <span>🎁 Brinde Fidelidade</span>
