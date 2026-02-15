@@ -206,6 +206,31 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   {formatDeliveryFeeDisplay()}
                 </span>
               </div>
+              {/* Free delivery nudge */}
+              {(() => {
+                const zonesWithFree = zones.filter((z) => z.free_delivery_above && z.free_delivery_above > 0);
+                if (zonesWithFree.length === 0) return null;
+                const lowestFreeThreshold = Math.min(...zonesWithFree.map((z) => z.free_delivery_above!));
+                const remaining = lowestFreeThreshold - subtotal;
+                const threshold = lowestFreeThreshold * 0.4;
+                if (remaining > 0 && remaining <= threshold) {
+                  return (
+                    <div className="flex items-center gap-2 bg-primary/10 text-primary text-xs font-medium px-3 py-2 rounded-lg animate-pulse">
+                      <span>🚚</span>
+                      <span>Faltam {formatPrice(remaining)} para entrega grátis!</span>
+                    </div>
+                  );
+                }
+                if (remaining <= 0) {
+                  return (
+                    <div className="flex items-center gap-2 bg-primary/10 text-primary text-xs font-medium px-3 py-2 rounded-lg">
+                      <span>🎉</span>
+                      <span>Você ganhou entrega grátis!</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <div className="flex justify-between font-bold text-lg pt-2 border-t border-border">
                 <span className="text-foreground">
                   {feeRange.hasRange ? 'Total estimado' : 'Total'}
