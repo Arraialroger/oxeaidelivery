@@ -1,80 +1,103 @@
 
 
-# Automatizar Push Notifications por Status do Pedido
+# Corrigir Taxa de Entrega Dinamica no Checkout e Exibir Faixa de Frete
 
 ## Diagnostico
 
-Apos analise detalhada do codigo, as push notifications **ja sao disparadas automaticamente** em cada mudanca de status no KDS (`Kitchen.tsx`, linha 612). O sistema ja cobre todos os status: `preparing`, `ready`, `out_for_delivery`, `delivered` e `cancelled`.
+Foram encontrados **3 problemas** relacionados a taxa de entrega:
 
-**O problema real**: o cliente precisa clicar manualmente no botao "Ativar" na pagina de rastreamento para se inscrever nas notificacoes. Isso cria atrito e muitos clientes nunca ativam, perdendo todas as notificacoes.
+### Problema 1: Checkout ignora a taxa calculada pela zona
+Na linha 140 do `Checkout.tsx`:
+```
+const deliveryFee = config?.delivery_fee ?? 0;
+```
+O sistema sempre usa o valor fixo do admin (`settings.delivery_fee`), ignorando completamente o `zoneCheckResult` que ja contem a taxa correta calculada pela zona de entrega.
 
-## Solucao
+### Problema 2: CartDrawer tambem mostra taxa fixa
+O `CartDrawer.tsx` exibe `config.delivery_fee` como taxa de entrega, sem ter acesso ao resultado da zona.
 
-Automatizar a inscricao push em dois momentos-chave, eliminando a necessidade de acao manual do cliente:
+### Problema 3: Pagina de informacoes mostra taxa fixa
+O `RestaurantDetails.tsx` (linha 146) exibe apenas o valor fixo do admin como taxa de entrega, sem considerar a faixa de valores das zonas configuradas.
 
-### 1. Auto-subscribe na pagina de rastreamento (pedido novo)
+---
 
-Quando o cliente chega na pagina de rastreamento vindo do checkout (`?new=true`), o sistema automaticamente solicita permissao de notificacao e faz a inscricao, sem necessidade de clicar em botao.
+## Plano de Acao
 
-**Arquivo**: `src/pages/OrderTracking.tsx`
-- Adicionar `useEffect` que detecta `?new=true` + push suportado + permissao nao negada + nao inscrito
-- Chamar `subscribe()` automaticamente apos 2 segundos (dar tempo da pagina carregar)
-- Se permissao ja foi concedida anteriormente, inscricao e silenciosa
-- Se primeira vez, o navegador mostra o prompt nativo de permissao
-- Exibir toast de confirmacao apenas quando sucesso
+### 1. Checkout.tsx - Usar taxa da zona de entrega
 
-### 2. Melhorar o banner de push para pedidos existentes
+**O que muda**: A variavel `deliveryFee` passa a ser derivada do `zoneCheckResult` quando disponivel, com fallback para o valor do config.
 
-Para clientes que acessam pedidos existentes (sem `?new=true`), manter o banner atual mas com texto mais urgente e CTA mais visivel.
+- Substituir `const deliveryFee = config?.delivery_fee ?? 0` por logica que prioriza `zoneCheckResult?.deliveryFee`
+- Considerar tambem o frete gratis (`freeDeliveryAbove`) quando o subtotal atingir o limite da zona
+- O `total` e o valor salvo no banco ja usam essa variavel, entao atualizam automaticamente
 
-**Arquivo**: `src/pages/OrderTracking.tsx`
-- Ajustar texto do banner para ser mais persuasivo
-- Adicionar animacao de atencao no botao
-
-### 3. Re-subscribe automatico se permissao ja concedida
-
-Se o cliente ja deu permissao de notificacao em um pedido anterior, os proximos pedidos inscrevem automaticamente sem nenhum prompt.
-
-**Arquivo**: `src/pages/OrderTracking.tsx`
-- No `useEffect` de auto-subscribe, verificar `Notification.permission === 'granted'`
-- Se ja concedido, inscrever silenciosamente sem mostrar nenhum UI
-
-## Detalhes Tecnicos
-
-### Fluxo do auto-subscribe:
-
-```text
-Cliente finaliza pedido
-       |
-       v
-Redireciona para /slug/order/id?new=true
-       |
-       v
-useEffect detecta new=true
-       |
-       v
-Verifica: pushSupported && !isSubscribed && permission !== 'denied'
-       |
-       +-- permission === 'granted' --> subscribe() silencioso
-       |
-       +-- permission === 'default' --> subscribe() (mostra prompt nativo)
-       |
-       +-- permission === 'denied' --> nao faz nada (mostra banner informativo existente)
+**Logica**:
+```
+Se zoneCheckResult existe e isValid:
+  - Se subtotal >= freeDeliveryAbove: deliveryFee = 0
+  - Senao: deliveryFee = zoneCheckResult.deliveryFee
+Senao:
+  - deliveryFee = config.delivery_fee (fallback)
 ```
 
-### Arquivos modificados:
+### 2. CartDrawer.tsx - Exibir faixa de frete (min-max)
 
-1. **`src/pages/OrderTracking.tsx`** - Adicionar logica de auto-subscribe via useEffect
+**O que muda**: Em vez de mostrar um valor fixo de entrega, o carrinho mostra a faixa de valores possivel baseada nas zonas ativas do restaurante.
 
-### Nenhuma mudanca necessaria em:
-- Edge Function `send-push-notification` (ja funciona)
-- `Kitchen.tsx` (ja dispara push em cada status)
-- `usePushNotifications.ts` (hook ja esta pronto)
-- Banco de dados (tabela `push_subscriptions` ja existe)
+- Importar `useDeliveryZones` para buscar todas as zonas ativas
+- Calcular o menor e o maior `delivery_fee_override` entre as zonas
+- Exibir "Entrega: R$ 10,00 - R$ 15,00" quando houver faixa
+- Se todas as zonas tiverem o mesmo valor, exibir valor unico
+- Se nao houver zonas configuradas, usar o valor fixo do config
+- O total do carrinho mostra "a partir de" ja que o valor exato depende do endereco
 
-## Impacto Esperado
+### 3. RestaurantDetails.tsx - Exibir faixa de frete
 
-- **Antes**: Apenas clientes que clicam manualmente em "Ativar" recebem notificacoes (estimativa: 10-20%)
-- **Depois**: Todo cliente que aceita a permissao do navegador recebe automaticamente (estimativa: 60-80%)
-- **Resultado**: Mais engajamento, menos clientes ligando para perguntar status, experiencia premium
+**O que muda**: O card de "Taxa de entrega" na pagina de informacoes do restaurante mostra a faixa de valores baseada nas zonas.
+
+- Importar `useDeliveryZones` para buscar zonas ativas
+- Calcular min/max das taxas de entrega
+- Exibir "R$ 10,00 - R$ 15,00" no card
+- Se nao houver zonas, mostrar o valor fixo do config como fallback
+
+---
+
+## Secao Tecnica
+
+### Arquivo 1: `src/pages/Checkout.tsx`
+
+Alteracoes na linha 140:
+```typescript
+// Calcular deliveryFee baseado na zona de entrega validada
+const deliveryFee = (() => {
+  if (zoneCheckResult?.isValid && zoneCheckResult.zone) {
+    const isFreeDelivery = zoneCheckResult.freeDeliveryAbove && subtotal >= zoneCheckResult.freeDeliveryAbove;
+    return isFreeDelivery ? 0 : zoneCheckResult.deliveryFee;
+  }
+  return config?.delivery_fee ?? 0;
+})();
+```
+
+### Arquivo 2: `src/components/cart/CartDrawer.tsx`
+
+- Adicionar hook `useDeliveryZones`
+- Calcular faixa min/max das taxas
+- Substituir exibicao fixa por faixa de valores
+- Ajustar total para indicar que e estimado
+
+### Arquivo 3: `src/pages/RestaurantDetails.tsx`
+
+- Adicionar hook `useDeliveryZones` (usando o restaurantId da pagina)
+- Calcular faixa min/max das taxas
+- Exibir faixa no card de informacoes
+
+### Arquivo 4: `src/hooks/useDeliveryZones.ts` (novo export)
+
+- Criar funcao utilitaria `getDeliveryFeeRange(zones, defaultFee)` para reutilizar a logica de calculo min/max nos 3 arquivos
+
+### Resumo de arquivos alterados:
+1. `src/hooks/useDeliveryZones.ts` - Adicionar helper `getDeliveryFeeRange`
+2. `src/pages/Checkout.tsx` - Usar taxa da zona validada
+3. `src/components/cart/CartDrawer.tsx` - Mostrar faixa de frete
+4. `src/pages/RestaurantDetails.tsx` - Mostrar faixa de frete
 
