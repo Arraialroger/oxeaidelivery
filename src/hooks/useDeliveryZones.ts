@@ -206,6 +206,27 @@ export function checkDeliveryZone(
   };
 }
 
+export interface DeliveryFeeRange {
+  min: number;
+  max: number;
+  hasRange: boolean;
+  hasZones: boolean;
+}
+
+export function getDeliveryFeeRange(zones: DeliveryZone[], defaultFee: number): DeliveryFeeRange {
+  const fees = zones
+    .filter((z) => z.delivery_fee_override !== null && z.delivery_fee_override !== undefined)
+    .map((z) => z.delivery_fee_override!);
+
+  if (fees.length === 0) {
+    return { min: defaultFee, max: defaultFee, hasRange: false, hasZones: zones.length > 0 };
+  }
+
+  const min = Math.min(...fees);
+  const max = Math.max(...fees);
+  return { min, max, hasRange: min !== max, hasZones: true };
+}
+
 export function useDeliveryZoneCheck() {
   const { data: zones = [], isLoading } = useDeliveryZones();
   const { settings } = useRestaurantContext();
