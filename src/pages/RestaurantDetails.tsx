@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { 
   MapPin, Clock, Phone, MessageCircle, Instagram, Facebook,
   CreditCard, Banknote, QrCode, ChevronLeft, ExternalLink,
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { supabase } from '@/integrations/supabase/client';
 import { useRestaurantDetails } from '@/hooks/useRestaurantDetails';
 import { useBusinessHours } from '@/hooks/useBusinessHours';
 import { useFeaturedProducts } from '@/hooks/useFeaturedProducts';
@@ -16,6 +18,7 @@ import { formatWhatsAppLink } from '@/lib/phoneUtils';
 import { GallerySection } from '@/components/restaurant/GallerySection';
 import { BusinessHoursSection } from '@/components/restaurant/BusinessHoursSection';
 import { FeaturedProductsSection } from '@/components/restaurant/FeaturedProductsSection';
+import { useDeliveryZones, getDeliveryFeeRange } from '@/hooks/useDeliveryZones';
 
 const paymentIcons: Record<string, { icon: React.ElementType; label: string }> = {
   pix: { icon: QrCode, label: 'PIX' },
@@ -32,6 +35,32 @@ export default function RestaurantDetails() {
   
   // All hooks must be called before any conditional returns
   const { isOpen, nextOpenTime, nextCloseTime, closingSoon, closingVerySoon, openingVerySoon } = useRestaurantOpenStatus(restaurant?.id, restaurant?.settings ?? null);
+
+  // Fetch delivery zones for fee range display
+  const { data: deliveryZonesRaw } = useQuery({
+    queryKey: ['delivery-zones-details', restaurant?.id],
+    queryFn: async () => {
+      if (!restaurant?.id) return [];
+      const { data } = await supabase
+        .from('delivery_zones')
+        .select('delivery_fee_override')
+        .eq('restaurant_id', restaurant.id)
+        .eq('is_active', true);
+      return data || [];
+    },
+    enabled: !!restaurant?.id,
+  });
+
+  const feeRange = (() => {
+    const fees = (deliveryZonesRaw || [])
+      .map((z) => z.delivery_fee_override)
+      .filter((f): f is number => f !== null && f !== undefined);
+    const defaultFee = restaurant?.settings?.delivery_fee ?? 5;
+    if (fees.length === 0) return { min: defaultFee, max: defaultFee, hasRange: false };
+    const min = Math.min(...fees);
+    const max = Math.max(...fees);
+    return { min, max, hasRange: min !== max };
+  })();
 
   if (isLoading) {
     return (
@@ -143,7 +172,12 @@ export default function RestaurantDetails() {
           <Card className="bg-card/50">
             <CardContent className="p-3 text-center">
               <Banknote className="w-5 h-5 mx-auto mb-1 text-primary" />
-              <p className="text-sm font-medium">R$ {(restaurant.settings?.delivery_fee || 5).toFixed(2).replace('.', ',')}</p>
+              <p className="text-sm font-medium">
+                {feeRange.hasRange
+                  ? `R$ ${feeRange.min.toFixed(2).replace('.', ',')} – R$ ${feeRange.max.toFixed(2).replace('.', ',')}`
+                  : `R$ ${feeRange.min.toFixed(2).replace('.', ',')}`
+                }
+              </p>
               <p className="text-xs text-muted-foreground">Taxa de entrega</p>
             </CardContent>
           </Card>

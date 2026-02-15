@@ -4,6 +4,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useConfig } from '@/hooks/useConfig';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useIsRestaurantOpen } from '@/hooks/useIsRestaurantOpen';
+import { useDeliveryZones, getDeliveryFeeRange } from '@/hooks/useDeliveryZones';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -16,9 +17,20 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
   const { isOpen: restaurantIsOpen, nextOpenTime } = useIsRestaurantOpen();
+  const { data: zones = [] } = useDeliveryZones();
 
-  const deliveryFee = config?.delivery_fee ?? 0;
-  const total = subtotal + deliveryFee;
+  const defaultDeliveryFee = config?.delivery_fee ?? 0;
+  const feeRange = getDeliveryFeeRange(zones, defaultDeliveryFee);
+
+  const formatDeliveryFeeDisplay = () => {
+    if (feeRange.hasRange) {
+      return `${formatPrice(feeRange.min)} – ${formatPrice(feeRange.max)}`;
+    }
+    return formatPrice(feeRange.min);
+  };
+
+  // Use min fee for estimated total
+  const estimatedTotal = subtotal + feeRange.min;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -191,12 +203,14 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Taxa de entrega</span>
                 <span className="text-foreground">
-                  {formatPrice(deliveryFee)}
+                  {formatDeliveryFeeDisplay()}
                 </span>
               </div>
               <div className="flex justify-between font-bold text-lg pt-2 border-t border-border">
-                <span className="text-foreground">Total</span>
-                <span className="text-primary">{formatPrice(total)}</span>
+                <span className="text-foreground">
+                  {feeRange.hasRange ? 'Total estimado' : 'Total'}
+                </span>
+                <span className="text-primary">{formatPrice(estimatedTotal)}</span>
               </div>
             </div>
 

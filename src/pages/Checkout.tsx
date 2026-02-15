@@ -137,7 +137,13 @@ export default function Checkout() {
     ? (config?.loyalty_reward_value || 50) 
     : 0;
 
-  const deliveryFee = config?.delivery_fee ?? 0;
+  const deliveryFee = (() => {
+    if (zoneCheckResult?.isValid && zoneCheckResult.zone) {
+      const isFreeDelivery = zoneCheckResult.freeDeliveryAbove && subtotal >= zoneCheckResult.freeDeliveryAbove;
+      return isFreeDelivery ? 0 : zoneCheckResult.deliveryFee;
+    }
+    return config?.delivery_fee ?? 0;
+  })();
   const total = Math.max(0, subtotal + deliveryFee - loyaltyDiscount - couponDiscount);
 
   // Track begin_checkout event when entering checkout (Google Analytics + Meta Pixel)
