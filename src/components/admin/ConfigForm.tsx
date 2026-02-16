@@ -7,7 +7,44 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useUpdateRestaurantSettings } from '@/hooks/useAdminMutations';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Gift, Clock, Settings2 } from 'lucide-react';
+import { Loader2, Gift, Clock, Settings2, MapPin } from 'lucide-react';
+import { useDeliveryZones } from '@/hooks/useDeliveryZones';
+import { Badge } from '@/components/ui/badge';
+
+function DeliveryFeeField({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const { data: zones = [] } = useDeliveryZones({ includeInactive: false });
+  const activeZonesCount = zones.length;
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="delivery_fee">Taxa de Entrega Padrão (R$)</Label>
+      <Input
+        id="delivery_fee"
+        type="number"
+        step="0.01"
+        min="0"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="0.00"
+      />
+      {activeZonesCount > 0 ? (
+        <div className="flex items-start gap-2 bg-primary/10 p-2.5 rounded-lg">
+          <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="text-xs text-muted-foreground">
+            <p>
+              Você tem <Badge variant="secondary" className="text-xs px-1.5 py-0">{activeZonesCount}</Badge> zona(s) de entrega configurada(s) no mapa.
+            </p>
+            <p className="mt-1">A taxa será calculada automaticamente pela zona do cliente. Este valor é usado apenas como <strong>fallback</strong> quando o endereço não se enquadra em nenhuma zona.</p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Configure zonas de entrega no mapa para definir taxas por região. Enquanto não houver zonas, este valor será usado para todos os pedidos.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function ConfigForm() {
   const { restaurant, restaurantId, settings } = useRestaurantContext();
@@ -89,18 +126,10 @@ export function ConfigForm() {
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="delivery_fee">Taxa de Entrega (R$)</Label>
-        <Input
-          id="delivery_fee"
-          type="number"
-          step="0.01"
-          min="0"
-          value={formData.delivery_fee}
-          onChange={(e) => setFormData({ ...formData, delivery_fee: e.target.value })}
-          placeholder="0.00"
-        />
-      </div>
+      <DeliveryFeeField
+        value={formData.delivery_fee}
+        onChange={(val) => setFormData({ ...formData, delivery_fee: val })}
+      />
 
       {/* Schedule Mode Section */}
       <div className="space-y-4 pt-4 border-t">

@@ -4,6 +4,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useRestaurantOpenStatus } from '@/hooks/useRestaurantOpenStatus';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { getDeliveryFeeRange } from '@/hooks/useDeliveryZones';
 
 interface RestaurantCardProps {
   restaurant: {
@@ -42,7 +45,29 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
   );
   
   const categoryLabel = categoryLabels[restaurant.category || 'restaurant'] || 'Restaurante';
-  const deliveryFee = restaurant.settings?.delivery_fee ?? 5;
+  const fallbackFee = restaurant.settings?.delivery_fee ?? 5;
+
+  // Fetch delivery zones for this restaurant to show fee range
+  const { data: deliveryZones = [] } = useQuery({
+    queryKey: ['delivery-zones-public', restaurant.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('delivery_zones')
+        .select('delivery_fee_override, is_active')
+        .eq('restaurant_id', restaurant.id)
+        .eq('is_active', true);
+      if (error) throw error;
+      return (data || []).map((z) => ({
+        delivery_fee_override: z.delivery_fee_override,
+      }));
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const feeRange = getDeliveryFeeRange(
+    deliveryZones as any,
+    fallbackFee
+  );
 
   return (
     <Card className="overflow-hidden border-border/50 hover:border-primary/30 transition-all duration-300 bg-card/80 backdrop-blur-sm">
@@ -132,7 +157,10 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
             <span>30-45 min</span>
           </div>
           <span className="text-sm text-primary font-medium">
-            Taxa: R$ {deliveryFee.toFixed(2).replace('.', ',')}
+            {feeRange.hasRange
+              ? `Taxa: R$ ${feeRange.min.toFixed(2).replace('.', ',')} - R$ ${feeRange.max.toFixed(2).replace('.', ',')}`
+              : `Taxa: R$ ${feeRange.min.toFixed(2).replace('.', ',')}`
+            }
           </span>
         </div>
 
