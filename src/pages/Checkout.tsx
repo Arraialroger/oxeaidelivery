@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowLeft, User, MapPin, CreditCard, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -145,6 +145,18 @@ export default function Checkout() {
     return config?.delivery_fee ?? 0;
   })();
   const total = Math.max(0, subtotal + deliveryFee - loyaltyDiscount - couponDiscount);
+
+  // Track delivery fee changes to show toast when free delivery is achieved (e.g. after upsell)
+  const prevDeliveryFeeRef = useRef(deliveryFee);
+  useEffect(() => {
+    if (prevDeliveryFeeRef.current > 0 && deliveryFee === 0) {
+      toast({
+        title: "🎉 Entrega Grátis!",
+        description: "Parabéns! Você atingiu o valor para entrega gratuita.",
+      });
+    }
+    prevDeliveryFeeRef.current = deliveryFee;
+  }, [deliveryFee, toast]);
 
   // Track begin_checkout event when entering checkout (Google Analytics + Meta Pixel)
   useEffect(() => {
@@ -804,7 +816,7 @@ export default function Checkout() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Entrega</span>
-                  <span>{deliveryFee === 0 && zoneCheckResult?.freeDeliveryAbove ? (
+                  <span>{deliveryFee === 0 && zoneCheckResult?.isValid ? (
                     <span className="text-primary font-medium">Grátis 🎉</span>
                   ) : formatPrice(deliveryFee)}</span>
                 </div>
