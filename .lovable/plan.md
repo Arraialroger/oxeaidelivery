@@ -1,103 +1,77 @@
 
-
-# Corrigir Taxa de Entrega Dinamica no Checkout e Exibir Faixa de Frete
+# Corrigir Taxa de Entrega no Marketplace e Melhorar Checkout
 
 ## Diagnostico
 
-Foram encontrados **3 problemas** relacionados a taxa de entrega:
+### Problema 1: Marketplace mostra taxa fixa do admin
+O `RestaurantCard.tsx` (linha 45) usa `restaurant.settings.delivery_fee` que vem do campo fixo do admin. Isso mostra "Taxa: R$ 5,00" para todos, ignorando as zonas configuradas no mapa. A pagina de informacoes (`RestaurantDetails.tsx`) ja foi corrigida para mostrar a faixa (R$ 10,00 - R$ 15,00), mas o card do marketplace nao.
 
-### Problema 1: Checkout ignora a taxa calculada pela zona
-Na linha 140 do `Checkout.tsx`:
-```
-const deliveryFee = config?.delivery_fee ?? 0;
-```
-O sistema sempre usa o valor fixo do admin (`settings.delivery_fee`), ignorando completamente o `zoneCheckResult` que ja contem a taxa correta calculada pela zona de entrega.
+**Causa raiz**: O `useRestaurants.ts` so busca dados da tabela `restaurants` (campo `settings.delivery_fee`). Nao consulta a tabela `delivery_zones` para calcular a faixa.
 
-### Problema 2: CartDrawer tambem mostra taxa fixa
-O `CartDrawer.tsx` exibe `config.delivery_fee` como taxa de entrega, sem ter acesso ao resultado da zona.
+### Problema 2: Checkout nao atualiza frete apos upsell
+Analisando o codigo, a logica de calculo do `deliveryFee` no `Checkout.tsx` (linhas 140-146) esta tecnicamente correta - ela usa `subtotal` reativo do `useCart()` e `zoneCheckResult` do estado. Quando o upsell adiciona um item, `subtotal` muda e `deliveryFee` recalcula.
 
-### Problema 3: Pagina de informacoes mostra taxa fixa
-O `RestaurantDetails.tsx` (linha 146) exibe apenas o valor fixo do admin como taxa de entrega, sem considerar a faixa de valores das zonas configuradas.
+**Porem**: o display do "Gratis" so aparece se `zoneCheckResult?.freeDeliveryAbove` existir (linha 807). Se o cliente adicionou um endereco que validou a zona corretamente, deveria funcionar. O possivel problema e que `zoneCheckResult` pode estar `null` caso o endereco nao tenha sido validado antes do upsell, ou o `freeDeliveryAbove` da zona e `null`. Vou adicionar uma verificacao mais robusta e um feedback visual claro quando o frete muda para gratis apos upsell.
+
+### Problema 3: Campo "Taxa de Entrega" no Admin
+Este campo (`ConfigForm.tsx`, linhas 92-103) agora e redundante. Com as zonas de entrega configuradas no mapa, o frete e definido por zona. O campo fixo so serve como fallback para restaurantes SEM zonas configuradas.
+
+**Sugestao**: Transformar o campo em "Taxa de Entrega Padrao (fallback)" com uma nota explicativa, ou remove-lo e usar R$ 0 como fallback quando nao ha zonas.
 
 ---
 
 ## Plano de Acao
 
-### 1. Checkout.tsx - Usar taxa da zona de entrega
+### 1. RestaurantCard - Mostrar faixa de frete das zonas
 
-**O que muda**: A variavel `deliveryFee` passa a ser derivada do `zoneCheckResult` quando disponivel, com fallback para o valor do config.
+**Arquivo**: `src/components/marketplace/RestaurantCard.tsx`
+- Buscar zonas de entrega do restaurante via query direta ao Supabase (similar ao que ja foi feito no `RestaurantDetails.tsx`)
+- Calcular min/max das taxas usando `getDeliveryFeeRange` de `useDeliveryZones.ts`
+- Exibir "Taxa: R$ 10,00 - R$ 15,00" quando houver faixa, ou valor unico se todas iguais
+- Fallback para `settings.delivery_fee` se nao houver zonas
 
-- Substituir `const deliveryFee = config?.delivery_fee ?? 0` por logica que prioriza `zoneCheckResult?.deliveryFee`
-- Considerar tambem o frete gratis (`freeDeliveryAbove`) quando o subtotal atingir o limite da zona
-- O `total` e o valor salvo no banco ja usam essa variavel, entao atualizam automaticamente
+**Abordagem**: Para evitar N+1 queries (uma por card), criar um hook ou query que busca zonas agrupadas por restaurante, ou fazer a query individualmente com cache do React Query (cada card faz sua query com `queryKey: ['delivery-zones-public', restaurantId]`).
 
-**Logica**:
-```
-Se zoneCheckResult existe e isValid:
-  - Se subtotal >= freeDeliveryAbove: deliveryFee = 0
-  - Senao: deliveryFee = zoneCheckResult.deliveryFee
-Senao:
-  - deliveryFee = config.delivery_fee (fallback)
-```
+### 2. Checkout - Garantir reatividade do frete gratis apos upsell
 
-### 2. CartDrawer.tsx - Exibir faixa de frete (min-max)
+**Arquivo**: `src/pages/Checkout.tsx`
+- Adicionar um `useEffect` que detecta quando `deliveryFee` muda de valor positivo para 0 (frete gratis atingido) e exibe um toast de congratulacao
+- Garantir que a condicao de display "Gratis" funcione mesmo quando `freeDeliveryAbove` nao esta explicitamente configurado na zona
+- O calculo ja e reativo; o foco e melhorar o feedback visual
 
-**O que muda**: Em vez de mostrar um valor fixo de entrega, o carrinho mostra a faixa de valores possivel baseada nas zonas ativas do restaurante.
+### 3. ConfigForm - Contextualizar o campo de frete
 
-- Importar `useDeliveryZones` para buscar todas as zonas ativas
-- Calcular o menor e o maior `delivery_fee_override` entre as zonas
-- Exibir "Entrega: R$ 10,00 - R$ 15,00" quando houver faixa
-- Se todas as zonas tiverem o mesmo valor, exibir valor unico
-- Se nao houver zonas configuradas, usar o valor fixo do config
-- O total do carrinho mostra "a partir de" ja que o valor exato depende do endereco
-
-### 3. RestaurantDetails.tsx - Exibir faixa de frete
-
-**O que muda**: O card de "Taxa de entrega" na pagina de informacoes do restaurante mostra a faixa de valores baseada nas zonas.
-
-- Importar `useDeliveryZones` para buscar zonas ativas
-- Calcular min/max das taxas de entrega
-- Exibir "R$ 10,00 - R$ 15,00" no card
-- Se nao houver zonas, mostrar o valor fixo do config como fallback
+**Arquivo**: `src/components/admin/ConfigForm.tsx`
+- Renomear label para "Taxa de Entrega Padrao (R$)"
+- Adicionar nota explicativa: "Usada apenas quando o endereco do cliente nao se enquadra em nenhuma zona de entrega configurada no mapa."
+- Verificar se o restaurante tem zonas configuradas e, se sim, mostrar um aviso: "Voce tem X zonas de entrega configuradas. A taxa sera calculada automaticamente pelo mapa."
 
 ---
 
 ## Secao Tecnica
 
-### Arquivo 1: `src/pages/Checkout.tsx`
+### Arquivo 1: `src/components/marketplace/RestaurantCard.tsx`
 
-Alteracoes na linha 140:
-```typescript
-// Calcular deliveryFee baseado na zona de entrega validada
-const deliveryFee = (() => {
-  if (zoneCheckResult?.isValid && zoneCheckResult.zone) {
-    const isFreeDelivery = zoneCheckResult.freeDeliveryAbove && subtotal >= zoneCheckResult.freeDeliveryAbove;
-    return isFreeDelivery ? 0 : zoneCheckResult.deliveryFee;
-  }
-  return config?.delivery_fee ?? 0;
-})();
-```
+- Importar `useQuery` e `supabase` para buscar zonas do restaurante
+- Importar `getDeliveryFeeRange` de `@/hooks/useDeliveryZones`
+- Adicionar query para buscar zonas ativas do restaurante especifico
+- Substituir `deliveryFee.toFixed(2)` por logica de faixa (min-max)
+- Usar `staleTime` longo para evitar refetch excessivo
 
-### Arquivo 2: `src/components/cart/CartDrawer.tsx`
+### Arquivo 2: `src/pages/Checkout.tsx`
 
-- Adicionar hook `useDeliveryZones`
-- Calcular faixa min/max das taxas
-- Substituir exibicao fixa por faixa de valores
-- Ajustar total para indicar que e estimado
+- Adicionar `useRef` para rastrear o valor anterior de `deliveryFee`
+- Adicionar `useEffect` que compara `prevDeliveryFee > 0` com `deliveryFee === 0` e mostra toast: "Voce ganhou entrega gratis!"
+- Isso cobre o cenario de upsell onde o subtotal ultrapassa o `freeDeliveryAbove`
 
-### Arquivo 3: `src/pages/RestaurantDetails.tsx`
+### Arquivo 3: `src/components/admin/ConfigForm.tsx`
 
-- Adicionar hook `useDeliveryZones` (usando o restaurantId da pagina)
-- Calcular faixa min/max das taxas
-- Exibir faixa no card de informacoes
-
-### Arquivo 4: `src/hooks/useDeliveryZones.ts` (novo export)
-
-- Criar funcao utilitaria `getDeliveryFeeRange(zones, defaultFee)` para reutilizar a logica de calculo min/max nos 3 arquivos
+- Importar `useDeliveryZones` para verificar se existem zonas configuradas
+- Alterar label do campo de "Taxa de Entrega (R$)" para "Taxa de Entrega Padrao (R$)"
+- Adicionar texto explicativo abaixo do campo
+- Se houver zonas configuradas, exibir badge informativo
 
 ### Resumo de arquivos alterados:
-1. `src/hooks/useDeliveryZones.ts` - Adicionar helper `getDeliveryFeeRange`
-2. `src/pages/Checkout.tsx` - Usar taxa da zona validada
-3. `src/components/cart/CartDrawer.tsx` - Mostrar faixa de frete
-4. `src/pages/RestaurantDetails.tsx` - Mostrar faixa de frete
-
+1. `src/components/marketplace/RestaurantCard.tsx` - Faixa de frete das zonas
+2. `src/pages/Checkout.tsx` - Toast de frete gratis apos upsell
+3. `src/components/admin/ConfigForm.tsx` - Contextualizar campo de frete
