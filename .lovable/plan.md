@@ -1,77 +1,107 @@
 
-# Corrigir Taxa de Entrega no Marketplace e Melhorar Checkout
+# Upsell Gerenciado pelo Admin -- Plano de Implementacao
 
 ## Diagnostico
 
-### Problema 1: Marketplace mostra taxa fixa do admin
-O `RestaurantCard.tsx` (linha 45) usa `restaurant.settings.delivery_fee` que vem do campo fixo do admin. Isso mostra "Taxa: R$ 5,00" para todos, ignorando as zonas configuradas no mapa. A pagina de informacoes (`RestaurantDetails.tsx`) ja foi corrigida para mostrar a faixa (R$ 10,00 - R$ 15,00), mas o card do marketplace nao.
+Atualmente, o upsell no checkout e 100% automatico: busca produtos ativos de categorias diferentes das que estao no carrinho, sem controle do restaurante. Isso gera sugestoes aleatorias que nem sempre fazem sentido comercial.
 
-**Causa raiz**: O `useRestaurants.ts` so busca dados da tabela `restaurants` (campo `settings.delivery_fee`). Nao consulta a tabela `delivery_zones` para calcular a faixa.
-
-### Problema 2: Checkout nao atualiza frete apos upsell
-Analisando o codigo, a logica de calculo do `deliveryFee` no `Checkout.tsx` (linhas 140-146) esta tecnicamente correta - ela usa `subtotal` reativo do `useCart()` e `zoneCheckResult` do estado. Quando o upsell adiciona um item, `subtotal` muda e `deliveryFee` recalcula.
-
-**Porem**: o display do "Gratis" so aparece se `zoneCheckResult?.freeDeliveryAbove` existir (linha 807). Se o cliente adicionou um endereco que validou a zona corretamente, deveria funcionar. O possivel problema e que `zoneCheckResult` pode estar `null` caso o endereco nao tenha sido validado antes do upsell, ou o `freeDeliveryAbove` da zona e `null`. Vou adicionar uma verificacao mais robusta e um feedback visual claro quando o frete muda para gratis apos upsell.
-
-### Problema 3: Campo "Taxa de Entrega" no Admin
-Este campo (`ConfigForm.tsx`, linhas 92-103) agora e redundante. Com as zonas de entrega configuradas no mapa, o frete e definido por zona. O campo fixo so serve como fallback para restaurantes SEM zonas configuradas.
-
-**Sugestao**: Transformar o campo em "Taxa de Entrega Padrao (fallback)" com uma nota explicativa, ou remove-lo e usar R$ 0 como fallback quando nao ha zonas.
+O objetivo e dar ao restaurante **controle total** sobre o que aparece como upsell, mantendo simplicidade.
 
 ---
 
-## Plano de Acao
+## Minha Recomendacao: O Que Priorizar
 
-### 1. RestaurantCard - Mostrar faixa de frete das zonas
+Analisando suas 12 sugestoes, vou classificar por **impacto vs. complexidade**:
 
-**Arquivo**: `src/components/marketplace/RestaurantCard.tsx`
-- Buscar zonas de entrega do restaurante via query direta ao Supabase (similar ao que ja foi feito no `RestaurantDetails.tsx`)
-- Calcular min/max das taxas usando `getDeliveryFeeRange` de `useDeliveryZones.ts`
-- Exibir "Taxa: R$ 10,00 - R$ 15,00" quando houver faixa, ou valor unico se todas iguais
-- Fallback para `settings.delivery_fee` se nao houver zonas
+### FASE 1 -- Implementar agora (alto impacto, baixo custo)
+| Funcionalidade | Justificativa |
+|---|---|
+| Selecionar produtos de upsell manualmente | Core da funcionalidade. Sem isso, nada funciona |
+| Ativar/desativar upsell | Switch simples, essencial para controle |
+| Definir ordem de exibicao | Drag-and-drop ja existe no projeto (dnd-kit instalado) |
+| Limite de ate 10 produtos | Regra simples no frontend |
+| Valor minimo do carrinho | Um campo numerico, filtra no frontend |
+| Integracao com frete gratis | Ja existe a logica, so precisa conectar a mensagem "Adicione X e ganhe frete gratis" |
 
-**Abordagem**: Para evitar N+1 queries (uma por card), criar um hook ou query que busca zonas agrupadas por restaurante, ou fazer a query individualmente com cache do React Query (cada card faz sua query com `queryKey: ['delivery-zones-public', restaurantId]`).
+### FASE 2 -- Implementar depois (medio impacto, media complexidade)
+| Funcionalidade | Justificativa |
+|---|---|
+| Upsell por categoria | Requer logica condicional (se carrinho tem lanche, mostrar bebidas). Util mas pode esperar |
+| Horarios/dias da semana | Complexidade extra de agenda. A maioria dos restaurantes nao precisa disso imediatamente |
 
-### 2. Checkout - Garantir reatividade do frete gratis apos upsell
-
-**Arquivo**: `src/pages/Checkout.tsx`
-- Adicionar um `useEffect` que detecta quando `deliveryFee` muda de valor positivo para 0 (frete gratis atingido) e exibe um toast de congratulacao
-- Garantir que a condicao de display "Gratis" funcione mesmo quando `freeDeliveryAbove` nao esta explicitamente configurado na zona
-- O calculo ja e reativo; o foco e melhorar o feedback visual
-
-### 3. ConfigForm - Contextualizar o campo de frete
-
-**Arquivo**: `src/components/admin/ConfigForm.tsx`
-- Renomear label para "Taxa de Entrega Padrao (R$)"
-- Adicionar nota explicativa: "Usada apenas quando o endereco do cliente nao se enquadra em nenhuma zona de entrega configurada no mapa."
-- Verificar se o restaurante tem zonas configuradas e, se sim, mostrar um aviso: "Voce tem X zonas de entrega configuradas. A taxa sera calculada automaticamente pelo mapa."
+### NAO IMPLEMENTAR AGORA (alto custo, baixo retorno imediato)
+| Funcionalidade | Justificativa |
+|---|---|
+| Produtos mais vendidos automaticamente | Requer analytics de vendas por produto, queries complexas, e o beneficio e marginal vs. selecao manual |
+| Metricas de conversao de upsell | Requer tracking de eventos no banco, dashboards novos. Importante mas e fase 3 |
+| Diferentes upsells por unidade | O sistema ja e multi-tenant. Cada restaurante configura o seu proprio |
 
 ---
 
-## Secao Tecnica
+## Plano Tecnico -- FASE 1
 
-### Arquivo 1: `src/components/marketplace/RestaurantCard.tsx`
+### 1. Tabela `upsell_products` no banco
 
-- Importar `useQuery` e `supabase` para buscar zonas do restaurante
-- Importar `getDeliveryFeeRange` de `@/hooks/useDeliveryZones`
-- Adicionar query para buscar zonas ativas do restaurante especifico
-- Substituir `deliveryFee.toFixed(2)` por logica de faixa (min-max)
-- Usar `staleTime` longo para evitar refetch excessivo
+Nova tabela para armazenar os produtos selecionados como upsell:
 
-### Arquivo 2: `src/pages/Checkout.tsx`
+```text
+upsell_products
+- id (uuid, PK)
+- restaurant_id (uuid, FK restaurants)
+- product_id (uuid, FK products)
+- order_index (int, para ordenacao)
+- created_at (timestamp)
+```
 
-- Adicionar `useRef` para rastrear o valor anterior de `deliveryFee`
-- Adicionar `useEffect` que compara `prevDeliveryFee > 0` com `deliveryFee === 0` e mostra toast: "Voce ganhou entrega gratis!"
-- Isso cobre o cenario de upsell onde o subtotal ultrapassa o `freeDeliveryAbove`
+Configuracoes gerais ficam no campo `settings` (JSON) da tabela `restaurants`:
+```text
+settings.upsell_enabled: boolean (default true)
+settings.upsell_min_cart_value: number (default 0)
+```
 
-### Arquivo 3: `src/components/admin/ConfigForm.tsx`
+Isso evita criar uma tabela extra so para 2 campos de configuracao.
 
-- Importar `useDeliveryZones` para verificar se existem zonas configuradas
-- Alterar label do campo de "Taxa de Entrega (R$)" para "Taxa de Entrega Padrao (R$)"
-- Adicionar texto explicativo abaixo do campo
-- Se houver zonas configuradas, exibir badge informativo
+### 2. Componente Admin: `UpsellManager.tsx`
 
-### Resumo de arquivos alterados:
-1. `src/components/marketplace/RestaurantCard.tsx` - Faixa de frete das zonas
-2. `src/pages/Checkout.tsx` - Toast de frete gratis apos upsell
-3. `src/components/admin/ConfigForm.tsx` - Contextualizar campo de frete
+Nova secao na aba "Config" do admin (ou uma nova aba dedicada):
+
+- **Switch** para ativar/desativar upsell
+- **Campo numerico** para valor minimo do carrinho
+- **Lista de produtos** selecionados como upsell (com drag-and-drop para reordenar)
+- **Botao "Adicionar Produto"** que abre um seletor dos produtos ja cadastrados (filtrados por ativos)
+- Limite visual de 10 produtos
+- Botao de remover em cada produto
+
+### 3. Atualizar `UpsellSection.tsx` no Checkout
+
+A query atual busca produtos automaticamente. Vai mudar para:
+
+```text
+Se upsell_enabled E existem produtos na tabela upsell_products:
+  - Buscar esses produtos especificos na ordem configurada
+  - Filtrar os que ja estao no carrinho
+  - Aplicar filtro de valor minimo do carrinho
+Senao (fallback):
+  - Manter a logica automatica atual (categorias diferentes)
+```
+
+Isso garante que restaurantes que nao configuraram upsell manual continuam vendo sugestoes automaticas.
+
+### 4. Mensagem de frete gratis no upsell
+
+Quando o cliente esta proximo do valor de frete gratis:
+- Cada card de upsell que, ao ser adicionado, faria o subtotal atingir o `freeDeliveryAbove`, recebe um badge: "Adicione e ganhe frete gratis!"
+
+### Resumo de arquivos
+
+1. **Migration SQL** -- Criar tabela `upsell_products` com RLS
+2. **`src/components/admin/UpsellManager.tsx`** -- Novo componente de gestao
+3. **`src/hooks/useUpsellProducts.ts`** -- Novo hook para CRUD dos upsell products
+4. **`src/pages/Admin.tsx`** -- Adicionar a secao de upsell (nova aba ou dentro de Config)
+5. **`src/components/checkout/UpsellSection.tsx`** -- Atualizar query para priorizar produtos manuais
+6. **`src/components/admin/ConfigForm.tsx`** -- Adicionar campos upsell_enabled e upsell_min_cart_value
+
+### RLS da nova tabela
+
+- SELECT: publico (anon pode ler para exibir no checkout)
+- INSERT/UPDATE/DELETE: apenas owner do restaurante (`is_restaurant_owner(auth.uid(), restaurant_id)`)
