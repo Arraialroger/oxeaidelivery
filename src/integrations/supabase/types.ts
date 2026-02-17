@@ -1144,6 +1144,45 @@ export type Database = {
           },
         ]
       }
+      upsell_products: {
+        Row: {
+          created_at: string
+          id: string
+          order_index: number
+          product_id: string
+          restaurant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_index?: number
+          product_id: string
+          restaurant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_index?: number
+          product_id?: string
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upsell_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsell_products_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null

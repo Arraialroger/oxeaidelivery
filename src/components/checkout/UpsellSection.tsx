@@ -1,28 +1,39 @@
 import { useState } from 'react';
-import { Plus, ShoppingBag } from 'lucide-react';
+import { Plus, ShoppingBag, Truck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
 import { useCart } from '@/contexts/CartContext';
 import type { CartItem, Product } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useUpsellProductsPublic } from '@/hooks/useUpsellProducts';
 
 interface UpsellSectionProps {
   cartItems: CartItem[];
+  freeDeliveryAbove?: number | null;
+  currentSubtotal?: number;
 }
 
-export function UpsellSection({ cartItems }: UpsellSectionProps) {
-  const { restaurantId } = useRestaurantContext();
+export function UpsellSection({ cartItems, freeDeliveryAbove, currentSubtotal }: UpsellSectionProps) {
+  const { restaurantId, settings } = useRestaurantContext();
   const { addItem } = useCart();
   const { toast } = useToast();
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
-  // Get category IDs already in cart to suggest from OTHER categories
+  const upsellEnabled = (settings as any)?.upsell_enabled ?? true;
+  const upsellMinCartValue = (settings as any)?.upsell_min_cart_value ?? 0;
+  const subtotal = currentSubtotal ?? cartItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+
+  // Fetch manually configured upsell products
+  const { data: manualProducts = [] } = useUpsellProductsPublic(restaurantId);
+
+  // Get category IDs already in cart to suggest from OTHER categories (fallback)
   const cartCategoryIds = [...new Set(cartItems.map(i => i.product.category_id).filter(Boolean))];
   const cartProductIds = cartItems.map(i => i.product.id);
 
-  const { data: suggestions = [] } = useQuery({
-    queryKey: ['upsell-products', restaurantId, cartCategoryIds.join(',')],
+  // Fallback: automatic suggestions
+  const { data: autoSuggestions = [] } = useQuery({
+    queryKey: ['upsell-products-auto', restaurantId, cartCategoryIds.join(',')],
     queryFn: async (): Promise<Product[]> => {
       if (!restaurantId) return [];
 
@@ -34,12 +45,9 @@ export function UpsellSection({ cartItems }: UpsellSectionProps) {
         .order('order_index', { ascending: true })
         .limit(8);
 
-      // Exclude products already in cart
       if (cartProductIds.length > 0) {
         query = query.not('id', 'in', `(${cartProductIds.join(',')})`);
       }
-
-      // Prefer products from different categories
       if (cartCategoryIds.length > 0) {
         query = query.not('category_id', 'in', `(${cartCategoryIds.join(',')})`);
       }
@@ -47,7 +55,6 @@ export function UpsellSection({ cartItems }: UpsellSectionProps) {
       const { data, error } = await query;
       if (error) throw error;
 
-      // If not enough from other categories, fetch from same categories too
       if ((data?.length || 0) < 4 && cartCategoryIds.length > 0) {
         const { data: sameCategory } = await supabase
           .from('products')
@@ -66,8 +73,17 @@ export function UpsellSection({ cartItems }: UpsellSectionProps) {
 
       return (data || []).slice(0, 6);
     },
-    enabled: !!restaurantId && cartItems.length > 0,
+    // Only run fallback if no manual products configured
+    enabled: !!restaurantId && cartItems.length > 0 && manualProducts.length === 0,
   });
+
+  // Decide which products to show
+  const useManual = upsellEnabled && manualProducts.length > 0;
+  const suggestions = (useManual ? manualProducts : autoSuggestions)
+    .filter(p => !cartProductIds.includes(p.id));
+
+  // Check min cart value
+  if (upsellMinCartValue > 0 && subtotal < upsellMinCartValue && useManual) return null;
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
@@ -79,6 +95,12 @@ export function UpsellSection({ cartItems }: UpsellSectionProps) {
       title: 'Adicionado!',
       description: `${product.name} foi adicionado ao pedido.`,
     });
+  };
+
+  // Check if adding a product would reach free delivery threshold
+  const wouldGetFreeDelivery = (productPrice: number) => {
+    if (!freeDeliveryAbove || subtotal >= freeDeliveryAbove) return false;
+    return subtotal + productPrice >= freeDeliveryAbove;
   };
 
   if (suggestions.length === 0) return null;
@@ -93,16 +115,23 @@ export function UpsellSection({ cartItems }: UpsellSectionProps) {
       <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
         {suggestions.map((product) => {
           const wasAdded = addedIds.has(product.id);
+          const givesFreeDelivery = wouldGetFreeDelivery(product.price);
           return (
             <div
               key={product.id}
-              className="flex-shrink-0 w-32 rounded-xl border border-border/50 bg-card overflow-hidden"
+              className="flex-shrink-0 w-32 rounded-xl border border-border/50 bg-card overflow-hidden relative"
             >
+              {givesFreeDelivery && (
+                <div className="absolute top-0 left-0 right-0 bg-green-600 text-white text-[10px] font-bold text-center py-0.5 flex items-center justify-center gap-1 z-10">
+                  <Truck className="w-3 h-3" />
+                  Frete grátis!
+                </div>
+              )}
               {product.image_url && (
                 <img
                   src={product.image_url}
                   alt={product.name}
-                  className="w-full h-20 object-cover"
+                  className={`w-full h-20 object-cover ${givesFreeDelivery ? 'mt-0' : ''}`}
                   loading="lazy"
                 />
               )}
