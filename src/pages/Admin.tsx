@@ -16,7 +16,8 @@ import { DashboardPanel } from '@/components/admin/DashboardPanel';
 import { DeliveryZonesManager } from '@/components/admin/DeliveryZonesManager';
 import { CouponList } from '@/components/admin/CouponList';
 import { CouponForm } from '@/components/admin/CouponForm';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag } from 'lucide-react';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag } from 'lucide-react';
+import { UpsellManager } from '@/components/admin/UpsellManager';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -88,7 +89,7 @@ export default function Admin() {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 lg:px-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-9">
+          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-10">
             <TabsTrigger value="dashboard" className="gap-2">
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -120,6 +121,10 @@ export default function Admin() {
             <TabsTrigger value="profile" className="gap-2">
               <Store className="w-4 h-4" />
               <span className="hidden sm:inline">Perfil</span>
+            </TabsTrigger>
+            <TabsTrigger value="upsell" className="gap-2">
+              <ShoppingBag className="w-4 h-4" />
+              <span className="hidden sm:inline">Upsell</span>
             </TabsTrigger>
             <TabsTrigger value="config" className="gap-2">
               <Settings className="w-4 h-4" />
@@ -222,6 +227,11 @@ export default function Admin() {
           {/* Profile Tab */}
           <TabsContent value="profile">
             <RestaurantProfileForm />
+          </TabsContent>
+
+          {/* Upsell Tab */}
+          <TabsContent value="upsell">
+            <UpsellManager />
           </TabsContent>
 
           {/* Config Tab */}

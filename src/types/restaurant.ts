@@ -25,6 +25,8 @@ export interface RestaurantSettings {
   loyalty_stamps_goal: number;
   loyalty_min_order: number;
   loyalty_reward_value: number;
+  upsell_enabled?: boolean;
+  upsell_min_cart_value?: number;
 }
 
 export const DEFAULT_SETTINGS: RestaurantSettings = {

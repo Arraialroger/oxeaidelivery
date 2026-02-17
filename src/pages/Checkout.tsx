@@ -769,7 +769,7 @@ export default function Checkout() {
             )}
 
             {/* Upsell Suggestions */}
-            <UpsellSection cartItems={items} />
+            <UpsellSection cartItems={items} freeDeliveryAbove={zoneCheckResult?.freeDeliveryAbove} currentSubtotal={subtotal} />
 
             {/* Order Summary */}
             <div className="mt-6 p-4 bg-secondary rounded-xl">
