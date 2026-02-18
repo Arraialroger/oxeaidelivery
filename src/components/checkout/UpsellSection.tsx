@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, ShoppingBag, Truck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +7,7 @@ import { useCart } from '@/contexts/CartContext';
 import type { CartItem, Product } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUpsellProductsPublic } from '@/hooks/useUpsellProducts';
+import { useUpsellTracking } from '@/hooks/useUpsellTracking';
 
 interface UpsellSectionProps {
   cartItems: CartItem[];
@@ -19,6 +20,8 @@ export function UpsellSection({ cartItems, freeDeliveryAbove, currentSubtotal }:
   const { addItem } = useCart();
   const { toast } = useToast();
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const { trackImpression, trackAdded } = useUpsellTracking();
+  const impressionsTracked = useRef(false);
 
   const upsellEnabled = (settings as any)?.upsell_enabled ?? true;
   const upsellMinCartValue = (settings as any)?.upsell_min_cart_value ?? 0;
@@ -82,8 +85,13 @@ export function UpsellSection({ cartItems, freeDeliveryAbove, currentSubtotal }:
   const suggestions = (useManual ? manualProducts : autoSuggestions)
     .filter(p => !cartProductIds.includes(p.id));
 
-  // Check min cart value
-  if (upsellMinCartValue > 0 && subtotal < upsellMinCartValue && useManual) return null;
+  // Track impressions once when suggestions are shown
+  useEffect(() => {
+    if (suggestions.length > 0 && !impressionsTracked.current) {
+      impressionsTracked.current = true;
+      suggestions.forEach(p => trackImpression(p.id, p.price));
+    }
+  }, [suggestions, trackImpression]);
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
@@ -91,6 +99,7 @@ export function UpsellSection({ cartItems, freeDeliveryAbove, currentSubtotal }:
   const handleAdd = (product: Product) => {
     addItem(product, 1, [], '');
     setAddedIds(prev => new Set(prev).add(product.id));
+    trackAdded(product.id, product.price);
     toast({
       title: 'Adicionado!',
       description: `${product.name} foi adicionado ao pedido.`,
@@ -102,6 +111,9 @@ export function UpsellSection({ cartItems, freeDeliveryAbove, currentSubtotal }:
     if (!freeDeliveryAbove || subtotal >= freeDeliveryAbove) return false;
     return subtotal + productPrice >= freeDeliveryAbove;
   };
+
+  // Check min cart value
+  if (upsellMinCartValue > 0 && subtotal < upsellMinCartValue && useManual) return null;
 
   if (suggestions.length === 0) return null;
 

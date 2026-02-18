@@ -8,6 +8,7 @@ import { formatPrice } from '@/lib/formatUtils';
 import { OrdersChart } from './OrdersChart';
 import { AddressModeChart } from './AddressModeChart';
 import { InactiveCustomersPanel } from './InactiveCustomersPanel';
+import { UpsellMetricsPanel } from './UpsellMetricsPanel';
 import { PeakHoursChart } from './PeakHoursChart';
 import { DemandHeatmap } from './DemandHeatmap';
 import { DashboardDateFilter, getDefaultDateRange, type DateRange } from './DashboardDateFilter';
@@ -349,6 +350,9 @@ export function DashboardPanel() {
 
           {/* Address Mode Chart */}
           <AddressModeChart dateRange={dateRange} />
+
+          {/* Upsell Metrics */}
+          <UpsellMetricsPanel dateRange={dateRange} />
 
           {/* Inactive Customers */}
           <InactiveCustomersPanel />
