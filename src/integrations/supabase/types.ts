@@ -1144,6 +1144,54 @@ export type Database = {
           },
         ]
       }
+      upsell_events: {
+        Row: {
+          created_at: string
+          customer_phone: string | null
+          event_type: string
+          id: string
+          product_id: string
+          product_price: number
+          restaurant_id: string
+          session_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_phone?: string | null
+          event_type: string
+          id?: string
+          product_id: string
+          product_price?: number
+          restaurant_id: string
+          session_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_phone?: string | null
+          event_type?: string
+          id?: string
+          product_id?: string
+          product_price?: number
+          restaurant_id?: string
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upsell_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsell_events_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       upsell_products: {
         Row: {
           created_at: string
