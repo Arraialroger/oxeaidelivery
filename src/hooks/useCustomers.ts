@@ -11,6 +11,7 @@ export interface CustomerWithStats {
   last_order_date: string | null;
   total_spent: number;
   order_count: number;
+  stamps_count: number;
 }
 
 export function useCustomers(filterType?: 'local' | 'tourist' | 'all') {
@@ -58,6 +59,7 @@ export function useCustomers(filterType?: 'local' | 'tourist' | 'all') {
             last_order_date: lastOrderDate,
             total_spent: totalSpent,
             order_count: orderCount,
+            stamps_count: customer.stamps_count || 0,
           };
         })
       );

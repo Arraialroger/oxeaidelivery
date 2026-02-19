@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Filter, Users, MapPin, Plane, LogOut } from 'lucide-react';
+import { ArrowLeft, Download, Filter, Users, MapPin, Plane, LogOut, Stamp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCustomers, useUpdateCustomerType, CustomerWithStats } from '@/hooks/useCustomers';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
+import StampAdjustmentDialog from '@/components/admin/StampAdjustmentDialog';
 
 export default function AdminCustomers() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function AdminCustomers() {
   const { user, isAdmin, loading, signOut } = useAuth();
   const { toast } = useToast();
   const [filterType, setFilterType] = useState<'all' | 'local' | 'tourist'>('all');
+  const [stampCustomer, setStampCustomer] = useState<{ id: string; name: string | null; phone: string; stamps_count: number } | null>(null);
   
   const { data: customers, isLoading } = useCustomers(filterType);
   const updateCustomerType = useUpdateCustomerType();
@@ -203,6 +205,7 @@ export default function AdminCustomers() {
                       <TableHead>Nome</TableHead>
                       <TableHead>Telefone</TableHead>
                       <TableHead>Tipo</TableHead>
+                      <TableHead>Selos</TableHead>
                       <TableHead>Último Pedido</TableHead>
                       <TableHead className="text-right">Total Gasto</TableHead>
                     </TableRow>
@@ -236,8 +239,23 @@ export default function AdminCustomers() {
                             </SelectContent>
                           </Select>
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 h-8"
+                            onClick={() => setStampCustomer({
+                              id: customer.id,
+                              name: customer.name,
+                              phone: customer.phone,
+                              stamps_count: customer.stamps_count,
+                            })}
+                          >
+                            <Stamp className="w-3 h-3" />
+                            {customer.stamps_count}
+                          </Button>
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {formatDate(customer.last_order_date)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatPrice(customer.total_spent)}
@@ -259,6 +277,12 @@ export default function AdminCustomers() {
           </CardContent>
         </Card>
       </main>
+
+      <StampAdjustmentDialog
+        open={!!stampCustomer}
+        onOpenChange={(open) => { if (!open) setStampCustomer(null); }}
+        customer={stampCustomer}
+      />
     </div>
   );
 }
