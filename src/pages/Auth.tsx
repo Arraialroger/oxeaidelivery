@@ -98,12 +98,13 @@ export default function Auth() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
   const { restaurant } = useRestaurantContext();
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp, resendConfirmation } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showResendFor, setShowResendFor] = useState('');
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -179,15 +180,18 @@ export default function Auth() {
     }
 
     setIsSubmitting(true);
-    const { error: authError } = await signUp(signupEmail, signupPassword, {
+    const { data, error: authError } = await signUp(signupEmail, signupPassword, {
       name: signupName,
       phone: signupPhoneDigits,
     }, slug);
 
+    setIsSubmitting(false);
+
     if (authError) {
-      setIsSubmitting(false);
       if (authError.message.includes('User already registered')) {
-        setError('Este e-mail já está cadastrado');
+        setError('Este e-mail já está cadastrado. Tente fazer login.');
+        setActiveTab('login');
+        setLoginEmail(signupEmail);
       } else if (authError.message.includes('Password should be at least')) {
         setError('A senha deve ter pelo menos 6 caracteres');
       } else {
@@ -196,8 +200,15 @@ export default function Auth() {
       return;
     }
 
-    setIsSubmitting(false);
+    // Check if user already exists but hasn't confirmed email (identities is empty)
+    if (data?.user && data.user.identities && data.user.identities.length === 0) {
+      setError('Este e-mail já está cadastrado mas não foi confirmado.');
+      setShowResendFor(signupEmail);
+      return;
+    }
+
     setSuccessMessage('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+    setShowResendFor(signupEmail);
     setSignupName('');
     setSignupPhone('');
     setSignupPhoneDigits('');
@@ -269,6 +280,30 @@ export default function Auth() {
                 <Alert className="mb-4 border-primary/50 bg-primary/10">
                   <AlertDescription className="text-primary">{successMessage}</AlertDescription>
                 </Alert>
+              )}
+
+              {/* Resend confirmation button */}
+              {showResendFor && (
+                <div className="mb-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={async () => {
+                      const { error: resendError } = await resendConfirmation(showResendFor, slug);
+                      if (resendError) {
+                        setError('Erro ao reenviar e-mail. Tente novamente em alguns minutos.');
+                      } else {
+                        setSuccessMessage('E-mail de confirmação reenviado! Verifique sua caixa de entrada.');
+                        setError('');
+                      }
+                    }}
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Reenviar e-mail de confirmação
+                  </Button>
+                </div>
               )}
 
               {/* Login Tab */}

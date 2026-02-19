@@ -76,7 +76,7 @@ export function useAuth() {
   ) => {
     const redirectPath = restaurantSlug ? `/${restaurantSlug}/account` : '/';
     const redirectUrl = `${window.location.origin}${redirectPath}`;
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -87,6 +87,17 @@ export function useAuth() {
           restaurant_slug: restaurantSlug,
         },
       },
+    });
+    return { data, error };
+  };
+
+  const resendConfirmation = async (email: string, restaurantSlug?: string) => {
+    const redirectPath = restaurantSlug ? `/${restaurantSlug}/account` : '/';
+    const redirectUrl = `${window.location.origin}${redirectPath}`;
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: redirectUrl },
     });
     return { error };
   };
@@ -104,5 +115,6 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    resendConfirmation,
   };
 }
