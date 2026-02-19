@@ -19,6 +19,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
 import Index from "./pages/Index";
 import RestaurantDetails from "./pages/RestaurantDetails";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -52,7 +53,8 @@ const App = () => (
               <Route path="termos" element={<TermsOfUse />} />
             </Route>
             
-            {/* Global pages (no restaurant context needed - fallback) */}
+            {/* Global pages */}
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacidade" element={<PrivacyPolicy />} />
             <Route path="/termos" element={<TermsOfUse />} />
             
