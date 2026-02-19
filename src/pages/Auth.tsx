@@ -37,6 +37,63 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
+function ForgotPasswordLink() {
+  const [sent, setSent] = useState(false);
+  const [email, setFpEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [fpError, setFpError] = useState('');
+
+  const handleReset = async () => {
+    if (!email || !email.includes('@')) {
+      setFpError('Informe um e-mail válido');
+      return;
+    }
+    setSending(true);
+    setFpError('');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setSending(false);
+    if (error) {
+      setFpError('Erro ao enviar e-mail. Tente novamente.');
+    } else {
+      setSent(true);
+    }
+  };
+
+  if (sent) {
+    return <p className="text-sm text-center text-primary mt-3">E-mail enviado! Verifique sua caixa de entrada.</p>;
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      <button
+        type="button"
+        className="text-sm text-muted-foreground hover:text-primary transition-colors w-full text-center"
+        onClick={() => {
+          const el = document.getElementById('forgot-pw-section');
+          if (el) el.classList.toggle('hidden');
+        }}
+      >
+        Esqueci minha senha
+      </button>
+      <div id="forgot-pw-section" className="hidden space-y-2">
+        <Input
+          type="email"
+          placeholder="Digite seu e-mail"
+          value={email}
+          onChange={(e) => setFpEmail(e.target.value)}
+        />
+        {fpError && <p className="text-sm text-destructive">{fpError}</p>}
+        <Button type="button" variant="outline" className="w-full" onClick={handleReset} disabled={sending}>
+          {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Enviar link de recuperação
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function Auth() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
@@ -263,6 +320,8 @@ export default function Auth() {
                       'Entrar'
                     )}
                   </Button>
+
+                  <ForgotPasswordLink />
                 </form>
               </TabsContent>
 
