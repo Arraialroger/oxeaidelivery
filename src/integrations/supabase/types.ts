@@ -848,6 +848,128 @@ export type Database = {
           },
         ]
       }
+      payment_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          payment_id: string
+          provider_status: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          payment_id: string
+          provider_status?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          payment_id?: string
+          provider_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string | null
+          metadata: Json | null
+          order_id: string | null
+          paid_at: string | null
+          payment_method: string
+          pix_expiration_date: string | null
+          pix_qr_code: string | null
+          pix_qr_code_base64: string | null
+          provider: string
+          provider_payment_id: string | null
+          provider_raw: Json | null
+          provider_status: string | null
+          refund_amount: number | null
+          refund_reason: string | null
+          restaurant_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json | null
+          order_id?: string | null
+          paid_at?: string | null
+          payment_method?: string
+          pix_expiration_date?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
+          provider?: string
+          provider_payment_id?: string | null
+          provider_raw?: Json | null
+          provider_status?: string | null
+          refund_amount?: number | null
+          refund_reason?: string | null
+          restaurant_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json | null
+          order_id?: string | null
+          paid_at?: string | null
+          payment_method?: string
+          pix_expiration_date?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
+          provider?: string
+          provider_payment_id?: string | null
+          provider_raw?: Json | null
+          provider_status?: string | null
+          refund_amount?: number | null
+          refund_reason?: string | null
+          restaurant_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           created_at: string
