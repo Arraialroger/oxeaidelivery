@@ -1,10 +1,13 @@
 import { useState, useMemo } from "react";
-import { Loader2, Store, Utensils } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, Store, Utensils, Plus } from "lucide-react";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { RestaurantCard } from "@/components/marketplace/RestaurantCard";
 import { CategoryFilter } from "@/components/marketplace/CategoryFilter";
 import { SearchBar, LocationHeader } from "@/components/marketplace/SearchBar";
+import { Button } from "@/components/ui/button";
 export default function Index() {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const {
@@ -39,7 +42,18 @@ export default function Index() {
                 <p className="text-xs text-muted-foreground">O delivery de Arraial d’Ajuda</p>
               </div>
             </div>
-            <LocationHeader />
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => navigate('/onboarding')}
+                className="gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Criar Restaurante</span>
+                <span className="sm:hidden">Criar</span>
+              </Button>
+              <LocationHeader />
+            </div>
           </div>
 
           <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Buscar restaurantes, pratos..." />
