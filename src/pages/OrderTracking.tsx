@@ -9,6 +9,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useConfig } from '@/hooks/useConfig';
+import { useRestaurantContext } from '@/contexts/RestaurantContext';
 
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
@@ -83,9 +84,10 @@ const statusSteps = [
 ];
 
 export default function OrderTracking() {
-  const { orderId, slug } = useParams<{ orderId: string; slug: string }>();
+  const { orderId } = useParams<{ orderId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { restaurantId, slug } = useRestaurantContext();
   const [order, setOrder] = useState<OrderData | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,6 +156,8 @@ export default function OrderTracking() {
     const fetchOrder = async () => {
       if (!orderId) return;
 
+      if (!restaurantId) return;
+
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
@@ -178,6 +182,7 @@ export default function OrderTracking() {
           )
         `)
         .eq('id', orderId)
+        .eq('restaurant_id', restaurantId)
         .maybeSingle();
 
       if (orderError) {
@@ -225,7 +230,7 @@ export default function OrderTracking() {
     };
 
     fetchOrder();
-  }, [orderId]);
+  }, [orderId, restaurantId]);
 
   // Detectar quando selo é ganho e mostrar celebração
   useEffect(() => {
