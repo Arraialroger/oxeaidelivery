@@ -11,6 +11,7 @@ import { InactiveCustomersPanel } from './InactiveCustomersPanel';
 import { UpsellMetricsPanel } from './UpsellMetricsPanel';
 import { PeakHoursChart } from './PeakHoursChart';
 import { DemandHeatmap } from './DemandHeatmap';
+import { TopProductsRanking } from './TopProductsRanking';
 import { DashboardDateFilter, getDefaultDateRange, type DateRange } from './DashboardDateFilter';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -341,6 +342,9 @@ export function DashboardPanel() {
             newPrevious={metrics.customers.newCustomersPrevious}
             returningPrevious={metrics.customers.returningCustomersPrevious}
           />
+
+          {/* Top Products Ranking */}
+          <TopProductsRanking dateRange={dateRange} />
 
           {/* Peak Hours Chart */}
           <PeakHoursChart dateRange={dateRange} />
