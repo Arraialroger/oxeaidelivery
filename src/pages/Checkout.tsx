@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowLeft, User, MapPin, CreditCard, Check } from "lucide-react";
+import { PixPaymentModal } from "@/components/checkout/PixPaymentModal";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,7 @@ import { CouponInput } from "@/components/checkout/CouponInput";
 import { UpsellSection } from "@/components/checkout/UpsellSection";
 import type { Coupon } from "@/hooks/useCoupons";
 
-type PaymentMethod = "pix" | "card" | "cash";
+type PaymentMethod = "pix_online" | "pix" | "card" | "cash";
 type AddressMode = "map" | "manual";
 
 import { formatPhone, getPhoneDigits, isValidPhone } from "@/lib/phoneUtils";
@@ -52,6 +53,8 @@ export default function Checkout() {
   const [useReward, setUseReward] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
+  const [showPixModal, setShowPixModal] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
 
   // Step 1: Customer Info
   const [name, setName] = useState("");
@@ -116,7 +119,7 @@ export default function Checkout() {
   const { trackEvent, logDeliveryAttempt } = useCheckoutEvents();
 
   // Step 3: Payment
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix_online");
   const [changeAmount, setChangeAmount] = useState("");
   const [checkoutTracked, setCheckoutTracked] = useState(false);
 
@@ -398,6 +401,7 @@ export default function Checkout() {
       }
 
       // 3. Create order with restaurant_id (include loyalty_discount if using reward)
+      const orderStatus = paymentMethod === "pix_online" ? "pending" : "pending";
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -410,7 +414,7 @@ export default function Checkout() {
           total,
           loyalty_discount: loyaltyDiscount,
           stamp_redeemed: useReward && canUseReward,
-          status: "pending",
+          status: orderStatus,
           restaurant_id: restaurantId,
           coupon_id: appliedCoupon?.id || null,
           coupon_discount: couponDiscount,
@@ -494,6 +498,15 @@ export default function Checkout() {
       fbTrackPurchase(order.id, purchaseItems, total);
       trackAddressMode(addressMode, 'completed');
       fbTrackAddressMode(addressMode, 'completed');
+      trackEvent("order_completed", "confirmation", { orderId: order.id, paymentMethod, total });
+
+      // If PIX online, open modal instead of navigating
+      if (paymentMethod === "pix_online") {
+        setCreatedOrderId(order.id);
+        setShowPixModal(true);
+        setIsSubmitting(false);
+        return;
+      }
 
       clearCart();
 
@@ -697,6 +710,7 @@ export default function Checkout() {
 
             <div className="flex flex-col gap-2">
               {[
+                { value: "pix_online", label: "Pix Online (na hora)", icon: "⚡" },
                 { value: "pix", label: "Pix na entrega", icon: "📱" },
                 { value: "card", label: "Cartão na entrega", icon: "💳" },
                 { value: "cash", label: "Dinheiro na entrega", icon: "💵" },
@@ -897,6 +911,31 @@ export default function Checkout() {
           </div>
         )}
       </div>
+      {/* PIX Payment Modal */}
+      {showPixModal && createdOrderId && restaurantId && (
+        <PixPaymentModal
+          isOpen={showPixModal}
+          orderId={createdOrderId}
+          restaurantId={restaurantId}
+          amount={total}
+          slug={slug || ''}
+          onClose={() => {
+            setShowPixModal(false);
+            // Navigate to order tracking even if payment not completed
+            clearCart();
+            navigate(`/${slug}/order/${createdOrderId}?new=true`);
+          }}
+          onPaymentApproved={() => {
+            setShowPixModal(false);
+            clearCart();
+            toast({
+              title: "Pagamento aprovado! ✅",
+              description: "Seu pedido está sendo preparado.",
+            });
+            navigate(`/${slug}/order/${createdOrderId}?new=true`);
+          }}
+        />
+      )}
     </div>
   );
 }
