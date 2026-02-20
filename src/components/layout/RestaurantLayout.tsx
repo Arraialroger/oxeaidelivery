@@ -2,9 +2,11 @@ import { Outlet } from 'react-router-dom';
 import { RestaurantProvider, useRestaurantContext } from '@/contexts/RestaurantContext';
 import RestaurantNotFound from '@/pages/RestaurantNotFound';
 import { Loader2 } from 'lucide-react';
+import { useRestaurantHead } from '@/hooks/useRestaurantHead';
 
 function RestaurantLayoutContent() {
-  const { isLoading, notFound, slug } = useRestaurantContext();
+  const { isLoading, notFound, slug, restaurant } = useRestaurantContext();
+  useRestaurantHead(restaurant);
 
   if (isLoading) {
     return (
