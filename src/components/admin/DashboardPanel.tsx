@@ -12,6 +12,7 @@ import { UpsellMetricsPanel } from './UpsellMetricsPanel';
 import { PeakHoursChart } from './PeakHoursChart';
 import { DemandHeatmap } from './DemandHeatmap';
 import { TopProductsRanking } from './TopProductsRanking';
+import { ActivationChecklist } from './ActivationChecklist';
 import { DashboardDateFilter, getDefaultDateRange, type DateRange } from './DashboardDateFilter';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -183,7 +184,7 @@ function LoadingSkeleton() {
   );
 }
 
-export function DashboardPanel() {
+export function DashboardPanel({ onNavigateTab }: { onNavigateTab?: (tab: string) => void }) {
   const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange);
   const { data: metrics, isLoading, error } = useDashboardMetrics(dateRange);
 
@@ -281,6 +282,9 @@ export function DashboardPanel() {
 
   return (
     <div className="space-y-4">
+      {/* Activation Checklist */}
+      <ActivationChecklist onNavigateTab={onNavigateTab} />
+
       {/* Date Filter + Export */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <DashboardDateFilter value={dateRange} onChange={setDateRange} />

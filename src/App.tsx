@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
 import Index from "./pages/Index";
+import Onboarding from "./pages/Onboarding";
 import RestaurantDetails from "./pages/RestaurantDetails";
 import ResetPassword from "./pages/ResetPassword";
 
@@ -33,6 +34,7 @@ const App = () => (
           <Routes>
             {/* Landing / Home page */}
             <Route path="/" element={<Index />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             
             {/* Restaurant details/info page (outside RestaurantLayout for lighter context) */}
             <Route path="/:slug/info" element={<RestaurantDetails />} />
