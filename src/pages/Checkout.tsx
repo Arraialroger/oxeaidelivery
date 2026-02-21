@@ -49,6 +49,7 @@ export default function Checkout() {
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false); // Double-click guard
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [useReward, setUseReward] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -318,6 +319,13 @@ export default function Checkout() {
   }, [step, trackEvent]);
 
   const handleSubmitOrder = async () => {
+    // Double-click guard
+    if (submittingRef.current) {
+      console.log("[CHECKOUT] Blocked duplicate submission");
+      return;
+    }
+    submittingRef.current = true;
+
     if (import.meta.env.DEV) {
       console.log("[CHECKOUT] Iniciando handleSubmitOrder, items:", items.length);
     }
@@ -532,6 +540,7 @@ export default function Checkout() {
       });
     } finally {
       setIsSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
