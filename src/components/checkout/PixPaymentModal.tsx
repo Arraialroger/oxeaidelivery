@@ -16,7 +16,7 @@ interface PixPaymentModalProps {
   onPaymentApproved: () => void;
 }
 
-type PixState = 'loading' | 'ready' | 'polling' | 'approved' | 'rejected' | 'error';
+type PixState = 'loading' | 'ready' | 'approved' | 'rejected' | 'error';
 
 export function PixPaymentModal({
   isOpen,
@@ -74,43 +74,69 @@ export function PixPaymentModal({
     }
   }, [orderId, restaurantId, amount, toast]);
 
-  // Start polling for payment status
+  // Realtime + Polling fallback for payment status
   useEffect(() => {
-    if (state !== 'ready' || !paymentId) return;
+    if (!paymentId) return;
 
-    setState('polling');
+    let isActive = true;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+    const handleStatusChange = (status: string) => {
+      if (!isActive) return;
+      if (status === 'approved') {
+        setState('approved');
+        setTimeout(() => onPaymentApproved(), 2000);
+      } else if (status === 'rejected') {
+        setState('rejected');
+      }
+    };
+
+    // 1. Realtime subscription
+    const channel = supabase
+      .channel(`pix-payment:${paymentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'payments',
+          filter: `id=eq.${paymentId}`,
+        },
+        (payload) => {
+          const newStatus = (payload.new as any)?.status;
+          console.log('[PIX-RT] Realtime event received:', newStatus);
+          handleStatusChange(newStatus);
+        }
+      )
+      .subscribe((status) => {
+        console.log('[PIX-RT] Channel status:', status);
+      });
+
+    // 2. Polling fallback every 5s
     const poll = async () => {
+      if (!isActive) return;
       try {
         const { data: payment } = await supabase
           .from('payments')
           .select('status')
           .eq('id', paymentId)
           .single();
-
-        if (payment?.status === 'approved') {
-          setState('approved');
-          if (pollingRef.current) clearInterval(pollingRef.current);
-          // Auto-redirect after 2s
-          setTimeout(() => onPaymentApproved(), 2000);
-        } else if (payment?.status === 'rejected') {
-          setState('rejected');
-          if (pollingRef.current) clearInterval(pollingRef.current);
-        }
+        console.log('[PIX-POLL] Polling result:', payment?.status);
+        if (payment?.status) handleStatusChange(payment.status);
       } catch {
-        // Silent fail on poll
+        // Silent fail
       }
     };
 
-    // Poll every 3 seconds
-    pollingRef.current = setInterval(poll, 3000);
-    // Also poll immediately
-    poll();
+    poll(); // immediate first check
+    pollInterval = setInterval(poll, 5000);
 
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
+      isActive = false;
+      supabase.removeChannel(channel);
+      if (pollInterval) clearInterval(pollInterval);
     };
-  }, [state, paymentId, onPaymentApproved]);
+  }, [paymentId, onPaymentApproved]);
 
   // Countdown timer
   useEffect(() => {
@@ -198,7 +224,7 @@ export function PixPaymentModal({
           )}
 
           {/* QR Code Ready / Polling */}
-          {(state === 'ready' || state === 'polling') && (
+          {state === 'ready' && (
             <div className="flex flex-col items-center gap-4">
               {/* Amount */}
               <div className="text-center">
