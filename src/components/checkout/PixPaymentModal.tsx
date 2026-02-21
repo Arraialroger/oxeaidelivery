@@ -18,6 +18,47 @@ interface PixPaymentModalProps {
 
 type PixState = 'loading' | 'ready' | 'approved' | 'rejected' | 'error';
 
+// localStorage helpers
+const PIX_STORAGE_KEY = (orderId: string) => `pix_pending_${orderId}`;
+
+interface PixStorageData {
+  paymentId: string;
+  pixQrCode: string | null;
+  pixQrCodeBase64: string | null;
+  expiresAt: string | null;
+  amount: number;
+  correlationId: string | null;
+  createdAt: string;
+}
+
+function savePixToStorage(orderId: string, data: PixStorageData) {
+  try {
+    localStorage.setItem(PIX_STORAGE_KEY(orderId), JSON.stringify(data));
+  } catch { /* silent */ }
+}
+
+function loadPixFromStorage(orderId: string): PixStorageData | null {
+  try {
+    const raw = localStorage.getItem(PIX_STORAGE_KEY(orderId));
+    if (!raw) return null;
+    const data = JSON.parse(raw) as PixStorageData;
+    // Check if expired
+    if (data.expiresAt && new Date(data.expiresAt) <= new Date()) {
+      localStorage.removeItem(PIX_STORAGE_KEY(orderId));
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function clearPixStorage(orderId: string) {
+  try {
+    localStorage.removeItem(PIX_STORAGE_KEY(orderId));
+  } catch { /* silent */ }
+}
+
 export function PixPaymentModal({
   isOpen,
   orderId,
@@ -34,13 +75,29 @@ export function PixPaymentModal({
   const [copied, setCopied] = useState(false);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>('');
+  const [correlationId, setCorrelationId] = useState<string | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<string>('disconnected');
+  const pollCountRef = useRef(0);
   const { toast } = useToast();
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Create PIX payment
+  // Create PIX payment (or restore from localStorage)
   const createPayment = useCallback(async () => {
+    // Try to restore from localStorage first
+    const cached = loadPixFromStorage(orderId);
+    if (cached) {
+      console.log(`[PIX] Restored from localStorage, paymentId=${cached.paymentId}`);
+      setPixQrCode(cached.pixQrCode);
+      setPixQrCodeBase64(cached.pixQrCodeBase64);
+      setPaymentId(cached.paymentId);
+      setCorrelationId(cached.correlationId);
+      if (cached.expiresAt) setExpiresAt(new Date(cached.expiresAt));
+      setState('ready');
+      return;
+    }
+
     setState('loading');
+    console.log(`[PIX] Creating payment for order=${orderId}, amount=${amount}`);
     try {
       const { data, error } = await supabase.functions.invoke('process-payment', {
         body: {
@@ -54,13 +111,27 @@ export function PixPaymentModal({
       if (error) throw error;
       if (!data) throw new Error('Empty response');
 
+      console.log(`[PIX] Payment created: paymentId=${data.payment_id}, cid=${data.correlation_id}`);
+
       setPixQrCode(data.pix_qr_code);
       setPixQrCodeBase64(data.pix_qr_code_base64);
       setPaymentId(data.payment_id);
+      setCorrelationId(data.correlation_id || null);
       
       if (data.pix_expiration_date) {
         setExpiresAt(new Date(data.pix_expiration_date));
       }
+
+      // Save to localStorage for recovery
+      savePixToStorage(orderId, {
+        paymentId: data.payment_id,
+        pixQrCode: data.pix_qr_code,
+        pixQrCodeBase64: data.pix_qr_code_base64,
+        expiresAt: data.pix_expiration_date || null,
+        amount,
+        correlationId: data.correlation_id || null,
+        createdAt: new Date().toISOString(),
+      });
 
       setState('ready');
     } catch (err) {
@@ -80,14 +151,18 @@ export function PixPaymentModal({
 
     let isActive = true;
     let pollInterval: ReturnType<typeof setInterval> | null = null;
+    pollCountRef.current = 0;
 
-    const handleStatusChange = (status: string) => {
+    const handleStatusChange = (status: string, source: string) => {
       if (!isActive) return;
+      console.log(`[PIX] Status change detected via ${source}: ${status}`);
       if (status === 'approved') {
         setState('approved');
+        clearPixStorage(orderId);
         setTimeout(() => onPaymentApproved(), 2000);
       } else if (status === 'rejected') {
         setState('rejected');
+        clearPixStorage(orderId);
       }
     };
 
@@ -104,39 +179,40 @@ export function PixPaymentModal({
         },
         (payload) => {
           const newStatus = (payload.new as any)?.status;
-          console.log('[PIX-RT] Realtime event received:', newStatus);
-          handleStatusChange(newStatus);
+          console.log(`[PIX-RT] Realtime event: status=${newStatus}`);
+          handleStatusChange(newStatus, 'realtime');
         }
       )
       .subscribe((status) => {
-        console.log('[PIX-RT] Channel status:', status);
+        setRealtimeStatus(status);
+        console.log(`[PIX-RT] Channel: ${status}`);
       });
 
     // 2. Polling fallback every 5s
     const poll = async () => {
       if (!isActive) return;
+      pollCountRef.current++;
       try {
         const { data: payment } = await supabase
           .from('payments')
           .select('status')
           .eq('id', paymentId)
           .single();
-        console.log('[PIX-POLL] Polling result:', payment?.status);
-        if (payment?.status) handleStatusChange(payment.status);
-      } catch {
-        // Silent fail
-      }
+        console.log(`[PIX-POLL] #${pollCountRef.current}: status=${payment?.status}`);
+        if (payment?.status) handleStatusChange(payment.status, 'polling');
+      } catch { /* silent */ }
     };
 
-    poll(); // immediate first check
+    poll();
     pollInterval = setInterval(poll, 5000);
 
     return () => {
       isActive = false;
       supabase.removeChannel(channel);
       if (pollInterval) clearInterval(pollInterval);
+      console.log(`[PIX] Cleanup: channel removed, polls=${pollCountRef.current}`);
     };
-  }, [paymentId, onPaymentApproved]);
+  }, [paymentId, onPaymentApproved, orderId]);
 
   // Countdown timer
   useEffect(() => {
@@ -148,6 +224,7 @@ export function PixPaymentModal({
       if (diff <= 0) {
         setTimeLeft('Expirado');
         setState('error');
+        clearPixStorage(orderId);
         if (timerRef.current) clearInterval(timerRef.current);
         return;
       }
@@ -162,7 +239,7 @@ export function PixPaymentModal({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [expiresAt]);
+  }, [expiresAt, orderId]);
 
   // Create payment on mount
   useEffect(() => {
@@ -171,12 +248,11 @@ export function PixPaymentModal({
     }
 
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [isOpen, orderId, createPayment]);
 
-  // Copy PIX code to clipboard
+  // Copy PIX code
   const handleCopy = async () => {
     if (!pixQrCode) return;
     try {
@@ -193,6 +269,18 @@ export function PixPaymentModal({
     }
   };
 
+  // Retry: clear storage and create new payment
+  const handleRetry = () => {
+    clearPixStorage(orderId);
+    setPaymentId(null);
+    setPixQrCode(null);
+    setPixQrCodeBase64(null);
+    setExpiresAt(null);
+    setTimeLeft('');
+    pollCountRef.current = 0;
+    createPayment();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -206,16 +294,25 @@ export function PixPaymentModal({
             <QrCode className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-bold text-foreground">Pagamento PIX</h2>
           </div>
-          {state !== 'approved' && (
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Realtime status indicator (DEV only) */}
+            {import.meta.env.DEV && (
+              <div className={cn(
+                'w-2 h-2 rounded-full',
+                realtimeStatus === 'SUBSCRIBED' ? 'bg-green-500' :
+                realtimeStatus === 'CHANNEL_ERROR' ? 'bg-red-500' : 'bg-yellow-500'
+              )} title={`RT: ${realtimeStatus}`} />
+            )}
+            {state !== 'approved' && (
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Loading */}
           {state === 'loading' && (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <Loader2 className="w-12 h-12 text-primary animate-spin" />
@@ -223,16 +320,13 @@ export function PixPaymentModal({
             </div>
           )}
 
-          {/* QR Code Ready / Polling */}
           {state === 'ready' && (
             <div className="flex flex-col items-center gap-4">
-              {/* Amount */}
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Valor a pagar</p>
                 <p className="text-2xl font-bold text-primary">{formatPrice(amount)}</p>
               </div>
 
-              {/* QR Code Image */}
               {pixQrCodeBase64 && (
                 <div className="bg-white p-4 rounded-xl">
                   <img
@@ -243,7 +337,6 @@ export function PixPaymentModal({
                 </div>
               )}
 
-              {/* Expiration timer */}
               {timeLeft && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="w-4 h-4" />
@@ -251,37 +344,25 @@ export function PixPaymentModal({
                 </div>
               )}
 
-              {/* Copy button */}
               {pixQrCode && (
                 <Button
                   onClick={handleCopy}
                   variant="outline"
-                  className={cn(
-                    'w-full gap-2',
-                    copied && 'border-primary text-primary'
-                  )}
+                  className={cn('w-full gap-2', copied && 'border-primary text-primary')}
                 >
                   {copied ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      Copiado!
-                    </>
+                    <><CheckCircle2 className="w-4 h-4" /> Copiado!</>
                   ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Copiar código PIX
-                    </>
+                    <><Copy className="w-4 h-4" /> Copiar código PIX</>
                   )}
                 </Button>
               )}
 
-              {/* Waiting indicator */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Aguardando pagamento...</span>
               </div>
 
-              {/* Instructions */}
               <div className="w-full mt-4 p-4 bg-secondary rounded-xl text-sm space-y-2">
                 <p className="font-medium text-foreground">Como pagar:</p>
                 <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
@@ -294,52 +375,46 @@ export function PixPaymentModal({
             </div>
           )}
 
-          {/* Approved */}
           {state === 'approved' && (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
                 <CheckCircle2 className="w-12 h-12 text-primary" />
               </div>
               <h3 className="text-xl font-bold text-foreground">Pagamento Aprovado!</h3>
-              <p className="text-muted-foreground text-center">
-                Seu pedido está sendo preparado.
-              </p>
+              <p className="text-muted-foreground text-center">Seu pedido está sendo preparado.</p>
               <p className="text-sm text-primary font-medium">{formatPrice(amount)}</p>
             </div>
           )}
 
-          {/* Rejected */}
           {state === 'rejected' && (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center">
                 <AlertCircle className="w-12 h-12 text-destructive" />
               </div>
               <h3 className="text-xl font-bold text-foreground">Pagamento Rejeitado</h3>
-              <p className="text-muted-foreground text-center">
-                O pagamento não foi aprovado. Tente novamente.
-              </p>
-              <Button onClick={createPayment} className="w-full">
-                Gerar novo PIX
-              </Button>
+              <p className="text-muted-foreground text-center">O pagamento não foi aprovado. Tente novamente.</p>
+              <Button onClick={handleRetry} className="w-full">Gerar novo PIX</Button>
             </div>
           )}
 
-          {/* Error */}
           {state === 'error' && (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center">
                 <AlertCircle className="w-12 h-12 text-destructive" />
               </div>
               <h3 className="text-xl font-bold text-foreground">Erro</h3>
-              <p className="text-muted-foreground text-center">
-                Não foi possível gerar o PIX. Tente novamente.
-              </p>
-              <Button onClick={createPayment} className="w-full">
-                Tentar novamente
-              </Button>
+              <p className="text-muted-foreground text-center">Não foi possível gerar o PIX. Tente novamente.</p>
+              <Button onClick={handleRetry} className="w-full">Tentar novamente</Button>
             </div>
           )}
         </div>
+
+        {/* Debug info (DEV only) */}
+        {import.meta.env.DEV && correlationId && (
+          <div className="px-4 pb-2 text-[10px] text-muted-foreground font-mono">
+            cid: {correlationId} | polls: {pollCountRef.current} | rt: {realtimeStatus}
+          </div>
+        )}
       </div>
     </div>
   );

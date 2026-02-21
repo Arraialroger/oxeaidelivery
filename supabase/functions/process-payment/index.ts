@@ -25,18 +25,11 @@ interface PaymentProvider {
     notificationUrl: string;
     idempotencyKey: string;
   }): Promise<PaymentResult>;
-
-  getPaymentStatus(providerPaymentId: string): Promise<{
-    status: string;
-    providerStatus: string;
-    raw: Record<string, unknown>;
-  }>;
 }
 
 // ─── Mercado Pago Implementation ──────────────────────────────────
 class MercadoPagoProvider implements PaymentProvider {
   private accessToken: string;
-
   constructor(accessToken: string) {
     this.accessToken = accessToken;
   }
@@ -55,9 +48,7 @@ class MercadoPagoProvider implements PaymentProvider {
       payment_method_id: "pix",
       external_reference: params.externalReference,
       notification_url: params.notificationUrl,
-      payer: {
-        email: params.payerEmail || "cliente@delivery.com",
-      },
+      payer: { email: params.payerEmail || "cliente@delivery.com" },
     };
 
     const response = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -72,58 +63,25 @@ class MercadoPagoProvider implements PaymentProvider {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error("[MP] Error creating payment:", response.status, errorBody);
       throw new Error(`Mercado Pago error: ${response.status} - ${errorBody}`);
     }
 
     const data = await response.json();
-
     return {
       providerPaymentId: String(data.id),
       status: this.mapStatus(data.status),
       pixQrCode: data.point_of_interaction?.transaction_data?.qr_code || null,
-      pixQrCodeBase64:
-        data.point_of_interaction?.transaction_data?.qr_code_base64 || null,
-      pixExpirationDate:
-        data.point_of_interaction?.transaction_data?.expiration_date || null,
-      raw: data,
-    };
-  }
-
-  async getPaymentStatus(providerPaymentId: string) {
-    const response = await fetch(
-      `https://api.mercadopago.com/v1/payments/${providerPaymentId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`MP status error: ${response.status} - ${errorBody}`);
-    }
-
-    const data = await response.json();
-    return {
-      status: this.mapStatus(data.status),
-      providerStatus: data.status,
+      pixQrCodeBase64: data.point_of_interaction?.transaction_data?.qr_code_base64 || null,
+      pixExpirationDate: data.point_of_interaction?.transaction_data?.expiration_date || null,
       raw: data,
     };
   }
 
   private mapStatus(mpStatus: string): string {
     const map: Record<string, string> = {
-      pending: "pending",
-      approved: "approved",
-      authorized: "approved",
-      in_process: "pending",
-      in_mediation: "pending",
-      rejected: "rejected",
-      cancelled: "rejected",
-      refunded: "refunded",
-      charged_back: "refunded",
+      pending: "pending", approved: "approved", authorized: "approved",
+      in_process: "pending", in_mediation: "pending", rejected: "rejected",
+      cancelled: "rejected", refunded: "refunded", charged_back: "refunded",
     };
     return map[mpStatus] || "pending";
   }
@@ -143,11 +101,11 @@ function getProvider(providerName: string): PaymentProvider {
 
 // ─── Rate Limiting ────────────────────────────────────────────────
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-function isRateLimited(ip: string, maxRequests = 10, windowMs = 60000): boolean {
+function isRateLimited(key: string, maxRequests = 10, windowMs = 60000): boolean {
   const now = Date.now();
-  const entry = rateLimitMap.get(ip);
+  const entry = rateLimitMap.get(key);
   if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + windowMs });
+    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
     return false;
   }
   entry.count++;
@@ -160,8 +118,14 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Generate correlation_id for end-to-end tracing
+  const correlationId = crypto.randomUUID().slice(0, 12);
+  const log = (action: string, detail?: unknown) =>
+    console.log(JSON.stringify({ fn: "process-payment", cid: correlationId, action, ...(detail ? { detail } : {}) }));
+
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
-  if (isRateLimited(clientIp)) {
+  if (isRateLimited(`ip:${clientIp}`)) {
+    log("rate_limited", { ip: clientIp });
     return new Response(
       JSON.stringify({ error: "Too many requests" }),
       { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -178,9 +142,11 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const { order_id, restaurant_id, amount, description, provider } = body;
+    log("request_received", { order_id, restaurant_id, amount, provider });
 
     // Validate required fields
     if (!order_id || !restaurant_id || !amount) {
+      log("validation_failed", { missing: { order_id: !order_id, restaurant_id: !restaurant_id, amount: !amount } });
       return new Response(
         JSON.stringify({ error: "Missing required fields: order_id, restaurant_id, amount" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -199,8 +165,56 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Generate idempotency key to prevent duplicate payments
-    const idempotencyKey = `${order_id}-${Date.now()}`;
+    // ── Security: Validate order exists and amount matches ──
+    const { data: orderData, error: orderError } = await supabase
+      .from("orders")
+      .select("id, total, status, restaurant_id")
+      .eq("id", order_id)
+      .eq("restaurant_id", restaurant_id)
+      .maybeSingle();
+
+    if (orderError || !orderData) {
+      log("order_not_found", { order_id, restaurant_id });
+      return new Response(
+        JSON.stringify({ error: "Order not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (orderData.status !== "pending") {
+      log("order_not_pending", { order_id, status: orderData.status });
+      return new Response(
+        JSON.stringify({ error: "Order is not pending" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate amount matches order total (anti-fraud)
+    if (Math.abs(Number(orderData.total) - amount) > 0.01) {
+      log("amount_mismatch", { order_total: orderData.total, requested: amount });
+      return new Response(
+        JSON.stringify({ error: "Amount does not match order total" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Rate limit per order_id (max 3 PIX per order) ──
+    if (isRateLimited(`order:${order_id}`, 3, 3600000)) {
+      log("order_rate_limited", { order_id });
+      return new Response(
+        JSON.stringify({ error: "Too many payment attempts for this order" }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Rate limit per restaurant (max 100 PIX/hour) ──
+    if (isRateLimited(`restaurant:${restaurant_id}`, 100, 3600000)) {
+      log("restaurant_rate_limited", { restaurant_id });
+      return new Response(
+        JSON.stringify({ error: "Too many payment requests" }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Check for existing pending payment for this order
     const { data: existingPayment } = await supabase
@@ -211,10 +225,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existingPayment) {
-      // Check if existing payment is still valid (not expired)
       if (existingPayment.pix_expiration_date) {
         const expDate = new Date(existingPayment.pix_expiration_date);
         if (expDate > new Date()) {
+          log("reusing_existing_pix", { payment_id: existingPayment.id });
           return new Response(
             JSON.stringify({
               payment_id: existingPayment.id,
@@ -222,6 +236,7 @@ Deno.serve(async (req) => {
               pix_qr_code_base64: existingPayment.pix_qr_code_base64,
               pix_expiration_date: existingPayment.pix_expiration_date,
               status: "pending",
+              correlation_id: correlationId,
             }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
@@ -232,10 +247,13 @@ Deno.serve(async (req) => {
     // Build webhook URL
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const notificationUrl = `${supabaseUrl}/functions/v1/payment-webhook`;
+    const idempotencyKey = `${order_id}-${Date.now()}`;
 
     // Create payment via provider
     const providerName = provider || "mercadopago";
     const paymentProvider = getProvider(providerName);
+
+    log("creating_pix", { provider: providerName });
 
     const result = await paymentProvider.createPixPayment({
       amount,
@@ -244,6 +262,8 @@ Deno.serve(async (req) => {
       notificationUrl,
       idempotencyKey,
     });
+
+    log("pix_created_at_provider", { provider_payment_id: result.providerPaymentId, status: result.status });
 
     // Save payment in DB
     const { data: payment, error: paymentError } = await supabase
@@ -267,7 +287,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (paymentError) {
-      console.error("[PAYMENT] DB insert error:", paymentError);
+      log("db_insert_error", { error: paymentError.message });
       throw new Error("Failed to save payment");
     }
 
@@ -276,10 +296,10 @@ Deno.serve(async (req) => {
       payment_id: payment.id,
       event_type: "payment_created",
       provider_status: result.raw?.status || "pending",
-      metadata: { provider: providerName, amount, order_id },
+      metadata: { provider: providerName, amount, order_id, correlation_id: correlationId },
     });
 
-    console.log(`[PAYMENT] Created payment ${payment.id} for order ${order_id}`);
+    log("payment_saved", { payment_id: payment.id });
 
     return new Response(
       JSON.stringify({
@@ -288,13 +308,14 @@ Deno.serve(async (req) => {
         pix_qr_code_base64: result.pixQrCodeBase64,
         pix_expiration_date: result.pixExpirationDate,
         status: result.status,
+        correlation_id: correlationId,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("[PAYMENT] Error:", error);
+    log("error", { message: error.message });
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: error.message || "Internal server error", correlation_id: correlationId }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

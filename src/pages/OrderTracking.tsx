@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2, Settings, Star, Gift } from 'lucide-react';
+import { Package, ChefHat, CheckCircle, Truck, ArrowLeft, Bike, XCircle, Bell, BellRing, Loader2, Settings, Star, Gift, QrCode } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { PWAInstallModal } from '@/components/pwa';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useConfig } from '@/hooks/useConfig';
 import { useRestaurantContext } from '@/contexts/RestaurantContext';
+import { PixPaymentModal } from '@/components/checkout/PixPaymentModal';
 
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
@@ -94,6 +95,7 @@ export default function OrderTracking() {
   const [showPWAModal, setShowPWAModal] = useState(false);
   const [customerStamps, setCustomerStamps] = useState<CustomerStamps | null>(null);
   const [showStampCelebration, setShowStampCelebration] = useState(false);
+  const [showPixModal, setShowPixModal] = useState(false);
   const { toast } = useToast();
   
   const { data: config } = useConfig();
@@ -476,6 +478,24 @@ export default function OrderTracking() {
           })()
         )}
         
+        {/* PIX Payment Recovery Banner */}
+        {order?.payment_method === 'pix_online' && order?.status === 'pending' && !showPixModal && (
+          <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <QrCode className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">Pagamento pendente</p>
+                <p className="text-xs text-muted-foreground">Conclua o pagamento PIX para confirmar seu pedido</p>
+              </div>
+              <Button size="sm" onClick={() => setShowPixModal(true)}>
+                Pagar
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Cancelled Status */}
         {isCancelled && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6">
@@ -620,6 +640,22 @@ export default function OrderTracking() {
           </p>
         </div>
       </div>
+
+      {/* PIX Payment Modal (recovery) */}
+      {showPixModal && orderId && order && (
+        <PixPaymentModal
+          isOpen={showPixModal}
+          orderId={orderId}
+          restaurantId={restaurantId}
+          amount={order.total || 0}
+          slug={slug}
+          onClose={() => setShowPixModal(false)}
+          onPaymentApproved={() => {
+            setShowPixModal(false);
+            toast({ title: 'Pagamento aprovado!', description: 'Seu pedido está sendo preparado.' });
+          }}
+        />
+      )}
 
       {/* PWA Install Modal - After Order */}
       <PWAInstallModal
