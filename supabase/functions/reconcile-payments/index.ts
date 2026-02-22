@@ -15,6 +15,19 @@ Deno.serve(async (req) => {
   const log = (action: string, detail?: unknown) =>
     console.log(JSON.stringify({ fn: "reconcile-payments", cid: correlationId, action, ...(detail ? { detail } : {}) }));
 
+  // ── Auth guard: validate CRON_SECRET_KEY ──
+  const authHeader = req.headers.get("authorization");
+  const cronSecret = Deno.env.get("CRON_SECRET_KEY");
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    log("auth_failed", { has_header: !!authHeader });
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  log("auth_ok");
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
