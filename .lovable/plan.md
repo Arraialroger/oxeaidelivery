@@ -77,3 +77,52 @@ Quando o pagamento PIX for aprovado:
 4. Apos 2 segundos, redireciona para a tela de acompanhamento
 5. Se o Realtime falhar, o polling detecta em ate 5 segundos
 
+---
+
+# Hardening V1 - Auditoria Tecnica Concluida
+
+## Implementado
+
+### Alta Prioridade (feito)
+1. **Alerta visual cron inativo (>15min)** - PaymentMonitorPanel exibe banner vermelho pulsante
+2. **Filtros `restaurant_id` explícitos** - Todas queries e subscriptions Realtime no usePaymentMonitor
+3. **RLS `reconciliation_runs` atualizado** - Filtro por `restaurant_id` ou NULL (runs globais)
+4. **`restaurant_id` nos runs direcionados** - Edge Function extrai e salva nos registros
+
+### Média Prioridade (feito)
+5. **Deduplicação alertas `high_failure_rate`** - Verifica existência antes de criar novo
+6. **Otimização N+1** - Batch fetch de orders em vez de queries individuais
+
+### Health-Check Automático (feito)
+7. **Edge Function `health-check`** - Valida:
+   - Última execução do cron
+   - Pagamentos aprovados sem reconciliação
+   - PIX expirados pendentes
+   - Alertas críticos não resolvidos
+   - Gera alertas automáticos para issues críticas
+
+## Pendente (configurar manualmente)
+
+### Cron do health-check
+Executar no SQL Editor do Supabase:
+```sql
+SELECT cron.schedule(
+  'health-check-every-10min',
+  '*/10 * * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://xcogccusyerkvoimfxeb.supabase.co/functions/v1/health-check',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer REPLACE_WITH_CRON_SECRET_KEY"}'::jsonb,
+    body := '{}'::jsonb,
+    timeout_milliseconds := 10000
+  ) AS request_id;
+  $$
+);
+```
+
+## Próximos Riscos Antes do Multi-tenant Mercado Pago
+
+1. **Credenciais MP por restaurante** - `restaurant_payment_settings` precisa de validação
+2. **Webhook routing** - Um único endpoint precisa rotear para o restaurante correto
+3. **Advisory lock** - Opcional, para evitar reconciliações simultâneas
+4. **Error tracking** - Integrar Sentry ou similar para erros persistentes
