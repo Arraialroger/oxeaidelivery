@@ -1218,6 +1218,59 @@ export type Database = {
           },
         ]
       }
+      reconciliation_runs: {
+        Row: {
+          alert_count: number
+          correlation_id: string | null
+          duration_ms: number
+          errors: string | null
+          executed_at: string
+          expired_count: number
+          fixed_count: number
+          id: string
+          restaurant_id: string | null
+          status: string
+          target_order_id: string | null
+          target_payment_id: string | null
+        }
+        Insert: {
+          alert_count?: number
+          correlation_id?: string | null
+          duration_ms?: number
+          errors?: string | null
+          executed_at?: string
+          expired_count?: number
+          fixed_count?: number
+          id?: string
+          restaurant_id?: string | null
+          status?: string
+          target_order_id?: string | null
+          target_payment_id?: string | null
+        }
+        Update: {
+          alert_count?: number
+          correlation_id?: string | null
+          duration_ms?: number
+          errors?: string | null
+          executed_at?: string
+          expired_count?: number
+          fixed_count?: number
+          id?: string
+          restaurant_id?: string | null
+          status?: string
+          target_order_id?: string | null
+          target_payment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_runs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_clicks: {
         Row: {
           created_at: string
