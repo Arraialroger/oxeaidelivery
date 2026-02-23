@@ -16,8 +16,9 @@ import { DashboardPanel } from '@/components/admin/DashboardPanel';
 import { DeliveryZonesManager } from '@/components/admin/DeliveryZonesManager';
 import { CouponList } from '@/components/admin/CouponList';
 import { CouponForm } from '@/components/admin/CouponForm';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag } from 'lucide-react';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag, Activity } from 'lucide-react';
 import { UpsellManager } from '@/components/admin/UpsellManager';
+import { PaymentMonitorPanel } from '@/components/admin/PaymentMonitorPanel';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -89,7 +90,7 @@ export default function Admin() {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 lg:px-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-10">
+          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-11">
             <TabsTrigger value="dashboard" className="gap-2">
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -125,6 +126,10 @@ export default function Admin() {
             <TabsTrigger value="upsell" className="gap-2">
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline">Upsell</span>
+            </TabsTrigger>
+            <TabsTrigger value="monitor" className="gap-2">
+              <Activity className="w-4 h-4" />
+              <span className="hidden sm:inline">Monitor</span>
             </TabsTrigger>
             <TabsTrigger value="config" className="gap-2">
               <Settings className="w-4 h-4" />
@@ -232,6 +237,14 @@ export default function Admin() {
           {/* Upsell Tab */}
           <TabsContent value="upsell">
             <UpsellManager />
+          </TabsContent>
+
+          {/* Monitor Tab */}
+          <TabsContent value="monitor" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Monitor de Pagamentos</h2>
+            </div>
+            <PaymentMonitorPanel />
           </TabsContent>
 
           {/* Config Tab */}
