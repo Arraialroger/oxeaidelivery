@@ -29,7 +29,6 @@ Deno.serve(async (req) => {
   if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
     log("auth_ok", { method: "cron_secret" });
   } else if (authHeader?.startsWith("Bearer ")) {
-    // Try to validate as admin JWT
     const token = authHeader.replace("Bearer ", "");
     const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") || supabaseServiceKey);
     const { data: { user }, error: userError } = await anonClient.auth.getUser(token);
@@ -42,7 +41,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check admin role
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -87,6 +85,7 @@ Deno.serve(async (req) => {
     let fixedCount = 0;
     let expiredCount = 0;
     let alertCount = 0;
+    let targetRestaurantId: string | null = null;
 
     // ── 1. Fix orphan payments: approved payment + pending order ──
     let orphanQuery = supabase
@@ -103,47 +102,57 @@ Deno.serve(async (req) => {
 
     const { data: orphanPayments } = await orphanQuery;
 
-    if (orphanPayments) {
+    if (orphanPayments && orphanPayments.length > 0) {
+      // Extract restaurant_id for targeted runs
+      if (isTargeted) {
+        targetRestaurantId = orphanPayments[0].restaurant_id;
+      }
+
+      // Batch fetch orders to avoid N+1
+      const orderIds = orphanPayments.map(p => p.order_id!).filter(Boolean);
+      const { data: orders } = await supabase
+        .from("orders")
+        .select("id, status")
+        .in("id", orderIds)
+        .eq("status", "pending");
+
+      const pendingOrderMap = new Map((orders || []).map(o => [o.id, o]));
+
       for (const payment of orphanPayments) {
-        const { data: order } = await supabase
+        const order = pendingOrderMap.get(payment.order_id!);
+        if (!order) continue;
+
+        log("fixing_orphan", { payment_id: payment.id, order_id: order.id });
+
+        const { error } = await supabase
           .from("orders")
-          .select("id, status")
-          .eq("id", payment.order_id!)
-          .single();
+          .update({ status: "preparing" })
+          .eq("id", order.id)
+          .eq("status", "pending");
 
-        if (order && order.status === "pending") {
-          log("fixing_orphan", { payment_id: payment.id, order_id: order.id });
+        if (!error) {
+          fixedCount++;
+          await supabase.from("payment_events").insert({
+            payment_id: payment.id,
+            event_type: "reconciliation_fix",
+            provider_status: "approved",
+            metadata: { action: "order_status_corrected", order_id: order.id, correlation_id: correlationId, triggered_by: isAdminCall ? "admin" : "cron" },
+          });
 
-          const { error } = await supabase
-            .from("orders")
-            .update({ status: "preparing" })
-            .eq("id", order.id)
-            .eq("status", "pending");
+          await supabase.from("kds_events").insert({
+            order_id: order.id,
+            restaurant_id: payment.restaurant_id,
+            event: "order_paid",
+          });
 
-          if (!error) {
-            fixedCount++;
-            await supabase.from("payment_events").insert({
-              payment_id: payment.id,
-              event_type: "reconciliation_fix",
-              provider_status: "approved",
-              metadata: { action: "order_status_corrected", order_id: order.id, correlation_id: correlationId, triggered_by: isAdminCall ? "admin" : "cron" },
-            });
-
-            await supabase.from("kds_events").insert({
-              order_id: order.id,
-              restaurant_id: payment.restaurant_id,
-              event: "order_paid",
-            });
-
-            await supabase.from("payment_alerts").insert({
-              restaurant_id: payment.restaurant_id,
-              alert_type: "status_mismatch_fixed",
-              severity: "warning",
-              message: `Pedido ${order.id.slice(0, 8)} corrigido automaticamente (pagamento aprovado mas pedido estava pendente)`,
-              metadata: { payment_id: payment.id, order_id: order.id, correlation_id: correlationId },
-            });
-            alertCount++;
-          }
+          await supabase.from("payment_alerts").insert({
+            restaurant_id: payment.restaurant_id,
+            alert_type: "status_mismatch_fixed",
+            severity: "warning",
+            message: `Pedido ${order.id.slice(0, 8)} corrigido automaticamente (pagamento aprovado mas pedido estava pendente)`,
+            metadata: { payment_id: payment.id, order_id: order.id, correlation_id: correlationId },
+          });
+          alertCount++;
         }
 
         // Fix missing paid_at
@@ -184,7 +193,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── 3. Check for high failure rate (last 30 min) ──
+      // ── 3. Check for high failure rate (last 30 min) with dedup ──
       const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
       const { data: recentPayments } = await supabase
         .from("payments")
@@ -202,15 +211,29 @@ Deno.serve(async (req) => {
 
         for (const [restaurantId, stats] of byRestaurant) {
           if (stats.total >= 3 && stats.failed / stats.total > 0.3) {
-            await supabase.from("payment_alerts").insert({
-              restaurant_id: restaurantId,
-              alert_type: "high_failure_rate",
-              severity: "critical",
-              message: `Alta taxa de falha: ${stats.failed}/${stats.total} pagamentos falharam nos últimos 30 min`,
-              metadata: { ...stats, correlation_id: correlationId },
-            });
-            alertCount++;
-            log("high_failure_rate", { restaurant_id: restaurantId, ...stats });
+            // Dedup: check if active alert already exists for this restaurant
+            const { data: existingAlert } = await supabase
+              .from("payment_alerts")
+              .select("id")
+              .eq("restaurant_id", restaurantId)
+              .eq("alert_type", "high_failure_rate")
+              .eq("resolved", false)
+              .gte("created_at", thirtyMinAgo)
+              .maybeSingle();
+
+            if (!existingAlert) {
+              await supabase.from("payment_alerts").insert({
+                restaurant_id: restaurantId,
+                alert_type: "high_failure_rate",
+                severity: "critical",
+                message: `Alta taxa de falha: ${stats.failed}/${stats.total} pagamentos falharam nos últimos 30 min`,
+                metadata: { ...stats, correlation_id: correlationId },
+              });
+              alertCount++;
+              log("high_failure_rate", { restaurant_id: restaurantId, ...stats });
+            } else {
+              log("high_failure_rate_deduped", { restaurant_id: restaurantId, existing_alert: existingAlert.id });
+            }
           }
         }
       }
@@ -218,7 +241,7 @@ Deno.serve(async (req) => {
 
     const durationMs = Date.now() - startTime;
 
-    // ── Record execution ──
+    // ── Record execution (include restaurant_id for targeted runs) ──
     await supabase.from("reconciliation_runs").insert({
       status: "success",
       duration_ms: durationMs,
@@ -228,6 +251,7 @@ Deno.serve(async (req) => {
       correlation_id: correlationId,
       target_payment_id: targetPaymentId,
       target_order_id: targetOrderId,
+      restaurant_id: targetRestaurantId,
     });
 
     log("reconciliation_complete", { fixed: fixedCount, expired: expiredCount, alerts: alertCount, duration_ms: durationMs });
@@ -247,13 +271,12 @@ Deno.serve(async (req) => {
     const durationMs = Date.now() - startTime;
     log("error", { message: error.message });
 
-    // Record failed execution
     await supabase.from("reconciliation_runs").insert({
       status: "error",
       duration_ms: durationMs,
       errors: error.message,
       correlation_id: correlationId,
-    }).catch(() => {}); // Don't fail if logging fails
+    }).catch(() => {});
 
     return new Response(
       JSON.stringify({ error: error.message }),

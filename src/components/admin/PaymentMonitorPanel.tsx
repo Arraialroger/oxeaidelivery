@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertTriangle, CheckCircle2, XCircle, RefreshCw, Clock, Shield, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle, RefreshCw, Clock, Shield, Loader2, AlertOctagon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -36,17 +36,31 @@ export function PaymentMonitorPanel() {
     setSeverityFilter,
     resolveAlert,
     forceReconcile,
+    cronStale,
+    lastRunAge,
   } = usePaymentMonitor();
 
   const timeSinceLastRun = lastRun?.executed_at
     ? formatDistanceToNow(new Date(lastRun.executed_at), { locale: ptBR, addSuffix: true })
     : null;
 
-  const cronOk = lastRun?.status === 'success';
+  const cronOk = lastRun?.status === 'success' && !cronStale;
   const hasInconsistencies = inconsistentPayments.length > 0;
 
   return (
     <div className="space-y-6">
+      {/* Alerta de cron inativo */}
+      {cronStale && (
+        <Alert variant="destructive" className="border-red-500 bg-red-50 dark:bg-red-950/20">
+          <AlertOctagon className="h-4 w-4" />
+          <AlertTitle>⚠️ Cron de Reconciliação Inativo</AlertTitle>
+          <AlertDescription>
+            A última execução do cron foi há {Math.round(lastRunAge || 0)} minutos (limite: 15 min).
+            O sistema de reconciliação automática pode estar parado. Verifique o pg_cron no Supabase Dashboard.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Banner de inconsistência */}
       {hasInconsistencies && (
         <Alert variant="destructive">
@@ -78,15 +92,21 @@ export function PaymentMonitorPanel() {
                 <div className="flex items-center gap-1.5 mt-1">
                   {cronOk ? (
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  ) : cronStale ? (
+                    <AlertOctagon className="w-4 h-4 text-red-500 animate-pulse" />
                   ) : (
                     <XCircle className="w-4 h-4 text-red-500" />
                   )}
-                  <span className="text-sm font-medium">{cronOk ? 'OK' : 'Falhou'}</span>
+                  <span className="text-sm font-medium">
+                    {cronOk ? 'OK' : cronStale ? 'Inativo' : 'Falhou'}
+                  </span>
                 </div>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Última execução</p>
-                <p className="text-sm font-medium mt-1">{timeSinceLastRun}</p>
+                <p className={`text-sm font-medium mt-1 ${cronStale ? 'text-red-500' : ''}`}>
+                  {timeSinceLastRun}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Duração</p>
