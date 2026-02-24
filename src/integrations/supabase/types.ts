@@ -650,6 +650,75 @@ export type Database = {
           },
         ]
       }
+      notification_queue: {
+        Row: {
+          alert_id: string
+          attempts: number
+          body: string
+          channel: string
+          created_at: string
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          max_attempts: number
+          metadata: Json
+          recipient: string | null
+          restaurant_id: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+        }
+        Insert: {
+          alert_id: string
+          attempts?: number
+          body: string
+          channel?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          metadata?: Json
+          recipient?: string | null
+          restaurant_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+        }
+        Update: {
+          alert_id?: string
+          attempts?: number
+          body?: string
+          channel?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          metadata?: Json
+          recipient?: string | null
+          restaurant_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "payment_alerts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_events: {
         Row: {
           created_at: string
