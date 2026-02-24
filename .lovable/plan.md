@@ -1,118 +1,117 @@
 
 
-# Sprint 2 Fix: Realtime + Polling no PixPaymentModal
+# Camada de Notificacoes Externas com Protecao contra Duplicacao
 
-## Problema Identificado
+## Resumo
 
-O `PixPaymentModal.tsx` usa polling via `setInterval` para verificar o status do pagamento, mas tem um bug critico na logica de estados:
+Criar a tabela `notification_queue`, a Edge Function `process-notifications`, e o trigger `enqueue_critical_alert_notification()` com protecao de idempotencia em dois niveis: logica no trigger (NOT EXISTS) e indice UNIQUE no banco.
 
-1. O `useEffect` (linha 78) verifica `if (state !== 'ready') return`
-2. Imediatamente muda `state` para `'polling'` (linha 81)
-3. Como `state` esta nas dependencias do `useEffect`, ele re-executa
-4. Na re-execucao, `state === 'polling'` (nao e `ready`), entao faz `return`
-5. O cleanup da primeira execucao destroi o `setInterval`
-6. Resultado: polling nunca funciona efetivamente
+## Componentes
 
-Alem disso, **nao usa Supabase Realtime** apesar da tabela `payments` ja estar na publicacao `supabase_realtime`.
+### 1. Migracao SQL
 
-## Solucao
+**Tabela `notification_queue`:**
+- `id` uuid PK default gen_random_uuid()
+- `alert_id` uuid NOT NULL (FK para payment_alerts)
+- `restaurant_id` uuid
+- `channel` text default 'email' (email, whatsapp, slack)
+- `recipient` text nullable
+- `subject` text NOT NULL
+- `body` text NOT NULL
+- `status` text default 'pending' (pending, processing, sent, failed, skipped)
+- `attempts` integer default 0
+- `max_attempts` integer default 3
+- `last_attempt_at` timestamptz
+- `sent_at` timestamptz
+- `error_message` text
+- `metadata` jsonb default '{}'
+- `created_at` timestamptz default now()
 
-Reescrever o mecanismo de deteccao de pagamento no `PixPaymentModal.tsx` para usar:
+**Indice UNIQUE em `alert_id`:**
+- `CREATE UNIQUE INDEX idx_notification_queue_alert_id ON notification_queue(alert_id)`
+- Garante protecao a nivel de banco contra duplicacoes, mesmo em cenarios de concorrencia
 
-1. **Supabase Realtime como canal primario** -- recebe UPDATE instantaneamente
-2. **Polling como fallback** -- a cada 5 segundos, caso o Realtime falhe
-3. **Correcao do bug de estado** -- separar o estado de "pronto para exibir" do estado de "aguardando pagamento"
+**Indice para performance do worker:**
+- `CREATE INDEX idx_notification_queue_pending ON notification_queue(status, created_at) WHERE status = 'pending'`
 
-## Alteracoes
+**RLS:**
+- SELECT: admins podem ver notificacoes do seu restaurante (`restaurant_id = get_user_restaurant_id(auth.uid())`)
+- Sem INSERT/UPDATE/DELETE via frontend (apenas service role e trigger SECURITY DEFINER)
 
-### Arquivo: `src/components/checkout/PixPaymentModal.tsx`
-
-Substituir o `useEffect` de polling (linhas 77-113) por um novo `useEffect` que:
-
-1. **Cria um canal Realtime** com `supabase.channel(`pix-payment:${paymentId}`)` escutando `postgres_changes` na tabela `payments` filtrado por `id=eq.${paymentId}` para evento `UPDATE`
-2. Quando recebe payload com `status === 'approved'`:
-   - Muda estado para `'approved'`
-   - Dispara `onPaymentApproved()` apos 2 segundos
-3. Quando recebe `status === 'rejected'`:
-   - Muda estado para `'rejected'`
-4. **Inicia polling como fallback** com `setInterval` a cada 5 segundos (mesmo SELECT atual)
-5. O polling nao depende mais do `state` -- usa uma ref `isListeningRef` para controlar se deve continuar
-6. Cleanup: remove o canal Realtime e limpa o interval
-
-### Logica de estado corrigida:
+**Funcao trigger `enqueue_critical_alert_notification()`:**
 
 ```text
-'loading' -> createPayment() -> 'ready'
-'ready'   -> useEffect detecta paymentId != null -> inicia Realtime + polling (sem mudar estado)
-            -> Realtime/polling detecta approved -> 'approved' -> onPaymentApproved()
-            -> Realtime/polling detecta rejected -> 'rejected'
+CREATE FUNCTION enqueue_critical_alert_notification()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.severity = 'critical'
+     AND NEW.alert_type LIKE 'health_%'
+     AND NOT EXISTS (
+       SELECT 1 FROM notification_queue WHERE alert_id = NEW.id
+     )
+  THEN
+    INSERT INTO notification_queue (alert_id, restaurant_id, channel, subject, body, metadata)
+    VALUES (
+      NEW.id,
+      NEW.restaurant_id,
+      'email',
+      'Alerta Critico: ' || NEW.alert_type,
+      NEW.message,
+      jsonb_build_object('alert_type', NEW.alert_type, 'source', 'auto_trigger')
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 ```
 
-O estado `'polling'` sera removido. Os estados `'ready'` e visualmente "aguardando" serao o mesmo -- o indicador "Aguardando pagamento..." continuara aparecendo quando `state === 'ready'`.
+**Trigger:**
+- `AFTER INSERT ON payment_alerts FOR EACH ROW EXECUTE FUNCTION enqueue_critical_alert_notification()`
 
-### Mudancas especificas:
+A protecao contra duplicacao opera em dois niveis:
+1. **Logica**: `NOT EXISTS` no trigger evita tentativa de insert duplicado
+2. **Banco**: indice UNIQUE em `alert_id` como barreira final contra race conditions
 
-- Remover o estado `'polling'` do type `PixState`
-- Atualizar a condicao do JSX de `(state === 'ready' || state === 'polling')` para `state === 'ready'`
-- Novo useEffect com Realtime + polling fallback, dependencias: `[paymentId, onPaymentApproved]` (sem `state`)
-- Adicionar logs temporarios (`console.log`) para debug:
-  - `[PIX-RT] Channel subscribed`
-  - `[PIX-RT] Realtime event received: {status}`
-  - `[PIX-POLL] Polling result: {status}`
+### 2. Edge Function `process-notifications`
+
+- Autenticacao via `CRON_SECRET_KEY` (mesmo padrao de reconcile-payments e health-check)
+- Busca ate 20 registros com `status = 'pending'` e `attempts < max_attempts`
+- Para cada notificacao:
+  - Marca como `processing`
+  - Simula envio com log estruturado `[NOTIFY-SIM]`
+  - Marca como `sent` com `sent_at` ou incrementa `attempts` e registra `error_message`
+  - Se `attempts >= max_attempts`, marca como `failed`
+- Log com `correlation_id`, metricas de processamento
+- Totalmente assincrono, nao bloqueia nenhum fluxo
+
+### 3. Config.toml
+
+Adicionar entrada para `process-notifications` com `verify_jwt = false`.
+
+## Arquivos a Criar/Editar
+
+1. **Nova migracao SQL** -- tabela, indices, funcao trigger, RLS
+2. **`supabase/functions/process-notifications/index.ts`** -- Edge Function worker
+3. **`supabase/config.toml`** -- registro da nova funcao
 
 ## O que NAO muda
 
-- Criacao do pagamento (edge function `process-payment`)
-- Webhook (`payment-webhook`)
-- Tabela `payments` e suas policies
-- Fluxo do `Checkout.tsx` (onPaymentApproved, onClose)
-- UI do modal (QR code, timer, copy)
+- Fluxo de criacao de alertas (health-check, reconcile-payments)
+- PaymentMonitorPanel (sem mudancas visuais)
+- Nenhum provedor externo integrado
 
-## Resultado esperado
+## Acao Manual Apos Implementacao
 
-Quando o pagamento PIX for aprovado:
-1. O webhook atualiza a tabela `payments`
-2. O Realtime notifica o frontend em menos de 1 segundo
-3. O modal mostra "Pagamento Aprovado!" automaticamente
-4. Apos 2 segundos, redireciona para a tela de acompanhamento
-5. Se o Realtime falhar, o polling detecta em ate 5 segundos
+Configurar o pg_cron no SQL Editor:
 
----
-
-# Hardening V1 - Auditoria Tecnica Concluida
-
-## Implementado
-
-### Alta Prioridade (feito)
-1. **Alerta visual cron inativo (>15min)** - PaymentMonitorPanel exibe banner vermelho pulsante
-2. **Filtros `restaurant_id` explícitos** - Todas queries e subscriptions Realtime no usePaymentMonitor
-3. **RLS `reconciliation_runs` atualizado** - Filtro por `restaurant_id` ou NULL (runs globais)
-4. **`restaurant_id` nos runs direcionados** - Edge Function extrai e salva nos registros
-
-### Média Prioridade (feito)
-5. **Deduplicação alertas `high_failure_rate`** - Verifica existência antes de criar novo
-6. **Otimização N+1** - Batch fetch de orders em vez de queries individuais
-
-### Health-Check Automático (feito)
-7. **Edge Function `health-check`** - Valida:
-   - Última execução do cron
-   - Pagamentos aprovados sem reconciliação
-   - PIX expirados pendentes
-   - Alertas críticos não resolvidos
-   - Gera alertas automáticos para issues críticas
-
-## Pendente (configurar manualmente)
-
-### Cron do health-check
-Executar no SQL Editor do Supabase:
-```sql
+```text
 SELECT cron.schedule(
-  'health-check-every-10min',
-  '*/10 * * * *',
+  'process-notifications-every-2min',
+  '*/2 * * * *',
   $$
   SELECT net.http_post(
-    url := 'https://xcogccusyerkvoimfxeb.supabase.co/functions/v1/health-check',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer REPLACE_WITH_CRON_SECRET_KEY"}'::jsonb,
+    url := '<SUPABASE_URL>/functions/v1/process-notifications',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer CRON_SECRET_KEY"}'::jsonb,
     body := '{}'::jsonb,
     timeout_milliseconds := 10000
   ) AS request_id;
@@ -120,9 +119,3 @@ SELECT cron.schedule(
 );
 ```
 
-## Próximos Riscos Antes do Multi-tenant Mercado Pago
-
-1. **Credenciais MP por restaurante** - `restaurant_payment_settings` precisa de validação
-2. **Webhook routing** - Um único endpoint precisa rotear para o restaurante correto
-3. **Advisory lock** - Opcional, para evitar reconciliações simultâneas
-4. **Error tracking** - Integrar Sentry ou similar para erros persistentes
