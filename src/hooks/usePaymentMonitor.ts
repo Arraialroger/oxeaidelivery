@@ -181,10 +181,23 @@ export function usePaymentMonitor() {
       })
       .subscribe();
 
+    const notifChannel = supabase
+      .channel('monitor-notifications-pm')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'notification_queue',
+        filter: `restaurant_id=eq.${restaurantId}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['notification-queue'] });
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(alertsChannel);
       supabase.removeChannel(runsChannel);
       supabase.removeChannel(paymentsChannel);
+      supabase.removeChannel(notifChannel);
     };
   }, [queryClient, restaurantId]);
 

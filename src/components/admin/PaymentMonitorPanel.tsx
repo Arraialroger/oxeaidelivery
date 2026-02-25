@@ -1,4 +1,5 @@
 import { usePaymentMonitor } from '@/hooks/usePaymentMonitor';
+import { NotificationQueueSection } from './NotificationQueueSection';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -194,6 +195,9 @@ export function PaymentMonitorPanel() {
           )}
         </CardContent>
       </Card>
+
+      {/* Status das Notificações */}
+      <NotificationQueueSection />
 
       {/* Alertas do Sistema */}
       <Card>
