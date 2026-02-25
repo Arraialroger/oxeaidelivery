@@ -1,121 +1,176 @@
 
 
-# Camada de Notificacoes Externas com Protecao contra Duplicacao
+# Testes e Visibilidade da Fila de Notificacoes
 
 ## Resumo
 
-Criar a tabela `notification_queue`, a Edge Function `process-notifications`, e o trigger `enqueue_critical_alert_notification()` com protecao de idempotencia em dois niveis: logica no trigger (NOT EXISTS) e indice UNIQUE no banco.
+Adicionar camada de testes manuais, metricas e visibilidade em tempo real para a `notification_queue` no painel Monitor, sem integrar canais externos.
 
-## Componentes
-
-### 1. Migracao SQL
-
-**Tabela `notification_queue`:**
-- `id` uuid PK default gen_random_uuid()
-- `alert_id` uuid NOT NULL (FK para payment_alerts)
-- `restaurant_id` uuid
-- `channel` text default 'email' (email, whatsapp, slack)
-- `recipient` text nullable
-- `subject` text NOT NULL
-- `body` text NOT NULL
-- `status` text default 'pending' (pending, processing, sent, failed, skipped)
-- `attempts` integer default 0
-- `max_attempts` integer default 3
-- `last_attempt_at` timestamptz
-- `sent_at` timestamptz
-- `error_message` text
-- `metadata` jsonb default '{}'
-- `created_at` timestamptz default now()
-
-**Indice UNIQUE em `alert_id`:**
-- `CREATE UNIQUE INDEX idx_notification_queue_alert_id ON notification_queue(alert_id)`
-- Garante protecao a nivel de banco contra duplicacoes, mesmo em cenarios de concorrencia
-
-**Indice para performance do worker:**
-- `CREATE INDEX idx_notification_queue_pending ON notification_queue(status, created_at) WHERE status = 'pending'`
-
-**RLS:**
-- SELECT: admins podem ver notificacoes do seu restaurante (`restaurant_id = get_user_restaurant_id(auth.uid())`)
-- Sem INSERT/UPDATE/DELETE via frontend (apenas service role e trigger SECURITY DEFINER)
-
-**Funcao trigger `enqueue_critical_alert_notification()`:**
+## Arquitetura
 
 ```text
-CREATE FUNCTION enqueue_critical_alert_notification()
-RETURNS trigger AS $$
-BEGIN
-  IF NEW.severity = 'critical'
-     AND NEW.alert_type LIKE 'health_%'
-     AND NOT EXISTS (
-       SELECT 1 FROM notification_queue WHERE alert_id = NEW.id
-     )
-  THEN
-    INSERT INTO notification_queue (alert_id, restaurant_id, channel, subject, body, metadata)
-    VALUES (
-      NEW.id,
-      NEW.restaurant_id,
-      'email',
-      'Alerta Critico: ' || NEW.alert_type,
-      NEW.message,
-      jsonb_build_object('alert_type', NEW.alert_type, 'source', 'auto_trigger')
-    );
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
++----------------------------+
+| PaymentMonitorPanel        |
++----------------------------+
+| [Cards de Metricas]        |  <-- Pendentes, Falhadas, Taxa sucesso 24h, Ultima enviada
+| [Testes do Sistema]        |  <-- Botao "Disparar Health-check manual"
+| [Status do Sistema]        |  <-- Existente
+| [Pagamentos Inconsist.]    |  <-- Existente
+| [Status das Notificacoes]  |  <-- NOVO: tabela com filtros
+| [Alertas do Sistema]       |  <-- Existente
++----------------------------+
+         |
+         | Realtime subscription
+         v
++---------------------+
+| notification_queue   |
+| (filtro restaurant_id)
++---------------------+
 ```
 
-**Trigger:**
-- `AFTER INSERT ON payment_alerts FOR EACH ROW EXECUTE FUNCTION enqueue_critical_alert_notification()`
+## Componentes a Criar/Editar
 
-A protecao contra duplicacao opera em dois niveis:
-1. **Logica**: `NOT EXISTS` no trigger evita tentativa de insert duplicado
-2. **Banco**: indice UNIQUE em `alert_id` como barreira final contra race conditions
+### 1. Hook: `useNotificationQueue` (novo arquivo)
 
-### 2. Edge Function `process-notifications`
+`src/hooks/useNotificationQueue.ts`
 
-- Autenticacao via `CRON_SECRET_KEY` (mesmo padrao de reconcile-payments e health-check)
-- Busca ate 20 registros com `status = 'pending'` e `attempts < max_attempts`
-- Para cada notificacao:
-  - Marca como `processing`
-  - Simula envio com log estruturado `[NOTIFY-SIM]`
-  - Marca como `sent` com `sent_at` ou incrementa `attempts` e registra `error_message`
-  - Se `attempts >= max_attempts`, marca como `failed`
-- Log com `correlation_id`, metricas de processamento
-- Totalmente assincrono, nao bloqueia nenhum fluxo
+Responsabilidades:
+- Query de notificacoes com filtros de status e canal
+- Query de metricas agregadas (pendentes, falhadas, taxa sucesso 24h, ultima enviada)
+- Subscription Realtime na `notification_queue` com filtro `restaurant_id`
+- Mutation para disparar health-check manual via `supabase.functions.invoke('health-check')`
 
-### 3. Config.toml
+Queries:
+- **Lista**: `notification_queue` com filtros de `status` e `channel`, order by `created_at desc`, limit 50
+- **Metricas**: 3 queries count (pending, failed, sent nas ultimas 24h) + 1 query para ultima enviada
+- **Disparo manual**: `supabase.functions.invoke('health-check', { method: 'POST' })` -- usa JWT do admin automaticamente
 
-Adicionar entrada para `process-notifications` com `verify_jwt = false`.
+### 2. Componente: `NotificationQueueSection` (novo arquivo)
 
-## Arquivos a Criar/Editar
+`src/components/admin/NotificationQueueSection.tsx`
 
-1. **Nova migracao SQL** -- tabela, indices, funcao trigger, RLS
-2. **`supabase/functions/process-notifications/index.ts`** -- Edge Function worker
-3. **`supabase/config.toml`** -- registro da nova funcao
+Contem:
+- **Cards de metricas** (3 cards no topo):
+  - Fila: total pendentes + total falhadas
+  - Taxa de sucesso: % sent / (sent + failed) nas ultimas 24h
+  - Ultima enviada: data/hora + canal
+- **Botao de teste**: "Disparar Health-check manual" com loading e toast de feedback
+- **Tabela de notificacoes** com colunas: Canal, Status, Tentativas, Ultima tentativa, Tempo na fila, Erro
+- **Filtros**: Select de status (todos/pending/sent/failed) e canal (todos/email/whatsapp/slack)
+- **Badges coloridos**: pending=amarelo, processing=azul, sent=verde, failed=vermelho
+- **Skeleton loading** nos cards e tabela
+- **Estado vazio** amigavel
+
+### 3. Edicao: `PaymentMonitorPanel.tsx`
+
+- Importar e renderizar `NotificationQueueSection` entre os cards existentes e a tabela de alertas
+- Nenhuma logica movida, apenas composicao
+
+### 4. Edicao: `usePaymentMonitor.ts`
+
+- Adicionar subscription Realtime na `notification_queue` com filtro `restaurant_id`
+- Invalidar queries de notificacoes quando houver mudancas
+
+## Detalhamento Tecnico
+
+### Hook `useNotificationQueue`
+
+```text
+Queries:
+1. notificationsList:
+   SELECT * FROM notification_queue
+   WHERE restaurant_id = $restaurantId
+   [AND status = $statusFilter]
+   [AND channel = $channelFilter]
+   ORDER BY created_at DESC LIMIT 50
+
+2. pendingCount:
+   SELECT count(*) FROM notification_queue
+   WHERE restaurant_id = $restaurantId AND status = 'pending'
+
+3. failedCount:
+   SELECT count(*) FROM notification_queue
+   WHERE restaurant_id = $restaurantId AND status = 'failed'
+
+4. sentLast24h:
+   SELECT count(*) FROM notification_queue
+   WHERE restaurant_id = $restaurantId
+   AND status = 'sent'
+   AND sent_at >= now() - interval '24 hours'
+
+5. failedLast24h:
+   SELECT count(*) FROM notification_queue
+   WHERE restaurant_id = $restaurantId
+   AND status = 'failed'
+   AND created_at >= now() - interval '24 hours'
+
+6. lastSent:
+   SELECT * FROM notification_queue
+   WHERE restaurant_id = $restaurantId AND status = 'sent'
+   ORDER BY sent_at DESC LIMIT 1
+
+Mutation triggerHealthCheck:
+   supabase.functions.invoke('health-check', { method: 'POST' })
+   -- JWT do admin enviado automaticamente pelo SDK
+
+Realtime:
+   Channel 'monitor-notifications' on notification_queue
+   filter: restaurant_id=eq.$restaurantId
+   -> invalidate all notification queries
+```
+
+### Componente `NotificationQueueSection`
+
+Layout:
+- 3 cards em grid `grid-cols-1 sm:grid-cols-3`
+- Botao de teste em card separado "Testes do Sistema"
+- Tabela com overflow-x-auto
+- Filtros inline no header da tabela
+
+Status badges:
+- `pending` -> Badge variant="secondary" com cor amarela
+- `processing` -> Badge com cor azul
+- `sent` -> Badge com cor verde (outline)
+- `failed` -> Badge variant="destructive"
+
+### Realtime no `usePaymentMonitor`
+
+Adicionar um 4o canal de subscription:
+
+```text
+const notifChannel = supabase
+  .channel('monitor-notifications')
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'notification_queue',
+    filter: `restaurant_id=eq.${restaurantId}`,
+  }, () => {
+    queryClient.invalidateQueries({ queryKey: ['notification-queue'] });
+  })
+  .subscribe();
+```
+
+### Seguranca
+
+- Health-check ja aceita JWT de admin (verificado no codigo existente)
+- Nenhum secret exposto no frontend
+- RLS da notification_queue ja configurado para SELECT por admins do restaurante
+- Filtro explicito de restaurant_id em todas as queries (defesa em profundidade)
+
+## Arquivos
+
+| Arquivo | Acao |
+|---------|------|
+| `src/hooks/useNotificationQueue.ts` | Criar |
+| `src/components/admin/NotificationQueueSection.tsx` | Criar |
+| `src/components/admin/PaymentMonitorPanel.tsx` | Editar (adicionar NotificationQueueSection) |
+| `src/hooks/usePaymentMonitor.ts` | Editar (adicionar Realtime da notification_queue) |
 
 ## O que NAO muda
 
-- Fluxo de criacao de alertas (health-check, reconcile-payments)
-- PaymentMonitorPanel (sem mudancas visuais)
+- Nenhuma migracao SQL necessaria (tabela e indices ja existem)
+- Edge Functions inalteradas
 - Nenhum provedor externo integrado
-
-## Acao Manual Apos Implementacao
-
-Configurar o pg_cron no SQL Editor:
-
-```text
-SELECT cron.schedule(
-  'process-notifications-every-2min',
-  '*/2 * * * *',
-  $$
-  SELECT net.http_post(
-    url := '<SUPABASE_URL>/functions/v1/process-notifications',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer CRON_SECRET_KEY"}'::jsonb,
-    body := '{}'::jsonb,
-    timeout_milliseconds := 10000
-  ) AS request_id;
-  $$
-);
-```
+- RLS ja configurado corretamente
 
