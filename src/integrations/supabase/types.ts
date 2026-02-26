@@ -751,6 +751,53 @@ export type Database = {
           },
         ]
       }
+      order_audit_log: {
+        Row: {
+          correlation_id: string
+          created_at: string
+          customer_phone: string | null
+          error_message: string | null
+          id: string
+          idempotency_key: string
+          metadata: Json
+          restaurant_id: string
+          status: string
+          total: number | null
+        }
+        Insert: {
+          correlation_id: string
+          created_at?: string
+          customer_phone?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key: string
+          metadata?: Json
+          restaurant_id: string
+          status: string
+          total?: number | null
+        }
+        Update: {
+          correlation_id?: string
+          created_at?: string
+          customer_phone?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string
+          metadata?: Json
+          restaurant_id?: string
+          status?: string
+          total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_audit_log_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_item_options: {
         Row: {
           id: string
@@ -833,6 +880,7 @@ export type Database = {
           customer_id: string | null
           delivery_fee: number | null
           id: string
+          idempotency_key: string | null
           loyalty_discount: number | null
           payment_method: string | null
           pix_proof_url: string | null
@@ -854,6 +902,7 @@ export type Database = {
           customer_id?: string | null
           delivery_fee?: number | null
           id?: string
+          idempotency_key?: string | null
           loyalty_discount?: number | null
           payment_method?: string | null
           pix_proof_url?: string | null
@@ -875,6 +924,7 @@ export type Database = {
           customer_id?: string | null
           delivery_fee?: number | null
           id?: string
+          idempotency_key?: string | null
           loyalty_discount?: number | null
           payment_method?: string | null
           pix_proof_url?: string | null
@@ -1723,6 +1773,7 @@ export type Database = {
       }
       cleanup_expired_push_subscriptions: { Args: never; Returns: undefined }
       cleanup_expired_sms_codes: { Args: never; Returns: undefined }
+      create_order_transaction: { Args: { p_data: Json }; Returns: Json }
       get_user_restaurant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
