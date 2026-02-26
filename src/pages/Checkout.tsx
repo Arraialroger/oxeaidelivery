@@ -10,10 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCart } from "@/contexts/CartContext";
 import { useConfig } from "@/hooks/useConfig";
 import { useCustomerStamps } from "@/hooks/useCustomerStamps";
-import { useLoyaltyRedemption } from "@/hooks/useLoyaltyRedemption";
 import { LoyaltyRewardBanner } from "@/components/loyalty/LoyaltyRewardBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useCheckoutSubmit } from "@/hooks/useCheckoutSubmit";
 import { cn } from "@/lib/utils";
 import { trackBeginCheckout, trackPurchase, trackAddressMode } from "@/lib/gtag";
 import { fbTrackInitiateCheckout, fbTrackPurchase, fbTrackAddressMode } from "@/lib/fbpixel";
@@ -43,13 +43,11 @@ export default function Checkout() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { logOrderReceived } = useKdsEvents();
-  const loyaltyRedemption = useLoyaltyRedemption();
   const { restaurantId, slug } = useRestaurantContext();
   const { isOpen: restaurantIsOpen, nextOpenTime } = useIsRestaurantOpen();
+  const { submit: submitOrder, isSubmitting: checkoutSubmitting, isRetrying, isSlowRequest, resetAfterSubmit } = useCheckoutSubmit();
 
   const [step, setStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const submittingRef = useRef(false); // Double-click guard
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [useReward, setUseReward] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -319,229 +317,110 @@ export default function Checkout() {
   }, [step, trackEvent]);
 
   const handleSubmitOrder = async () => {
-    // Double-click guard
-    if (submittingRef.current) {
-      console.log("[CHECKOUT] Blocked duplicate submission");
+    if (!restaurantId) return;
+
+    const phoneDigits = getPhoneDigits(phone);
+
+    // Classify customer type safely
+    let customerType: "local" | "tourist" = "tourist";
+    try {
+      customerType = classifyCustomerType(phone);
+    } catch {
+      customerType = "tourist";
+    }
+
+    const result = await submitOrder({
+      restaurantId,
+      customer: {
+        phone: phoneDigits,
+        name: name || "",
+        customer_type: customerType,
+      },
+      address: {
+        street,
+        number,
+        neighborhood,
+        complement: complement || undefined,
+        reference: reference || undefined,
+        latitude: addressLocation?.lat,
+        longitude: addressLocation?.lng,
+        formatted_address: formattedAddress || undefined,
+        place_id: placeId,
+        delivery_zone_id: zoneCheckResult?.zone?.id || null,
+        address_source: addressMode === "map" ? "map" : "manual",
+      },
+      order_data: {
+        payment_method: paymentMethod,
+        change: paymentMethod === "cash" && changeAmount ? changeAmount : undefined,
+        subtotal,
+        delivery_fee: deliveryFee,
+        total,
+        loyalty_discount: loyaltyDiscount,
+        stamp_redeemed: useReward && canUseReward,
+        coupon_id: appliedCoupon?.id || null,
+        coupon_discount: couponDiscount,
+      },
+      items: items.map((item) => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+        unit_price: item.product.price,
+        note: item.note || undefined,
+        options: item.selectedOptions.map((opt) => ({
+          name: opt.name,
+          price: opt.price,
+        })),
+      })),
+      loyalty: useReward && canUseReward && stamps ? {
+        enabled: true,
+        stamps_goal: config?.loyalty_stamps_goal || 8,
+        current_stamps: stamps.stamps_count || 0,
+        reward_value: config?.loyalty_reward_value || 50,
+      } : null,
+      coupon: appliedCoupon && couponDiscount > 0 ? {
+        coupon_id: appliedCoupon.id,
+        discount_applied: couponDiscount,
+      } : null,
+    });
+
+    if (!result?.order_id) {
+      resetAfterSubmit();
       return;
     }
-    submittingRef.current = true;
 
-    if (import.meta.env.DEV) {
-      console.log("[CHECKOUT] Iniciando handleSubmitOrder, items:", items.length);
+    // Track purchase event (Google Analytics + Meta Pixel)
+    const purchaseItems = items.map((item) => ({
+      id: item.product.id,
+      name: item.product.name,
+      price: item.product.price,
+      quantity: item.quantity,
+    }));
+    trackPurchase(result.order_id, purchaseItems, total, deliveryFee);
+    fbTrackPurchase(result.order_id, purchaseItems, total);
+    trackAddressMode(addressMode, 'completed');
+    fbTrackAddressMode(addressMode, 'completed');
+    trackEvent("order_completed", "confirmation", { orderId: result.order_id, paymentMethod, total });
+
+    // If PIX online, open modal instead of navigating
+    if (paymentMethod === "pix_online") {
+      setCreatedOrderId(result.order_id);
+      setShowPixModal(true);
+      resetAfterSubmit();
+      return;
     }
-    setIsSubmitting(true);
 
-    try {
-      // Get only digits for storage
-      const phoneDigits = getPhoneDigits(phone);
+    clearCart();
 
-      // Classify customer type with SAFE try-catch
-      // This NEVER blocks checkout - if it fails, defaults to 'tourist'
-      let customerType: "local" | "tourist" = "tourist";
-      try {
-        customerType = classifyCustomerType(phone);
-      } catch {
-        customerType = "tourist";
-      }
+    const targetUrl = `/${slug}/order/${result.order_id}?new=true`;
 
-      // 1. Get or create customer directly
-      let customerId: string;
-      
-      // Check if customer exists by phone AND restaurant_id (multi-tenant)
-      const { data: existingCustomer } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("phone", phoneDigits)
-        .eq("restaurant_id", restaurantId)
-        .maybeSingle();
+    toast({
+      title: "Pedido enviado!",
+      description: `Pedido #${result.order_id.slice(0, 8)} foi recebido.`,
+    });
 
-      if (existingCustomer) {
-        customerId = existingCustomer.id;
-        // Update name if provided
-        if (name) {
-          await supabase
-            .from("customers")
-            .update({ name, customer_type: customerType })
-            .eq("id", customerId);
-        }
-      } else {
-        // Create new customer with restaurant_id
-        const { data: newCustomer, error: customerError } = await supabase
-          .from("customers")
-          .insert({
-            phone: phoneDigits,
-            name: name || null,
-            customer_type: customerType,
-            restaurant_id: restaurantId,
-          })
-          .select("id")
-          .single();
-
-        if (customerError) {
-          throw customerError;
-        }
-        customerId = newCustomer.id;
-      }
-
-      // 2. Create address with restaurant_id (include geo data if available)
-      const { data: address, error: addressError } = await supabase
-        .from("addresses")
-        .insert({
-          customer_id: customerId,
-          street,
-          number,
-          neighborhood,
-          complement: complement || null,
-          reference: reference || null,
-          restaurant_id: restaurantId,
-          latitude: addressLocation?.lat || null,
-          longitude: addressLocation?.lng || null,
-          formatted_address: formattedAddress || null,
-          place_id: placeId || null,
-          delivery_zone_id: zoneCheckResult?.zone?.id || null,
-          address_source: addressMode === "map" ? "map" : "manual",
-        })
-        .select()
-        .single();
-
-      if (addressError) {
-        throw addressError;
-      }
-
-      // 3. Create order with restaurant_id (include loyalty_discount if using reward)
-      const orderStatus = paymentMethod === "pix_online" ? "pending" : "pending";
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          customer_id: customerId,
-          address_id: address.id,
-          payment_method: paymentMethod,
-          change: paymentMethod === "cash" && changeAmount ? changeAmount : null,
-          subtotal,
-          delivery_fee: deliveryFee,
-          total,
-          loyalty_discount: loyaltyDiscount,
-          stamp_redeemed: useReward && canUseReward,
-          status: orderStatus,
-          restaurant_id: restaurantId,
-          coupon_id: appliedCoupon?.id || null,
-          coupon_discount: couponDiscount,
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // 4. Process loyalty redemption if customer is using reward
-      if (useReward && canUseReward && stamps) {
-        try {
-          await loyaltyRedemption.mutateAsync({
-            customerId,
-            orderId: order.id,
-            stampsGoal: config?.loyalty_stamps_goal || 8,
-            currentStamps: stamps.stamps_count || 0,
-            rewardValue: config?.loyalty_reward_value || 50,
-          });
-        } catch {
-          // Silent fail - order was created successfully
-        }
-      }
-
-      // Record coupon usage
-      if (appliedCoupon && couponDiscount > 0) {
-        try {
-          await supabase.from('coupon_uses').insert({
-            coupon_id: appliedCoupon.id,
-            order_id: order.id,
-            customer_id: customerId,
-            restaurant_id: restaurantId,
-            discount_applied: couponDiscount,
-          });
-          await supabase
-            .from('coupons')
-            .update({ current_uses: appliedCoupon.current_uses + 1 })
-            .eq('id', appliedCoupon.id);
-        } catch {
-          // Silent fail - order was created successfully
-        }
-      }
-
-      // 4. Create order items
-      for (const item of items) {
-        const { data: orderItem, error: itemError } = await supabase
-          .from("order_items")
-          .insert({
-            order_id: order.id,
-            product_id: item.product.id,
-            quantity: item.quantity,
-            unit_price: item.product.price,
-            note: item.note || null,
-          })
-          .select()
-          .single();
-
-        if (itemError) throw itemError;
-
-        if (item.selectedOptions.length > 0) {
-          const optionsToInsert = item.selectedOptions.map((opt) => ({
-            order_item_id: orderItem.id,
-            option_name: opt.name,
-            option_price: opt.price,
-          }));
-
-          const { error: optionsError } = await supabase.from("order_item_options").insert(optionsToInsert);
-
-          if (optionsError) throw optionsError;
-        }
-      }
-
-      // Track purchase event (Google Analytics + Meta Pixel)
-      const purchaseItems = items.map((item) => ({
-        id: item.product.id,
-        name: item.product.name,
-        price: item.product.price,
-        quantity: item.quantity,
-      }));
-      trackPurchase(order.id, purchaseItems, total, deliveryFee);
-      fbTrackPurchase(order.id, purchaseItems, total);
-      trackAddressMode(addressMode, 'completed');
-      fbTrackAddressMode(addressMode, 'completed');
-      trackEvent("order_completed", "confirmation", { orderId: order.id, paymentMethod, total });
-
-      // If PIX online, open modal instead of navigating
-      if (paymentMethod === "pix_online") {
-        setCreatedOrderId(order.id);
-        setShowPixModal(true);
-        setIsSubmitting(false);
-        return;
-      }
-
-      clearCart();
-
-      const targetUrl = `/${slug}/order/${order.id}?new=true`;
-
-      toast({
-        title: "Pedido enviado!",
-        description: `Pedido #${order.id.slice(0, 8)} foi recebido.`,
-      });
-
-      // Registrar evento KDS - fail-safe (não bloqueia navegação)
-      logOrderReceived(order.id).catch(() => {});
-
-      navigate(targetUrl);
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("[CHECKOUT] ERRO:", error);
-      }
-      toast({
-        title: "Erro ao enviar pedido",
-        description: "Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-      submittingRef.current = false;
-    }
+    // Registrar evento KDS - fail-safe
+    logOrderReceived(result.order_id).catch(() => {});
+    resetAfterSubmit();
+    navigate(targetUrl);
   };
 
   if (items.length === 0) {
@@ -907,7 +786,7 @@ export default function Checkout() {
             <Button
               onClick={handleSubmitOrder}
               disabled={
-                isSubmitting ||
+                checkoutSubmitting ||
                 (paymentMethod === "cash" &&
                   changeAmount &&
                   getCurrencyValue(changeAmount) > 0 &&
@@ -915,7 +794,7 @@ export default function Checkout() {
               }
               className="w-full h-12 text-base font-semibold"
             >
-              {isSubmitting ? "Enviando..." : `Enviar Pedido ${formatPrice(total)}`}
+              {isRetrying ? "Tentando novamente..." : isSlowRequest ? "Processando..." : checkoutSubmitting ? "Enviando..." : `Enviar Pedido ${formatPrice(total)}`}
             </Button>
           </div>
         )}
