@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ["logo-astral.png", "pwa-192x192.png", "pwa-512x512.png", "apple-touch-icon.png"],
       manifest: false,
       workbox: {
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}"],
         globIgnores: ["**/manifest.webmanifest"],
         importScripts: ['/sw-push.js'],
