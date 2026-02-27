@@ -97,15 +97,45 @@ class MercadoPagoProvider implements PaymentProvider {
 }
 
 // ─── Provider Factory ─────────────────────────────────────────────
-function getProvider(providerName: string): PaymentProvider {
-  switch (providerName) {
-    case "mercadopago":
-    default: {
-      const token = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
-      if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN not configured");
-      return new MercadoPagoProvider(token);
+async function getProviderForRestaurant(
+  supabase: any,
+  restaurantId: string,
+  providerName: string,
+  log: (action: string, detail?: unknown) => void
+): Promise<PaymentProvider> {
+  // Try to get restaurant-specific credentials
+  const { data: settings } = await supabase
+    .from("restaurant_payment_settings")
+    .select("gateway_mode, encrypted_access_token")
+    .eq("restaurant_id", restaurantId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (settings?.gateway_mode === "own_gateway" && settings?.encrypted_access_token) {
+    try {
+      const encryptionKey = Deno.env.get("PAYMENT_ENCRYPTION_KEY");
+      if (encryptionKey) {
+        const { data: decryptedToken, error: decError } = await supabase.rpc("decrypt_payment_token", {
+          p_encrypted: settings.encrypted_access_token,
+          p_key: encryptionKey,
+        });
+
+        if (!decError && decryptedToken) {
+          log("using_restaurant_gateway", { restaurant_id: restaurantId });
+          return new MercadoPagoProvider(decryptedToken);
+        }
+        log("decryption_failed", { error: decError?.message });
+      }
+    } catch (err) {
+      log("gateway_fallback", { error: err.message });
     }
   }
+
+  // Fallback to platform global token
+  log("using_platform_gateway", { restaurant_id: restaurantId });
+  const token = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+  if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN not configured");
+  return new MercadoPagoProvider(token);
 }
 
 // ─── Rate Limiting ────────────────────────────────────────────────
@@ -260,7 +290,7 @@ Deno.serve(async (req) => {
 
     // Create payment via provider
     const providerName = provider || "mercadopago";
-    const paymentProvider = getProvider(providerName);
+    const paymentProvider = await getProviderForRestaurant(supabase, restaurant_id, providerName, log);
 
     log("creating_pix", { provider: providerName });
 

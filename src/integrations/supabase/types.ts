@@ -1862,6 +1862,14 @@ export type Database = {
       cleanup_expired_push_subscriptions: { Args: never; Returns: undefined }
       cleanup_expired_sms_codes: { Args: never; Returns: undefined }
       create_order_transaction: { Args: { p_data: Json }; Returns: Json }
+      decrypt_payment_token: {
+        Args: { p_encrypted: string; p_key: string }
+        Returns: string
+      }
+      encrypt_payment_token: {
+        Args: { p_key: string; p_token: string }
+        Returns: string
+      }
       get_customers_with_stats: {
         Args: { p_filter_type?: string; p_restaurant_id: string }
         Returns: Json
