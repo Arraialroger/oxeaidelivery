@@ -152,6 +152,7 @@ export function NotificationQueueSection() {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="telegram">Telegram</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
                   <SelectItem value="slack">Slack</SelectItem>
                 </SelectContent>
