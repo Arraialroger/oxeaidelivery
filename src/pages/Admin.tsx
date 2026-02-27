@@ -92,7 +92,7 @@ export default function Admin() {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 lg:px-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 sm:grid-cols-13">
+          <TabsList className="flex w-full overflow-x-auto">
             <TabsTrigger value="dashboard" className="gap-2">
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
