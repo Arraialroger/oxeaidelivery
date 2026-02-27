@@ -397,7 +397,7 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name, phone: phone.replace(/\D/g, '') } },
+      options: { emailRedirectTo: `${window.location.origin}/onboarding`, data: { name, phone: phone.replace(/\D/g, '') } },
     });
     setIsSubmitting(false);
     if (authError) {
