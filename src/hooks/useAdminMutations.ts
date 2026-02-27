@@ -283,34 +283,3 @@ export function useUpdateRestaurantSettings(restaurantId: string | null) {
   });
 }
 
-/**
- * @deprecated Use useUpdateRestaurantSettings instead for multi-tenant support
- */
-export function useUpdateConfig() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (config: { 
-      delivery_fee?: number; 
-      restaurant_open?: boolean; 
-      kds_enabled?: boolean; 
-      hero_banner_url?: string | null;
-      loyalty_enabled?: boolean;
-      loyalty_stamps_goal?: number;
-      loyalty_min_order?: number;
-      loyalty_reward_value?: number;
-    }) => {
-      const { data, error } = await supabase
-        .from('config')
-        .update(config)
-        .eq('id', 1)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['config'] });
-    },
-  });
-}
