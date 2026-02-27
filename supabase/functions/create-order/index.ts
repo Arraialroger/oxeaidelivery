@@ -119,6 +119,23 @@ Deno.serve(async (req) => {
         log("error", correlationId, "Failed to write audit log", { audit_error: String(auditErr) });
       }
 
+      // Emit health event for critical failures
+      const isTimeout = error.message?.includes("statement timeout");
+      const eventType = isTimeout ? "order_creation_timeout" : "order_creation_failed";
+      try {
+        await supabase.rpc("log_health_event", {
+          p_event_type: eventType,
+          p_severity: "critical",
+          p_source: "create-order",
+          p_restaurant_id: restaurant_id,
+          p_correlation_id: correlationId,
+          p_message: `Falha ao criar pedido: ${error.message}`,
+          p_metadata: { error_code: error.code, customer_phone: customer.phone, total: order_data.total },
+        });
+      } catch (healthErr) {
+        log("error", correlationId, "Failed to log health event", { health_error: String(healthErr) });
+      }
+
       // Map error types
       if (error.message?.includes("RESTAURANT_INACTIVE")) {
         return new Response(
@@ -126,7 +143,7 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (error.message?.includes("statement timeout")) {
+      if (isTimeout) {
         return new Response(
           JSON.stringify({ error: "TIMEOUT_ERROR", message: "Tempo limite excedido.", correlation_id: correlationId }),
           { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }

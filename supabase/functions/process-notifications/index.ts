@@ -6,6 +6,64 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface NotificationRecord {
+  id: string;
+  channel: string;
+  subject: string;
+  body: string;
+  restaurant_id: string | null;
+  attempts: number;
+  max_attempts: number;
+  metadata: Record<string, unknown>;
+}
+
+// ── Telegram provider ──
+async function sendTelegram(notification: NotificationRecord, log: (a: string, d?: unknown) => void): Promise<void> {
+  const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
+  const chatId = Deno.env.get("TELEGRAM_CHAT_ID");
+
+  if (!token || !chatId) {
+    throw new Error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not configured");
+  }
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: notification.body,
+      parse_mode: "Markdown",
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    log("telegram_api_error", { status: res.status, error: errText });
+    throw new Error(`Telegram API error: ${res.status} - ${errText}`);
+  }
+
+  const result = await res.json();
+  log("telegram_sent", { message_id: result?.result?.message_id });
+}
+
+// ── Provider dispatcher ──
+async function sendNotification(notification: NotificationRecord, log: (a: string, d?: unknown) => void): Promise<void> {
+  switch (notification.channel) {
+    case "telegram":
+      await sendTelegram(notification, log);
+      break;
+    default:
+      // Future channels (email, whatsapp, slack) - simulate for now
+      log("[NOTIFY-SIM]", {
+        notification_id: notification.id,
+        channel: notification.channel,
+        subject: notification.subject,
+        body_preview: notification.body?.slice(0, 100),
+      });
+      break;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -78,16 +136,8 @@ Deno.serve(async (req) => {
         .eq("id", notification.id);
 
       try {
-        // ── Simulated send ──
-        log("[NOTIFY-SIM]", {
-          notification_id: notification.id,
-          channel: notification.channel,
-          restaurant_id: notification.restaurant_id,
-          subject: notification.subject,
-          body_preview: notification.body?.slice(0, 100),
-        });
+        await sendNotification(notification as NotificationRecord, log);
 
-        // Simulate success
         await supabase
           .from("notification_queue")
           .update({
@@ -114,6 +164,7 @@ Deno.serve(async (req) => {
         failedCount++;
         log("send_error", {
           notification_id: notification.id,
+          channel: notification.channel,
           attempts: newAttempts,
           max_attempts: notification.max_attempts,
           final_status: newStatus,

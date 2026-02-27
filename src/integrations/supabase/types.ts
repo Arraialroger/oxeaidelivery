@@ -1643,6 +1643,50 @@ export type Database = {
           },
         ]
       }
+      system_health_events: {
+        Row: {
+          correlation_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          message: string
+          metadata: Json
+          restaurant_id: string | null
+          severity: string
+          source: string
+        }
+        Insert: {
+          correlation_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          message: string
+          metadata?: Json
+          restaurant_id?: string | null
+          severity: string
+          source: string
+        }
+        Update: {
+          correlation_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          restaurant_id?: string | null
+          severity?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_health_events_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       upsell_events: {
         Row: {
           created_at: string
@@ -1789,6 +1833,18 @@ export type Database = {
       is_valid_restaurant: {
         Args: { _restaurant_id: string }
         Returns: boolean
+      }
+      log_health_event: {
+        Args: {
+          p_correlation_id?: string
+          p_event_type: string
+          p_message?: string
+          p_metadata?: Json
+          p_restaurant_id?: string
+          p_severity: string
+          p_source: string
+        }
+        Returns: string
       }
     }
     Enums: {

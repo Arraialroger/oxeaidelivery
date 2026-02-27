@@ -232,6 +232,22 @@ Deno.serve(async (req) => {
           }
         }
       }
+
+      // Also emit to system_health_events for observability
+      for (const critical of criticalResults) {
+        try {
+          await supabase.rpc("log_health_event", {
+            p_event_type: `health_${critical.check}`,
+            p_severity: "critical",
+            p_source: "health-check",
+            p_correlation_id: correlationId,
+            p_message: critical.message,
+            p_metadata: critical.metadata || {},
+          });
+        } catch (err) {
+          log("health_event_error", { check: critical.check, error: err.message });
+        }
+      }
     }
 
     // ── Overall status ──
