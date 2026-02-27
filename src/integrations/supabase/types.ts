@@ -1818,6 +1818,29 @@ export type Database = {
       cleanup_expired_push_subscriptions: { Args: never; Returns: undefined }
       cleanup_expired_sms_codes: { Args: never; Returns: undefined }
       create_order_transaction: { Args: { p_data: Json }; Returns: Json }
+      get_customers_with_stats: {
+        Args: { p_filter_type?: string; p_restaurant_id: string }
+        Returns: Json
+      }
+      get_dashboard_metrics: {
+        Args: {
+          p_from: string
+          p_prev_from: string
+          p_prev_to: string
+          p_restaurant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      get_top_products: {
+        Args: {
+          p_from: string
+          p_limit?: number
+          p_restaurant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
       get_user_restaurant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

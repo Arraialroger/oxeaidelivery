@@ -1,12 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useRestaurantContext } from '@/contexts/RestaurantContext';
-import { startOfDay, endOfDay } from 'date-fns';
+import { useOrderTimestamps } from '@/hooks/useOrderTimestamps';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Clock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useMemo } from 'react';
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -15,42 +13,25 @@ interface PeakHoursChartProps {
 }
 
 export function PeakHoursChart({ dateRange }: PeakHoursChartProps) {
-  const { restaurantId } = useRestaurantContext();
+  const { data: timestamps, isLoading } = useOrderTimestamps(dateRange);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['peak-hours', restaurantId, dateRange.from.toISOString(), dateRange.to.toISOString()],
-    queryFn: async () => {
-      if (!restaurantId) return null;
+  const data = useMemo(() => {
+    if (!timestamps || timestamps.length === 0) return null;
 
-      const { data: orders, error } = await supabase
-        .from('orders')
-        .select('created_at')
-        .eq('restaurant_id', restaurantId)
-        .neq('status', 'cancelled')
-        .gte('created_at', startOfDay(dateRange.from).toISOString())
-        .lte('created_at', endOfDay(dateRange.to).toISOString());
+    const byHour = Array.from({ length: 24 }, (_, i) => ({ hour: i, label: `${String(i).padStart(2, '0')}h`, orders: 0 }));
+    const byDay = DAY_LABELS.map((label, i) => ({ day: i, label, orders: 0 }));
 
-      if (error) throw error;
+    timestamps.forEach(ts => {
+      const d = new Date(ts);
+      byHour[d.getHours()].orders++;
+      byDay[d.getDay()].orders++;
+    });
 
-      // By hour (0-23)
-      const byHour = Array.from({ length: 24 }, (_, i) => ({ hour: i, label: `${String(i).padStart(2, '0')}h`, orders: 0 }));
-      // By day of week (0=Sun, 6=Sat)
-      const byDay = DAY_LABELS.map((label, i) => ({ day: i, label, orders: 0 }));
+    const maxHour = byHour.reduce((max, h) => h.orders > max.orders ? h : max, byHour[0]);
+    const maxDay = byDay.reduce((max, d) => d.orders > max.orders ? d : max, byDay[0]);
 
-      (orders || []).forEach(o => {
-        const d = new Date(o.created_at || '');
-        byHour[d.getHours()].orders++;
-        byDay[d.getDay()].orders++;
-      });
-
-      const maxHour = byHour.reduce((max, h) => h.orders > max.orders ? h : max, byHour[0]);
-      const maxDay = byDay.reduce((max, d) => d.orders > max.orders ? d : max, byDay[0]);
-
-      return { byHour, byDay, peakHour: maxHour, peakDay: maxDay, total: orders?.length || 0 };
-    },
-    enabled: !!restaurantId,
-    staleTime: 1000 * 60 * 5,
-  });
+    return { byHour, byDay, peakHour: maxHour, peakDay: maxDay, total: timestamps.length };
+  }, [timestamps]);
 
   if (isLoading) {
     return (

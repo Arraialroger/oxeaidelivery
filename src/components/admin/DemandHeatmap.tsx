@@ -1,8 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useRestaurantContext } from '@/contexts/RestaurantContext';
-import { startOfDay, endOfDay } from 'date-fns';
+import { useOrderTimestamps } from '@/hooks/useOrderTimestamps';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Flame } from 'lucide-react';
 import { useMemo } from 'react';
@@ -15,44 +12,27 @@ interface DemandHeatmapProps {
 }
 
 export function DemandHeatmap({ dateRange }: DemandHeatmapProps) {
-  const { restaurantId } = useRestaurantContext();
+  const { data: timestamps, isLoading } = useOrderTimestamps(dateRange);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['demand-heatmap', restaurantId, dateRange.from.toISOString(), dateRange.to.toISOString()],
-    queryFn: async () => {
-      if (!restaurantId) return null;
+  const data = useMemo(() => {
+    if (!timestamps || timestamps.length === 0) return null;
 
-      const { data: orders, error } = await supabase
-        .from('orders')
-        .select('created_at')
-        .eq('restaurant_id', restaurantId)
-        .neq('status', 'cancelled')
-        .gte('created_at', startOfDay(dateRange.from).toISOString())
-        .lte('created_at', endOfDay(dateRange.to).toISOString());
+    const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+    let max = 0;
 
-      if (error) throw error;
+    timestamps.forEach(ts => {
+      const d = new Date(ts);
+      const day = d.getDay();
+      const hour = d.getHours();
+      grid[day][hour]++;
+      if (grid[day][hour] > max) max = grid[day][hour];
+    });
 
-      // grid[day][hour] = count
-      const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
-      let max = 0;
-
-      (orders || []).forEach(o => {
-        const d = new Date(o.created_at || '');
-        const day = d.getDay();
-        const hour = d.getHours();
-        grid[day][hour]++;
-        if (grid[day][hour] > max) max = grid[day][hour];
-      });
-
-      return { grid, max, total: orders?.length || 0 };
-    },
-    enabled: !!restaurantId,
-    staleTime: 1000 * 60 * 5,
-  });
+    return { grid, max, total: timestamps.length };
+  }, [timestamps]);
 
   const visibleHours = useMemo(() => {
     if (!data) return [];
-    // Show hours that have at least 1 order in any day, plus padding
     const hasOrders = new Set<number>();
     data.grid.forEach(row => row.forEach((v, h) => { if (v > 0) hasOrders.add(h); }));
     if (hasOrders.size === 0) return [];
@@ -116,7 +96,6 @@ export function DemandHeatmap({ dateRange }: DemandHeatmapProps) {
       <CardContent>
         <div className="overflow-x-auto">
           <div className="min-w-[500px]">
-            {/* Header row with hours */}
             <div className="flex">
               <div className="w-10 shrink-0" />
               {visibleHours.map(h => (
@@ -126,7 +105,6 @@ export function DemandHeatmap({ dateRange }: DemandHeatmapProps) {
               ))}
             </div>
 
-            {/* Grid rows */}
             {DAY_LABELS.map((dayLabel, dayIndex) => (
               <div key={dayIndex} className="flex items-center gap-0">
                 <div className="w-10 shrink-0 text-xs font-medium text-muted-foreground pr-1 text-right">
@@ -149,7 +127,6 @@ export function DemandHeatmap({ dateRange }: DemandHeatmapProps) {
               </div>
             ))}
 
-            {/* Legend */}
             <div className="flex items-center justify-end gap-2 mt-3">
               <span className="text-[10px] text-muted-foreground">Menos</span>
               <div className="flex gap-[2px]">

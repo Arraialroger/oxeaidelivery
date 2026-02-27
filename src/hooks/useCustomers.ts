@@ -19,52 +19,27 @@ export function useCustomers(filterType?: 'local' | 'tourist' | 'all') {
 
   return useQuery({
     queryKey: ['customers', restaurantId, filterType],
-    queryFn: async () => {
+    queryFn: async (): Promise<CustomerWithStats[]> => {
       if (!restaurantId) return [];
 
-      // Get all customers for this restaurant
-      let query = supabase
-        .from('customers')
-        .select('*')
-        .eq('restaurant_id', restaurantId);
-      
-      if (filterType && filterType !== 'all') {
-        query = query.eq('customer_type', filterType);
-      }
-      
-      const { data: customers, error: customersError } = await query.order('created_at', { ascending: false });
-      
-      if (customersError) throw customersError;
-      
-      // Get order stats for each customer
-      const customersWithStats: CustomerWithStats[] = await Promise.all(
-        (customers || []).map(async (customer) => {
-          const { data: orders } = await supabase
-            .from('orders')
-            .select('total, created_at')
-            .eq('customer_id', customer.id)
-            .eq('restaurant_id', restaurantId)
-            .order('created_at', { ascending: false });
-          
-          const totalSpent = orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
-          const lastOrderDate = orders?.[0]?.created_at || null;
-          const orderCount = orders?.length || 0;
-          
-          return {
-            id: customer.id,
-            name: customer.name,
-            phone: customer.phone,
-            customer_type: customer.customer_type as 'local' | 'tourist' | null,
-            created_at: customer.created_at,
-            last_order_date: lastOrderDate,
-            total_spent: totalSpent,
-            order_count: orderCount,
-            stamps_count: customer.stamps_count || 0,
-          };
-        })
-      );
-      
-      return customersWithStats;
+      const { data, error } = await (supabase.rpc as any)('get_customers_with_stats', {
+        p_restaurant_id: restaurantId,
+        p_filter_type: filterType || 'all',
+      });
+
+      if (error) throw error;
+
+      return ((data as any[]) || []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        customer_type: c.customer_type as 'local' | 'tourist' | null,
+        created_at: c.created_at,
+        last_order_date: c.last_order_date,
+        total_spent: Number(c.total_spent) || 0,
+        order_count: Number(c.order_count) || 0,
+        stamps_count: Number(c.stamps_count) || 0,
+      }));
     },
     enabled: !!restaurantId,
   });
