@@ -5,11 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Store, ArrowLeft, ArrowRight, Check, Loader2, Palette,
-  ImagePlus, Utensils, Rocket, CheckCircle, XCircle, AlertCircle
+  ImagePlus, Utensils, Rocket, CheckCircle, XCircle, AlertCircle,
+  Mail, Lock, User, Phone
 } from 'lucide-react';
 
 function StepIndicator({ current, total }: { current: number; total: number }) {
@@ -353,6 +356,131 @@ function Step4Summary({ data }: { data: ReturnType<typeof useOnboarding>['data']
     </div>
   );
 }
+function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }) {
+  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('signup');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+
+  const formatPhoneDisplay = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    setIsSubmitting(false);
+    if (authError) {
+      setError(authError.message.includes('Invalid login') ? 'E-mail ou senha incorretos' : 'Erro ao fazer login');
+    } else {
+      onAuthenticated();
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (name.length < 2) { setError('Nome deve ter pelo menos 2 caracteres'); return; }
+    if (password.length < 6) { setError('Senha deve ter pelo menos 6 caracteres'); return; }
+    setIsSubmitting(true);
+    const { data, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name, phone: phone.replace(/\D/g, '') } },
+    });
+    setIsSubmitting(false);
+    if (authError) {
+      setError(authError.message.includes('already registered') ? 'E-mail já cadastrado. Tente fazer login.' : 'Erro ao criar conta');
+      return;
+    }
+    if (data?.user?.identities?.length === 0) {
+      setError('E-mail já cadastrado mas não confirmado.');
+      return;
+    }
+    if (data?.session) {
+      onAuthenticated();
+    } else {
+      setSuccess('Conta criada! Verifique seu e-mail para confirmar.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardContent className="py-6 space-y-4">
+          <div className="text-center space-y-2">
+            <Store className="w-12 h-12 text-primary mx-auto" />
+            <h2 className="text-xl font-bold">Crie sua conta</h2>
+            <p className="text-sm text-muted-foreground">Para criar seu restaurante</p>
+          </div>
+
+          {error && (
+            <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
+          )}
+          {success && (
+            <Alert className="border-primary/50 bg-primary/10"><AlertDescription className="text-primary">{success}</AlertDescription></Alert>
+          )}
+
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as 'login' | 'signup'); setError(''); setSuccess(''); }}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="signup">Criar conta</TabsTrigger>
+              <TabsTrigger value="login">Entrar</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="signup">
+              <form onSubmit={handleSignup} className="space-y-3 mt-3">
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} className="pl-10" disabled={isSubmitting} />
+                </div>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="(XX) XXXXX-XXXX" value={formatPhoneDisplay(phone)} onChange={(e) => setPhone(e.target.value)} className="pl-10" disabled={isSubmitting} />
+                </div>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" disabled={isSubmitting} />
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input type="password" placeholder="Senha (mín. 6 caracteres)" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" disabled={isSubmitting} />
+                </div>
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando...</> : 'Criar conta'}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-3 mt-3">
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" disabled={isSubmitting} />
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input type="password" placeholder="Sua senha" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" disabled={isSubmitting} />
+                </div>
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Entrando...</> : 'Entrar'}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -386,22 +514,7 @@ export default function Onboarding() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="py-8 text-center space-y-4">
-            <Store className="w-12 h-12 text-primary mx-auto" />
-            <h2 className="text-xl font-bold">Crie sua conta primeiro</h2>
-            <p className="text-sm text-muted-foreground">
-              Você precisa estar logado para criar seu restaurante.
-            </p>
-            <Button onClick={() => navigate('/astral/auth')} className="w-full">
-              Criar conta / Entrar
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <OnboardingAuthGate onAuthenticated={() => setIsAuthenticated(true)} />;
   }
 
   const canProceed = () => {
