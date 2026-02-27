@@ -76,7 +76,7 @@ function Step1NameSlug({
         <div>
           <Label htmlFor="slug">Link do seu cardápio</Label>
           <div className="mt-1 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">oxeai.com/</span>
+            <span className="text-sm text-muted-foreground whitespace-nowrap">{window.location.hostname}/</span>
             <Input
               id="slug"
               value={data.slug}
@@ -237,7 +237,7 @@ function Step2LogoColors({
               <p className="font-bold" style={{ color: data.primaryColor }}>
                 {data.name || 'Meu Restaurante'}
               </p>
-              <p className="text-xs text-muted-foreground">oxeai.com/{data.slug || 'meu-restaurante'}</p>
+              <p className="text-xs text-muted-foreground">{window.location.hostname}/{data.slug || 'meu-restaurante'}</p>
             </div>
           </div>
         </div>
@@ -333,7 +333,7 @@ function Step4Summary({ data }: { data: ReturnType<typeof useOnboarding>['data']
             )}
             <div>
               <p className="font-bold text-lg">{data.name}</p>
-              <p className="text-sm text-muted-foreground">oxeai.com/{data.slug}</p>
+              <p className="text-sm text-muted-foreground">{window.location.hostname}/{data.slug}</p>
             </div>
           </div>
 
