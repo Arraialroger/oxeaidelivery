@@ -1,10 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://deliveryarraial.lovable.app",
+  "https://id-preview--0384a06e-621e-4be3-9b52-eaa7f97369ec.lovable.app",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  };
+}
 
 // In-memory rate limiting (resets on cold start)
 const ipLimiter = new Map<string, { count: number; resetAt: number }>();
@@ -33,7 +42,7 @@ function log(level: string, correlationId: string, message: string, data?: Recor
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: getCorsHeaders(req) });
   }
 
   const correlationId = crypto.randomUUID().slice(0, 12);
@@ -42,7 +51,7 @@ Deno.serve(async (req) => {
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -55,7 +64,7 @@ Deno.serve(async (req) => {
       log("warn", correlationId, "Validation failed: missing required fields");
       return new Response(
         JSON.stringify({ error: "VALIDATION_ERROR", message: "Campos obrigatórios ausentes", correlation_id: correlationId }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -65,14 +74,14 @@ Deno.serve(async (req) => {
       log("warn", correlationId, "IP rate limit exceeded", { ip: clientIp });
       return new Response(
         JSON.stringify({ error: "RATE_LIMIT", message: "Muitas tentativas. Aguarde um momento.", correlation_id: correlationId }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 429, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
     if (!checkRateLimit(restaurantLimiter, restaurant_id, 200, 3_600_000)) {
       log("warn", correlationId, "Restaurant rate limit exceeded", { restaurant_id });
       return new Response(
         JSON.stringify({ error: "RATE_LIMIT", message: "Limite de pedidos excedido.", correlation_id: correlationId }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 429, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -140,19 +149,19 @@ Deno.serve(async (req) => {
       if (error.message?.includes("RESTAURANT_INACTIVE")) {
         return new Response(
           JSON.stringify({ error: "RESTAURANT_INACTIVE", message: "Restaurante não está ativo.", correlation_id: correlationId }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
         );
       }
       if (isTimeout) {
         return new Response(
           JSON.stringify({ error: "TIMEOUT_ERROR", message: "Tempo limite excedido.", correlation_id: correlationId }),
-          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 504, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
         );
       }
 
       return new Response(
         JSON.stringify({ error: "INTERNAL_ERROR", message: "Erro ao criar pedido.", correlation_id: correlationId }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -160,13 +169,13 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify(data), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (err) {
     log("error", correlationId, "Unhandled error", { error: String(err) });
     return new Response(
       JSON.stringify({ error: "INTERNAL_ERROR", message: "Erro interno.", correlation_id: correlationId }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
 });
