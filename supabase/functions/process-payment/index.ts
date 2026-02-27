@@ -1,10 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://deliveryarraial.lovable.app",
+  "https://id-preview--0384a06e-621e-4be3-9b52-eaa7f97369ec.lovable.app",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  };
+}
 
 // ─── PaymentProvider Abstraction ───────────────────────────────────
 interface PaymentResult {
@@ -115,7 +124,7 @@ function isRateLimited(key: string, maxRequests = 10, windowMs = 60000): boolean
 // ─── Main Handler ─────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: getCorsHeaders(req) });
   }
 
   // Generate correlation_id for end-to-end tracing
@@ -128,7 +137,7 @@ Deno.serve(async (req) => {
     log("rate_limited", { ip: clientIp });
     return new Response(
       JSON.stringify({ error: "Too many requests" }),
-      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 429, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
 
@@ -136,7 +145,7 @@ Deno.serve(async (req) => {
     if (req.method !== "POST") {
       return new Response(
         JSON.stringify({ error: "Method not allowed" }),
-        { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 405, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -149,14 +158,14 @@ Deno.serve(async (req) => {
       log("validation_failed", { missing: { order_id: !order_id, restaurant_id: !restaurant_id, amount: !amount } });
       return new Response(
         JSON.stringify({ error: "Missing required fields: order_id, restaurant_id, amount" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
     if (amount <= 0) {
       return new Response(
         JSON.stringify({ error: "Amount must be positive" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -177,7 +186,7 @@ Deno.serve(async (req) => {
       log("order_not_found", { order_id, restaurant_id });
       return new Response(
         JSON.stringify({ error: "Order not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 404, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -185,7 +194,7 @@ Deno.serve(async (req) => {
       log("order_not_pending", { order_id, status: orderData.status });
       return new Response(
         JSON.stringify({ error: "Order is not pending" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -194,7 +203,7 @@ Deno.serve(async (req) => {
       log("amount_mismatch", { order_total: orderData.total, requested: amount });
       return new Response(
         JSON.stringify({ error: "Amount does not match order total" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -203,7 +212,7 @@ Deno.serve(async (req) => {
       log("order_rate_limited", { order_id });
       return new Response(
         JSON.stringify({ error: "Too many payment attempts for this order" }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 429, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -212,7 +221,7 @@ Deno.serve(async (req) => {
       log("restaurant_rate_limited", { restaurant_id });
       return new Response(
         JSON.stringify({ error: "Too many payment requests" }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 429, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
@@ -238,7 +247,7 @@ Deno.serve(async (req) => {
               status: "pending",
               correlation_id: correlationId,
             }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { status: 200, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
           );
         }
       }
@@ -310,13 +319,13 @@ Deno.serve(async (req) => {
         status: result.status,
         correlation_id: correlationId,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (error) {
     log("error", { message: error.message });
     return new Response(
       JSON.stringify({ error: error.message || "Internal server error", correlation_id: correlationId }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
 });
