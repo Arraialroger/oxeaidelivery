@@ -1,221 +1,228 @@
 
-
-# Checkout Transacional Atomico (com Auditoria e Timeout)
+# Sistema de Observabilidade e Alertas via Telegram
 
 ## Resumo
 
-Mover toda a logica de criacao de pedido para uma unica transacao SQL no backend, com auditoria estruturada via tabela `order_audit_log` e tratamento robusto de timeout/retry no frontend.
+Implementar deteccao automatica de falhas criticas com envio de alertas em tempo real via Telegram Bot API, reutilizando a infraestrutura existente (`notification_queue`, `payment_alerts`, `order_audit_log`) e criando uma nova tabela `system_health_events` como hub central de observabilidade.
 
 ## Arquitetura
 
 ```text
-Frontend (Checkout.tsx)
-    |
-    | POST /create-order (1 chamada, timeout 25s)
-    | body: { idempotency_key, restaurant_id, customer, address, items, loyalty?, coupon? }
-    |
-    v
-Edge Function: create-order (timeout 30s)
-    |
-    | supabase.rpc('create_order_transaction', payload)
-    |
-    v
-PostgreSQL Function (SECURITY DEFINER, statement_timeout 15s)
-    BEGIN
-      check idempotency -> return existing if found
-      upsert customer
-      insert address
-      insert order (with idempotency_key)
-      insert order_items + order_item_options
-      process loyalty (conditional)
-      record coupon_uses (conditional)
-      INSERT audit log (status='created')
-      RETURN order_id
-    COMMIT (automatico) ou ROLLBACK (em erro)
-    |
-    | on exception -> INSERT audit log (status='failed') via separate call
+Fontes de Eventos:
+  create-order (failed/timeout)
+  process-payment (failed)
+  payment-webhook (failed)
+  health-check (critical results)
+  order_audit_log (status=failed)
+       |
+       v
+system_health_events (nova tabela)
+       |
+       | trigger (severity=critical)
+       v
+notification_queue (channel=telegram)
+       |
+       | pg_cron cada 2 min -> process-notifications
+       v
+Edge Function process-notifications
+       |
+       | fetch() -> Telegram Bot API
+       v
+Bot Telegram envia mensagem formatada
 ```
 
-## REFINAMENTO 1: Tabela de Auditoria
+## Secrets Necessarios
 
-### Nova tabela: `order_audit_log`
+Antes de implementar, serao solicitados 2 novos secrets:
+
+| Secret | Descricao | Onde obter |
+|--------|-----------|------------|
+| `TELEGRAM_BOT_TOKEN` | Token do bot criado via @BotFather | https://t.me/BotFather -> /newbot |
+| `TELEGRAM_CHAT_ID` | ID do chat/grupo que recebera alertas | Enviar mensagem ao bot, acessar `https://api.telegram.org/bot{TOKEN}/getUpdates` |
+
+## Componentes
+
+### 1. Migracao SQL
+
+**Nova tabela: `system_health_events`**
 
 | Coluna | Tipo | Default |
 |--------|------|---------|
 | id | uuid | gen_random_uuid() |
-| correlation_id | text | NOT NULL |
-| idempotency_key | text | NOT NULL |
-| restaurant_id | uuid | NOT NULL |
-| customer_phone | text | |
-| total | numeric | |
-| status | text | NOT NULL (created, reused, failed) |
-| error_message | text | nullable |
+| event_type | text | NOT NULL |
+| severity | text | NOT NULL (info, warning, critical) |
+| source | text | NOT NULL (create-order, process-payment, health-check, etc.) |
+| restaurant_id | uuid | nullable |
+| correlation_id | text | nullable |
+| message | text | NOT NULL |
 | metadata | jsonb | '{}' |
 | created_at | timestamptz | now() |
 
-**RLS:** SELECT apenas para admins do restaurante. INSERT apenas via SECURITY DEFINER (sem acesso direto do frontend).
+**Indices:**
+- `(severity, created_at DESC)`
+- `(restaurant_id, created_at DESC)`
 
-**Indice:** `(restaurant_id, created_at DESC)` para consultas rapidas no painel admin.
+**RLS:**
+- SELECT: admins do restaurante veem seus eventos; eventos globais (restaurant_id IS NULL) visiveis para qualquer admin
+- INSERT/UPDATE/DELETE: bloqueados para frontend (apenas SECURITY DEFINER)
 
-### Como funciona dentro da transacao
+**Novo trigger: `enqueue_critical_health_event`**
 
-A funcao SQL `create_order_transaction` registra o audit log em 3 cenarios:
+Ao inserir em `system_health_events` com `severity = 'critical'`:
+- Insere na `notification_queue` com `channel = 'telegram'`
+- Dedup via NOT EXISTS (mesmo event_type + restaurant_id nos ultimos 30 min)
+- Mensagem formatada em Markdown para Telegram
 
-1. **Pedido criado com sucesso** -> `status = 'created'`, inclui `order_id` no metadata
-2. **Pedido reutilizado (idempotencia)** -> `status = 'reused'`, inclui `order_id` existente no metadata
-3. **Falha** -> A Edge Function registra `status = 'failed'` com `error_message` apos o rollback (fora da transacao, pois o rollback desfaria o log)
+**Nova funcao SQL: `log_health_event()`**
 
-Isso garante rastreabilidade completa para debug, antifraude e auditoria operacional.
+Funcao `SECURITY DEFINER` que as Edge Functions chamam via RPC para registrar eventos. Parametros: event_type, severity, source, restaurant_id, correlation_id, message, metadata.
 
-## REFINAMENTO 2: Timeout e Feedback
+### 2. Edge Function: `process-notifications` (editar)
 
-### Edge Function `create-order`
-
-- **Timeout explicito**: `AbortController` com 25 segundos no `fetch` interno (se houver chamadas externas)
-- **statement_timeout**: A funcao SQL configura `SET LOCAL statement_timeout = '15s'` no inicio da transacao
-- **Tratamento de erro estruturado**: Retorna codigos de erro semanticos para o frontend:
-  - `ORDER_CREATED` -> sucesso
-  - `ORDER_REUSED` -> idempotencia ativada, retorna order_id existente
-  - `VALIDATION_ERROR` -> dados invalidos (400)
-  - `RESTAURANT_INACTIVE` -> restaurante nao ativo (400)
-  - `TIMEOUT_ERROR` -> transacao excedeu limite (504)
-  - `INTERNAL_ERROR` -> erro generico (500)
-
-### Frontend `useCheckoutSubmit`
-
-- **Retry automatico**: 1 retry em caso de erro de rede (5xx ou timeout), com delay de 2 segundos
-- **Idempotency key**: `hash(phone + JSON.stringify(cartItems) + floor(Date.now() / 300000))` -- mesma chave por 5 minutos, garantindo que retry nao duplica
-- **Timeout visual**: Apos 20 segundos sem resposta, mostra mensagem "Estamos processando seu pedido..."
-- **Mensagens de erro amigaveis**:
-  - Timeout: "O servidor demorou para responder. Estamos verificando seu pedido..."
-  - Rede: "Erro de conexao. Tentando novamente..."
-  - Validacao: Mensagem especifica retornada pelo backend
-  - Generico: "Erro ao criar pedido. Tente novamente."
-- **Estado de retry visivel**: Botao mostra "Tentando novamente..." durante retry
-
-## Componentes Detalhados
-
-### 1. Migracao SQL
-
-**Tabela `order_audit_log`** com colunas listadas acima.
-
-**Coluna `idempotency_key`** na tabela `orders`:
-- `ALTER TABLE orders ADD COLUMN idempotency_key text`
-- `CREATE UNIQUE INDEX idx_orders_idempotency ON orders(idempotency_key) WHERE idempotency_key IS NOT NULL`
-
-**Constraint UNIQUE em `customers(phone, restaurant_id)`**:
-- Verificar se ja existe antes de criar
-
-**Funcao `create_order_transaction(p_data jsonb)`**:
-- `SECURITY DEFINER SET search_path = public`
-- `SET LOCAL statement_timeout = '15s'` no inicio
-- Logica completa descrita na arquitetura acima
-- Retorna `jsonb` com `{ order_id, status, correlation_id }`
-
-### 2. Edge Function `create-order/index.ts`
+Substituir o bloco `[NOTIFY-SIM]` (simulacao) por envio real baseado no canal:
 
 ```text
-Responsabilidades:
-- Validar campos obrigatorios
-- Gerar correlation_id
-- Rate limit por IP (10/min) e restaurant_id (200/hora)
-- Chamar supabase.rpc('create_order_transaction', { p_data: payload })
-- Em caso de erro SQL, registrar audit log com status='failed'
-- Retornar { order_id, correlation_id, status_code }
-- Logs estruturados JSON com correlation_id em todas as acoes
-```
-
-### 3. Hook `useCheckoutSubmit.ts`
-
-```text
-export function useCheckoutSubmit() {
-  // Gera idempotency_key estavel por 5 minutos
-  // useMutation com:
-  //   - retry: 1 (apenas em 5xx/network error)
-  //   - retryDelay: 2000ms
-  //   - onMutate: set loading state
-  //   - onError: toast com mensagem amigavel
-  //   - onSuccess: return { orderId, correlationId }
-  // Timer visual de 20s para feedback de "processando..."
+if (notification.channel === 'telegram') {
+  const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
+  const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
+  
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text: formatTelegramMessage(notification),
+      parse_mode: 'Markdown',
+    }),
+  });
+} else {
+  // Canais futuros (email, whatsapp, slack) - manter simulacao
+  log("[NOTIFY-SIM]", { channel: notification.channel });
 }
 ```
 
-### 4. Refatoracao `Checkout.tsx`
+**Formato da mensagem Telegram:**
 
-Substituir `handleSubmitOrder` (linhas 321-544) por:
-
+Para `critical`:
 ```text
-const { submit, isSubmitting, isRetrying, isSlowRequest } = useCheckoutSubmit();
-
-const handleSubmitOrder = async () => {
-  const result = await submit({
-    restaurantId,
-    customer: { phone: getPhoneDigits(phone), name, customerType },
-    address: { street, number, neighborhood, complement, reference, lat, lng, ... },
-    order: { paymentMethod, change, subtotal, deliveryFee, total, loyaltyDiscount, ... },
-    items: items.map(i => ({ ... })),
-    loyalty: useReward ? { ... } : null,
-    coupon: appliedCoupon ? { ... } : null,
-  });
-
-  if (result?.orderId) {
-    // analytics, pix modal ou navigate (logica existente mantida)
-  }
-};
-
-// No botao:
-<Button disabled={isSubmitting}>
-  {isRetrying ? "Tentando novamente..." : isSlowRequest ? "Processando..." : "Confirmar Pedido"}
-</Button>
+🔴 *ALERTA CRITICO*
+*Tipo:* {event_type}
+*Restaurante:* {restaurant_name ou id}
+*Horario:* {timestamp formatado}
+*Correlation ID:* `{correlation_id}`
+*Detalhes:* {resumo do body}
 ```
 
-Reducao estimada: ~200 linhas removidas.
-
-## Fluxo de Idempotencia
-
+Para `warning`:
 ```text
-1. Frontend gera: idempotency_key = hash(phone + cartJSON + floor(timestamp/300000))
-2. Edge Function repassa para a funcao SQL
-3. SQL verifica: SELECT id FROM orders WHERE idempotency_key = $key AND restaurant_id = $rid
-4. Se existir: registra audit log 'reused', retorna order_id existente
-5. Se nao: executa transacao completa, registra audit log 'created'
-6. Se falhar: Edge Function registra audit log 'failed' fora da transacao
+🟠 *AVISO*
+*Tipo:* {event_type}
+*Restaurante:* {restaurant_name ou id}
+*Horario:* {timestamp formatado}
 ```
+
+**Rate limit interno:** Maximo 20 mensagens Telegram por execucao do batch (ja controlado pelo LIMIT 20 existente).
+
+**Retry:** Ja implementado via `attempts/max_attempts` na `notification_queue`.
+
+### 3. Edge Functions existentes (editar para emitir eventos)
+
+Adicionar chamada `supabase.rpc('log_health_event', {...})` nos pontos de falha de cada Edge Function:
+
+**`create-order/index.ts`:**
+- Apos falha no RPC (linhas 103-139): emitir evento `order_creation_failed` com severity `critical`
+- Apos timeout (linha 129): emitir evento `order_creation_timeout` com severity `critical`
+
+**`process-payment/index.ts`:**
+- Apos falha na chamada ao Mercado Pago: emitir `payment_processing_failed` com severity `critical`
+
+**`payment-webhook/index.ts`:**
+- Apos falha na validacao do webhook: emitir `webhook_validation_failed` com severity `warning`
+
+**`health-check/index.ts`:**
+- Apos detectar resultados criticos (linha 197-234): emitir `health_check_critical` via `log_health_event` (alem dos payment_alerts ja existentes)
+
+### 4. Dashboard "Saude da Plataforma" (novo componente)
+
+**Novo arquivo: `src/components/admin/PlatformHealthPanel.tsx`**
+
+Secoes:
+- **Cards de metricas (grid 4 colunas):**
+  - Erros criticos 24h (count de system_health_events severity=critical)
+  - Warnings 24h
+  - Ultimo evento critico (timestamp + tipo)
+  - Tempo medio pedido->confirmacao (avg de orders.created_at ate payments.paid_at)
+- **Grafico de falhas por hora** (recharts BarChart, ultimas 24h agrupado por hora)
+- **Tabela de eventos recentes** com filtro por severidade e restaurante
+- **Botao "Disparar alerta de teste":**
+  - Insere evento ficticio via RPC `log_health_event` com event_type='test_alert', severity='critical'
+  - O trigger enfileira na notification_queue
+  - O cron process-notifications envia para Telegram
+  - Frontend mostra toast confirmando
+
+**Novo arquivo: `src/hooks/useSystemHealth.ts`**
+
+Queries:
+- Lista de system_health_events (ultimos 100, filtros de severidade/restaurante)
+- Counts por severidade nas ultimas 24h
+- Ultimo evento critico
+- Tempo medio pedido->confirmacao
+- Dados para grafico de falhas por hora (GROUP BY date_trunc('hour', created_at))
+
+Realtime:
+- Subscription na tabela `system_health_events` com filtro por restaurant_id
+
+### 5. Integracao no Admin
+
+Adicionar nova tab "Saude" no `Admin.tsx`:
+- Icone: HeartPulse
+- Renderizar `PlatformHealthPanel`
+- Posicionar ao lado de "Monitor"
+
+Atualizar o filtro de canal no `NotificationQueueSection.tsx`:
+- Adicionar opcao "Telegram" no select de canais
+
+### 6. Notificacao na notification_queue
+
+Adicionar `'telegram'` como valor valido no campo `channel`.
+A tabela ja suporta qualquer texto, nao precisa de migracao para isso.
 
 ## Arquivos a Criar/Editar
 
 | Arquivo | Acao |
 |---------|------|
-| Nova migracao SQL | Criar: tabela order_audit_log, coluna idempotency_key em orders, constraint UNIQUE customers, funcao create_order_transaction |
-| `supabase/functions/create-order/index.ts` | Criar: Edge Function wrapper com timeout e audit |
-| `supabase/config.toml` | Editar: adicionar create-order com verify_jwt = false |
-| `src/hooks/useCheckoutSubmit.ts` | Criar: hook com mutation, retry e feedback |
-| `src/pages/Checkout.tsx` | Editar: substituir handleSubmitOrder por chamada ao hook |
+| Nova migracao SQL | Criar: tabela system_health_events, trigger, funcao log_health_event, RLS |
+| `supabase/functions/process-notifications/index.ts` | Editar: substituir simulacao por envio real Telegram |
+| `supabase/functions/create-order/index.ts` | Editar: adicionar log_health_event em falhas |
+| `supabase/functions/health-check/index.ts` | Editar: adicionar log_health_event para criticos |
+| `src/hooks/useSystemHealth.ts` | Criar: hook com queries e realtime |
+| `src/components/admin/PlatformHealthPanel.tsx` | Criar: dashboard de saude |
+| `src/pages/Admin.tsx` | Editar: adicionar tab Saude |
+| `src/components/admin/NotificationQueueSection.tsx` | Editar: adicionar "Telegram" no filtro de canal |
 
 ## O que NAO muda
 
-- Tabelas existentes (exceto nova coluna em orders)
-- RLS policies existentes
-- Edge Functions existentes (process-payment, payment-webhook, etc.)
-- Fluxo de pagamento PIX (recebe order_id pronto)
-- UI do checkout (steps, formularios)
+- Fluxo de checkout transacional
+- Fluxo de pagamento PIX
+- Logica de idempotencia
+- RLS existentes em outras tabelas
+- Edge Functions de reconciliacao (apenas emissao de eventos)
 
-## Seguranca
+## Sequencia de Implementacao
 
-- Funcao SQL usa SECURITY DEFINER (bypassa RLS de forma controlada)
-- Edge Function valida restaurant ativo via `is_valid_restaurant()`
-- Rate limiting por IP e restaurant_id
-- Idempotency key previne duplicacao
-- Audit log registra todas as tentativas (debug e antifraude)
-- Nenhum secret exposto no frontend
-- `statement_timeout` de 15s previne transacoes longas
+1. Solicitar secrets `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`
+2. Migracao SQL (tabela + trigger + funcao RPC)
+3. Editar `process-notifications` para envio real via Telegram
+4. Editar Edge Functions para emitir eventos de saude
+5. Criar hook `useSystemHealth` + componente `PlatformHealthPanel`
+6. Integrar no Admin e atualizar filtros
+7. Testar end-to-end com botao de alerta de teste
 
 ## Riscos e Mitigacoes
 
 | Risco | Mitigacao |
 |-------|-----------|
-| Funcao SQL complexa | Testes manuais com chamada direta via SQL Editor antes de conectar frontend |
-| Timeout em transacoes | statement_timeout de 15s; operacoes simples (~5 INSERTs, < 100ms esperado) |
-| Falha na Edge Function | Retry 1x no frontend com mesma idempotency_key; audit log registra falha |
-| Audit log dentro de transacao que faz rollback | Logs de 'failed' sao gravados FORA da transacao pela Edge Function |
-
+| Token Telegram invalido | Validacao na Edge Function + log de erro + status=failed na fila |
+| Flood de mensagens | Dedup de 30 min no trigger + LIMIT 20 no batch + rate limit existente |
+| Telegram API fora do ar | Retry automatico via attempts/max_attempts (3 tentativas) |
+| Eventos demais em system_health_events | Indice eficiente + cleanup futuro (90 dias) |
