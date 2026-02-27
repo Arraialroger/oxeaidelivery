@@ -1435,6 +1435,50 @@ export type Database = {
           },
         ]
       }
+      restaurant_payment_settings: {
+        Row: {
+          created_at: string
+          encrypted_access_token: string | null
+          gateway_mode: string
+          id: string
+          is_active: boolean
+          provider: string
+          public_key: string | null
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_access_token?: string | null
+          gateway_mode?: string
+          id?: string
+          is_active?: boolean
+          provider?: string
+          public_key?: string | null
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_access_token?: string | null
+          gateway_mode?: string
+          id?: string
+          is_active?: boolean
+          provider?: string
+          public_key?: string | null
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_payment_settings_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurants: {
         Row: {
           accepted_payments: string[] | null
