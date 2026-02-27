@@ -1,31 +1,33 @@
 
 
-# Corrigir Domínio no Onboarding
+# Corrigir Tabs do Admin que Somem no Deploy
 
-## Problema
-O campo "Link do seu cardápio" exibe o hostname do preview do Lovable (`0384a06e-621e-...lovableproject.com/`) em vez do domínio real `deliveryarraial.com.br`.
+## Diagnostico
 
-Isso acontece porque usamos `window.location.hostname`, que retorna o domínio do ambiente atual -- que no preview de desenvolvimento é o ID do projeto Lovable.
+A classe `sm:grid-cols-13` usada no `TabsList` do Admin nao e uma classe padrao do Tailwind CSS (que suporta apenas ate `grid-cols-12`). No modo de desenvolvimento (Vite HMR), o Tailwind pode gerar a classe sob demanda, mas no build de producao ela e descartada por nao existir na configuracao. Resultado: os tabs ficam limitados a `grid-cols-6` e as abas excedentes (Entrega, Cupons, Upsell, Monitor, Saude, Pagamento) ficam ocultas.
 
 ## Solucao
 
-### 1. Criar variavel de ambiente `VITE_APP_DOMAIN`
-No arquivo `.env`, adicionar:
-```
-VITE_APP_DOMAIN="deliveryarraial.com.br"
+Substituir o layout de grid fixo por um layout com scroll horizontal, que e mais adequado para 13 abas e funciona bem em qualquer tamanho de tela.
+
+### Arquivo: `src/pages/Admin.tsx`
+
+Alterar a `TabsList` de:
+```tsx
+<TabsList className="grid w-full grid-cols-6 sm:grid-cols-13">
 ```
 
-### 2. Atualizar `src/pages/Onboarding.tsx`
-Substituir todas as 3 ocorrencias de `window.location.hostname` por:
-```ts
-const appDomain = import.meta.env.VITE_APP_DOMAIN || window.location.hostname;
+Para:
+```tsx
+<TabsList className="flex w-full overflow-x-auto">
 ```
 
 Isso garante que:
-- Em producao com dominio customizado: mostra `deliveryarraial.com.br`
-- Em qualquer outro ambiente sem a variavel: mostra o hostname atual como fallback
+- Todas as 13 abas ficam visiveis e acessiveis
+- Em telas pequenas, o usuario pode rolar horizontalmente
+- Nao depende de classes custom do Tailwind
+- Funciona identicamente em dev e producao
 
 ### Arquivos modificados
-- `.env` -- adicionar `VITE_APP_DOMAIN`
-- `src/pages/Onboarding.tsx` -- usar a variavel em vez de `window.location.hostname` (3 ocorrencias: campo de slug, preview do cartao, e resumo final)
+- `src/pages/Admin.tsx` -- uma unica linha alterada na `TabsList`
 
