@@ -297,42 +297,6 @@ export type Database = {
           },
         ]
       }
-      config: {
-        Row: {
-          delivery_fee: number | null
-          hero_banner_url: string | null
-          id: number
-          kds_enabled: boolean | null
-          loyalty_enabled: boolean | null
-          loyalty_min_order: number | null
-          loyalty_reward_value: number | null
-          loyalty_stamps_goal: number | null
-          restaurant_open: boolean | null
-        }
-        Insert: {
-          delivery_fee?: number | null
-          hero_banner_url?: string | null
-          id: number
-          kds_enabled?: boolean | null
-          loyalty_enabled?: boolean | null
-          loyalty_min_order?: number | null
-          loyalty_reward_value?: number | null
-          loyalty_stamps_goal?: number | null
-          restaurant_open?: boolean | null
-        }
-        Update: {
-          delivery_fee?: number | null
-          hero_banner_url?: string | null
-          id?: number
-          kds_enabled?: boolean | null
-          loyalty_enabled?: boolean | null
-          loyalty_min_order?: number | null
-          loyalty_reward_value?: number | null
-          loyalty_stamps_goal?: number | null
-          restaurant_open?: boolean | null
-        }
-        Relationships: []
-      }
       coupon_uses: {
         Row: {
           coupon_id: string
