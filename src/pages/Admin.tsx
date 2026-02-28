@@ -16,7 +16,7 @@ import { DashboardPanel } from '@/components/admin/DashboardPanel';
 import { DeliveryZonesManager } from '@/components/admin/DeliveryZonesManager';
 import { CouponList } from '@/components/admin/CouponList';
 import { CouponForm } from '@/components/admin/CouponForm';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag, CreditCard } from 'lucide-react';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag, CreditCard, Shield } from 'lucide-react';
 import { UpsellManager } from '@/components/admin/UpsellManager';
 import { PaymentSettingsForm } from '@/components/admin/PaymentSettingsForm';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 export default function Admin() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
-  const { user, isAdmin, loading, signOut } = useAuth();
+  const { user, isAdmin, isSuperAdmin, loading, signOut } = useAuth();
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
@@ -73,6 +73,14 @@ export default function Admin() {
               </a>
             </div>
             <div className="flex items-center gap-2">
+              {isSuperAdmin && (
+                <a href="/platform-admin">
+                  <Button variant="outline" size="sm" className="gap-2 border-primary text-primary">
+                    <Shield className="w-4 h-4" />
+                    <span className="hidden sm:inline">Plataforma</span>
+                  </Button>
+                </a>
+              )}
               <a href={`/${slug}/admin/customers`} target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-2">
                   <Users className="w-4 h-4" />
