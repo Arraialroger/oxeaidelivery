@@ -14,7 +14,7 @@ export default function PlatformAdmin() {
 
   useEffect(() => {
     if (!loading && (!user || !isSuperAdmin)) {
-      navigate('/');
+      navigate('/platform-admin/login');
     }
   }, [user, isSuperAdmin, loading, navigate]);
 
