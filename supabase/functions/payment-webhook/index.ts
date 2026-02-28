@@ -27,6 +27,49 @@ function mapStatus(mpStatus: string): string {
   return map[mpStatus] || "pending";
 }
 
+/**
+ * Resolve the Mercado Pago access token for a given restaurant.
+ * If the restaurant uses own_gateway, decrypt their stored token.
+ * Otherwise, fall back to the platform-level MERCADOPAGO_ACCESS_TOKEN.
+ */
+async function getMpTokenForRestaurant(
+  supabase: ReturnType<typeof createClient>,
+  restaurantId: string,
+  log: (action: string, detail?: unknown) => void,
+): Promise<string> {
+  const { data: settings } = await supabase
+    .from("restaurant_payment_settings")
+    .select("gateway_mode, encrypted_access_token")
+    .eq("restaurant_id", restaurantId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (settings?.gateway_mode === "own_gateway" && settings?.encrypted_access_token) {
+    const encryptionKey = Deno.env.get("PAYMENT_ENCRYPTION_KEY");
+    if (encryptionKey) {
+      try {
+        const { data: decryptedToken, error: decError } = await supabase.rpc(
+          "decrypt_payment_token",
+          { p_encrypted: settings.encrypted_access_token, p_key: encryptionKey },
+        );
+        if (!decError && decryptedToken) {
+          log("using_restaurant_gateway", { restaurant_id: restaurantId });
+          return decryptedToken;
+        }
+        log("decryption_failed", { error: decError?.message });
+      } catch (err) {
+        log("gateway_decrypt_error", { error: (err as Error).message });
+      }
+    }
+  }
+
+  // Fallback: platform token
+  log("using_platform_gateway", { restaurant_id: restaurantId });
+  const token = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+  if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN not configured");
+  return token;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -66,16 +109,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify with Mercado Pago
-    const mpToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
-    if (!mpToken) {
-      log("missing_mp_token");
-      return new Response("Server configuration error", { status: 500, headers: corsHeaders });
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // Find our payment record FIRST so we know which restaurant it belongs to
+    const { data: payment, error: findError } = await supabase
+      .from("payments")
+      .select("id, order_id, status, restaurant_id")
+      .eq("provider_payment_id", String(mpPaymentId))
+      .maybeSingle();
+
+    if (findError || !payment) {
+      log("payment_not_found", { provider_payment_id: mpPaymentId });
+      if (!findError) {
+        log("suspicious_webhook", { provider_payment_id: mpPaymentId });
+      }
+      return new Response(JSON.stringify({ received: true, warning: "payment_not_found" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
+    // Resolve the correct MP token for THIS restaurant (multi-tenant)
+    const mpToken = await getMpTokenForRestaurant(supabase, payment.restaurant_id, log);
+
+    // Verify with Mercado Pago using the restaurant-specific token
     const mpResponse = await fetch(
       `https://api.mercadopago.com/v1/payments/${mpPaymentId}`,
-      { headers: { Authorization: `Bearer ${mpToken}` } }
+      { headers: { Authorization: `Bearer ${mpToken}` } },
     );
 
     if (!mpResponse.ok) {
@@ -87,29 +149,6 @@ Deno.serve(async (req) => {
     const mpPayment = await mpResponse.json();
     const internalStatus = mapStatus(mpPayment.status);
     log("mp_verified", { mp_status: mpPayment.status, internal_status: internalStatus });
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    // Find our payment record
-    const { data: payment, error: findError } = await supabase
-      .from("payments")
-      .select("id, order_id, status, restaurant_id")
-      .eq("provider_payment_id", String(mpPaymentId))
-      .maybeSingle();
-
-    if (findError || !payment) {
-      log("payment_not_found", { provider_payment_id: mpPaymentId });
-      // Register suspicious webhook alert
-      if (!findError) {
-        log("suspicious_webhook", { provider_payment_id: mpPaymentId });
-      }
-      return new Response(JSON.stringify({ received: true, warning: "payment_not_found" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     log("payment_found", { payment_id: payment.id, current_status: payment.status, new_status: internalStatus });
 
@@ -171,7 +210,6 @@ Deno.serve(async (req) => {
 
       if (orderError) {
         log("order_update_error", { order_id: payment.order_id, error: orderError.message });
-        // Register alert for failed order update
         await supabase.from("payment_alerts").insert({
           restaurant_id: payment.restaurant_id,
           alert_type: "order_update_failed",
@@ -183,7 +221,6 @@ Deno.serve(async (req) => {
         log("order_updated", { order_id: payment.order_id, from: orderCheck?.status, to: "preparing" });
       }
 
-      // KDS event
       await supabase.from("kds_events").insert({
         order_id: payment.order_id,
         restaurant_id: payment.restaurant_id,
@@ -207,7 +244,7 @@ Deno.serve(async (req) => {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    log("error", { message: error.message });
+    log("error", { message: (error as Error).message });
     return new Response(JSON.stringify({ received: true, error: "processing_error" }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
