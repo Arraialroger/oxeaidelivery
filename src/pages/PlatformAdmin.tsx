@@ -4,7 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { PlatformMonitorPanel } from '@/components/platform/PlatformMonitorPanel';
 import { PlatformHealthPanel } from '@/components/platform/PlatformHealthPanel';
-import { Activity, HeartPulse, LogOut, Shield } from 'lucide-react';
+import { PlatformRestaurantsPanel } from '@/components/platform/PlatformRestaurantsPanel';
+import { Activity, HeartPulse, LogOut, Shield, Store } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function PlatformAdmin() {
@@ -49,8 +50,12 @@ export default function PlatformAdmin() {
       </header>
 
       <main className="container mx-auto px-4 py-6 lg:px-8">
-        <Tabs defaultValue="monitor" className="space-y-6">
+        <Tabs defaultValue="restaurants" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="restaurants" className="gap-2">
+              <Store className="w-4 h-4" />
+              Restaurantes
+            </TabsTrigger>
             <TabsTrigger value="monitor" className="gap-2">
               <Activity className="w-4 h-4" />
               Monitor
@@ -60,6 +65,13 @@ export default function PlatformAdmin() {
               Saúde
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="restaurants" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Gestão de Restaurantes</h2>
+            </div>
+            <PlatformRestaurantsPanel />
+          </TabsContent>
 
           <TabsContent value="monitor" className="space-y-4">
             <div className="flex items-center justify-between">

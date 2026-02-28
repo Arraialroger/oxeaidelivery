@@ -1884,6 +1884,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_platform_restaurants_overview: { Args: never; Returns: Json }
       get_top_products: {
         Args: {
           p_from: string
