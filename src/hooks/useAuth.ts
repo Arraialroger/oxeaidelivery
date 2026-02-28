@@ -7,6 +7,7 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -22,6 +23,7 @@ export function useAuth() {
           }, 0);
         } else {
           setIsAdmin(false);
+          setIsSuperAdmin(false);
           setLoading(false);
         }
       }
@@ -47,14 +49,15 @@ export function useAuth() {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
+        .eq('user_id', userId);
       
-      setIsAdmin(!!data);
+      const roles = (data || []).map((r: any) => r.role);
+      setIsAdmin(roles.includes('admin') || roles.includes('super_admin'));
+      setIsSuperAdmin(roles.includes('super_admin'));
     } catch (error) {
       console.error('Error checking admin role:', error);
       setIsAdmin(false);
+      setIsSuperAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -112,6 +115,7 @@ export function useAuth() {
     session,
     loading,
     isAdmin,
+    isSuperAdmin,
     signIn,
     signUp,
     signOut,
