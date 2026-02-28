@@ -16,10 +16,8 @@ import { DashboardPanel } from '@/components/admin/DashboardPanel';
 import { DeliveryZonesManager } from '@/components/admin/DeliveryZonesManager';
 import { CouponList } from '@/components/admin/CouponList';
 import { CouponForm } from '@/components/admin/CouponForm';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag, Activity, HeartPulse, CreditCard } from 'lucide-react';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag, CreditCard } from 'lucide-react';
 import { UpsellManager } from '@/components/admin/UpsellManager';
-import { PaymentMonitorPanel } from '@/components/admin/PaymentMonitorPanel';
-import { PlatformHealthPanel } from '@/components/admin/PlatformHealthPanel';
 import { PaymentSettingsForm } from '@/components/admin/PaymentSettingsForm';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -128,14 +126,6 @@ export default function Admin() {
             <TabsTrigger value="upsell" className="gap-2">
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline">Upsell</span>
-            </TabsTrigger>
-            <TabsTrigger value="monitor" className="gap-2">
-              <Activity className="w-4 h-4" />
-              <span className="hidden sm:inline">Monitor</span>
-            </TabsTrigger>
-            <TabsTrigger value="health" className="gap-2">
-              <HeartPulse className="w-4 h-4" />
-              <span className="hidden sm:inline">Saúde</span>
             </TabsTrigger>
             <TabsTrigger value="payments" className="gap-2">
               <CreditCard className="w-4 h-4" />
@@ -249,21 +239,8 @@ export default function Admin() {
             <UpsellManager />
           </TabsContent>
 
-          {/* Monitor Tab */}
-          <TabsContent value="monitor" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Monitor de Pagamentos</h2>
-            </div>
-            <PaymentMonitorPanel />
-          </TabsContent>
 
-          {/* Health Tab */}
-          <TabsContent value="health" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Saúde da Plataforma</h2>
-            </div>
-            <PlatformHealthPanel />
-          </TabsContent>
+
 
           {/* Payment Settings Tab */}
           <TabsContent value="payments">

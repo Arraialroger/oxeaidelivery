@@ -26,6 +26,7 @@ const TermsOfUse = lazy(() => import("./pages/TermsOfUse"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const RestaurantDetails = lazy(() => import("./pages/RestaurantDetails"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => (
               </Route>
               
               {/* Global pages */}
+              <Route path="/platform-admin" element={<PlatformAdmin />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/privacidade" element={<PrivacyPolicy />} />
               <Route path="/termos" element={<TermsOfUse />} />
