@@ -1,91 +1,187 @@
 
 
-# Rotina de Limpeza Automatica do Banco de Dados
+# Fase 1: Tema Dinamico por Restaurante
 
-## Diagnostico Atual
+## Resumo
 
-**Cron jobs existentes:**
-| Job | Frequencia | O que faz |
-|-----|-----------|-----------|
-| reconcile-payments-every-5min | */5 min | Reconcilia pagamentos |
-| health-check-every-10min | */10 min | Verifica saude do sistema |
-| process-notifications-every-2min | */2 min | Processa fila de notificacoes |
-| cleanup-reconciliation-runs (job 2) | Domingo 3AM | DELETE > 60 dias (DUPLICADO) |
-| cleanup-reconciliation-runs-90d (job 4) | Domingo 3AM | DELETE > 90 dias |
+Implementar um sistema de cores dinamicas onde cada restaurante configura suas cores no painel admin, e o frontend aplica automaticamente via CSS variables. Zero impacto no banco (usa o JSONB `settings` existente). Fallback para tema neutro otimizado para conversao.
 
-**Problemas encontrados:**
-1. Job duplicado de limpeza (job 2 e job 4) -- um limpa 60d, outro 90d
-2. Nenhuma limpeza para: `system_health_events`, `payment_events`, `kds_events`, `checkout_events`, `delivery_attempts_log`, `notification_queue` (processadas), `order_audit_log`, `sms_codes`, `push_subscriptions` expiradas
-3. Essas tabelas crescem infinitamente em producao
+## O que muda para o lojista
 
-## Politica de Retencao Recomendada
+Uma nova secao "Cores / Aparencia" aparece dentro da aba **Perfil** do admin, com 4 color pickers simples:
+- **Cor primaria** (botoes, destaques, CTA)
+- **Cor secundaria** (fundo de cards, badges)
+- **Cor de fundo** (background geral)
+- **Cor de texto** (textos principais)
 
-| Tabela | Retencao | Justificativa |
-|--------|----------|---------------|
-| reconciliation_runs | 90 dias | Auditoria de cron, volume alto |
-| system_health_events | 90 dias | Observabilidade, volume medio |
-| payment_events | 180 dias | Auditoria financeira, requer mais tempo |
-| kds_events | 60 dias | Operacional, alto volume |
-| checkout_events | 90 dias | Analytics de funil |
-| delivery_attempts_log | 90 dias | Otimizacao de zonas |
-| notification_queue (sent) | 30 dias | Ja processadas, so historico |
-| order_audit_log | 180 dias | Auditoria de pedidos |
-| sms_codes | 1 dia | Efemeros, ja existe funcao mas sem cron |
-| push_subscriptions (expiradas) | 0 dias | Ja expiradas, sem utilidade |
-| payment_alerts (resolvidos) | 90 dias | Historico de alertas |
-| upsell_events | 90 dias | Analytics de conversao |
-| referral_clicks | 180 dias | Analytics de marketing |
+Preview em tempo real ao lado dos pickers mostrando como ficam botao, card e texto.
 
-## Plano de Implementacao
+---
 
-### Passo 1: Remover job duplicado
-Executar via SQL (nao migration): `SELECT cron.unschedule(2);` para remover o job antigo de 60 dias.
+## Arquitetura Tecnica
 
-### Passo 2: Criar cron job unificado de limpeza
-Um unico job semanal (Domingo 3AM UTC) que executa todos os DELETEs em sequencia:
+### 1. Banco de Dados (zero migrations)
+
+As cores ficam dentro de `restaurants.settings` (JSONB), adicionando um objeto `theme`:
 
 ```text
-DELETE FROM reconciliation_runs WHERE executed_at < NOW() - INTERVAL '90 days';
-DELETE FROM system_health_events WHERE created_at < NOW() - INTERVAL '90 days';
-DELETE FROM kds_events WHERE created_at < NOW() - INTERVAL '60 days';
-DELETE FROM checkout_events WHERE created_at < NOW() - INTERVAL '90 days';
-DELETE FROM delivery_attempts_log WHERE created_at < NOW() - INTERVAL '90 days';
-DELETE FROM notification_queue WHERE status = 'sent' AND sent_at < NOW() - INTERVAL '30 days';
-DELETE FROM notification_queue WHERE status = 'failed' AND created_at < NOW() - INTERVAL '30 days';
-DELETE FROM payment_events WHERE created_at < NOW() - INTERVAL '180 days';
-DELETE FROM order_audit_log WHERE created_at < NOW() - INTERVAL '180 days';
-DELETE FROM payment_alerts WHERE resolved = true AND resolved_at < NOW() - INTERVAL '90 days';
-DELETE FROM upsell_events WHERE created_at < NOW() - INTERVAL '90 days';
-DELETE FROM referral_clicks WHERE created_at < NOW() - INTERVAL '180 days';
-DELETE FROM sms_codes WHERE created_at < NOW() - INTERVAL '1 day';
-DELETE FROM push_subscriptions WHERE expires_at < NOW();
+settings: {
+  ...campos_existentes,
+  theme: {
+    primary: "#E63946",
+    secondary: "#1D3557",
+    background: "#FFFFFF",
+    foreground: "#1A1A2E"
+  }
+}
 ```
 
-### Passo 3: Remover job antigo de reconciliation_runs (job 4)
-Substituido pelo job unificado: `SELECT cron.unschedule(4);`
+Nenhuma coluna nova. Nenhuma migration. O campo `primary_color` e `secondary_color` existentes na tabela continuam para compatibilidade (favicon, PWA), mas o tema visual usa `settings.theme`.
 
-## Execucao Tecnica
+### 2. Tipo RestaurantSettings (src/types/restaurant.ts)
 
-Tudo sera feito via SQL direto (nao migration), pois:
-- Contem dados especificos do projeto (job IDs)
-- Cron jobs nao devem ser replicados em remix
+Adicionar interface `RestaurantTheme` e campo `theme?` ao `RestaurantSettings`. Definir `DEFAULT_THEME` neutro:
 
-Serao 3 operacoes SQL sequenciais:
-1. `cron.unschedule(2)` -- remove duplicado
-2. `cron.unschedule(4)` -- remove antigo individual
-3. `cron.schedule('db-cleanup-weekly', ...)` -- cria job unificado
+```text
+DEFAULT_THEME = {
+  primary: "#E63946"    -- vermelho conversivo (CTA forte)
+  secondary: "#1D3557"  -- azul escuro (confianca)
+  background: "#FFFFFF" -- fundo limpo
+  foreground: "#1A1A2E" -- texto escuro legivel
+}
+```
 
-## Resultado Esperado
+### 3. Injecao de CSS Variables (src/contexts/RestaurantContext.tsx)
 
-- Um unico job de limpeza semanal cobrindo todas as tabelas de logs
-- Zero acumulo infinito de dados
-- Dados financeiros preservados por 6 meses (payment_events, order_audit_log)
-- Dados operacionais preservados por 60-90 dias
-- Dados efemeros limpos em 24h-30 dias
+Dentro do `RestaurantProvider`, apos carregar o restaurante, injetar CSS variables no `document.documentElement.style`:
 
-## Indicadores para Acompanhar
+```text
+--primary: [HSL convertido de theme.primary]
+--primary-foreground: [calculado automaticamente]
+--background: [HSL convertido de theme.background]
+--foreground: [HSL convertido de theme.foreground]
+--secondary: [HSL convertido de theme.secondary]
+--card: [derivado de background]
+--muted: [derivado de secondary]
+--border: [derivado de secondary]
+--ring: [igual ao primary]
+```
 
-- Volume das tabelas de logs (query semanal)
-- Execucao do job no `cron.job_run_details`
-- Tempo de execucao do cleanup (se > 30s, considerar batch)
+Isso substitui automaticamente todas as CSS variables do Tailwind definidas em `index.css`, sem precisar alterar nenhum componente existente. Todos os botoes, cards, textos e backgrounds ja usam essas variables.
+
+Logica de cleanup: ao desmontar o provider, remover as variables para nao contaminar outros restaurantes.
+
+### 4. Utilidade de Conversao HEX -> HSL (src/lib/themeUtils.ts)
+
+Criar funcao `hexToHSL(hex: string): string` que converte "#E63946" para "355 80% 56%" (formato Tailwind sem `hsl()`).
+
+Funcao `applyTheme(theme: RestaurantTheme)` que calcula todas as variables derivadas e aplica no DOM.
+
+Funcao `removeTheme()` para cleanup.
+
+Validacao: aceitar apenas hex validos (`/^#[0-9A-Fa-f]{6}$/`), rejeitar qualquer outro input (prevencao de CSS injection).
+
+### 5. Editor de Cores no Admin (src/components/admin/RestaurantProfileForm.tsx)
+
+Adicionar um novo Card "Aparencia" dentro do formulario existente, com:
+- 4 inputs `type="color"` nativos do HTML (funcionam em todos os browsers, zero dependencia)
+- Ao lado, um mini-preview com: botao primario, card com fundo secondary, texto foreground sobre background
+- O preview atualiza em tempo real conforme o usuario muda as cores
+- Botao "Restaurar Padrao" que reseta para DEFAULT_THEME
+
+As cores sao salvas no campo `settings` via `useRestaurantProfile` (ja existe a mutation de update).
+
+### 6. Hook useRestaurantProfile (update)
+
+Atualizar o hook para incluir `theme` no UpdateProfileData, salvando dentro de `settings.theme` via merge com settings existentes.
+
+### 7. useRestaurantHead (update)
+
+Atualizar para usar `settings.theme.primary` como `theme-color` do PWA (com fallback para `primary_color`).
+
+---
+
+## Fluxo Completo
+
+```text
+Lojista abre Admin > Perfil > Aparencia
+  |
+  v
+Escolhe 4 cores com color picker nativo
+  |
+  v
+Preview em tempo real mostra resultado
+  |
+  v
+Clica "Salvar"
+  |
+  v
+settings.theme salvo no JSONB do restaurants
+  |
+  v
+Cliente acessa /slug/menu
+  |
+  v
+RestaurantProvider carrega restaurant
+  |
+  v
+useEffect injeta CSS variables no :root
+  |
+  v
+Tailwind aplica as cores em TODOS os componentes automaticamente
+```
+
+---
+
+## Arquivos a criar/modificar
+
+| Arquivo | Acao |
+|---------|------|
+| `src/lib/themeUtils.ts` | **Criar** - hexToHSL, applyTheme, removeTheme |
+| `src/types/restaurant.ts` | **Modificar** - adicionar RestaurantTheme + DEFAULT_THEME |
+| `src/contexts/RestaurantContext.tsx` | **Modificar** - useEffect para injetar CSS variables |
+| `src/components/admin/RestaurantProfileForm.tsx` | **Modificar** - adicionar Card "Aparencia" com color pickers |
+| `src/hooks/useRestaurantProfile.ts` | **Modificar** - incluir theme no update |
+| `src/hooks/useRestaurantHead.ts` | **Modificar** - usar theme.primary para PWA |
+
+---
+
+## Tema Padrao Neutro (otimizado para conversao)
+
+Quando o restaurante nao configura nada, aplica-se:
+- **Primaria**: Vermelho (#E63946) -- cor de maior conversao em delivery/food
+- **Secundaria**: Azul escuro (#1D3557) -- transmite confianca
+- **Fundo**: Branco (#FFFFFF) -- limpo, profissional
+- **Texto**: Quase preto (#1A1A2E) -- legibilidade maxima
+
+Esse tema segue os padroes de iFood, Rappi e UberEats.
+
+---
+
+## Seguranca
+
+- Validacao regex de hex no frontend e no Zod schema
+- CSS variables sao injetadas via `style.setProperty()` (seguro, nao aceita CSS arbitrario)
+- Nenhum `dangerouslySetInnerHTML` ou template literal de CSS
+- Isolamento garantido: cleanup no unmount do provider
+
+---
+
+## Riscos e Mitigacoes
+
+| Risco | Mitigacao |
+|-------|----------|
+| Lojista escolhe cores com baixo contraste | Mini-preview mostra resultado em tempo real |
+| Flash de tema padrao antes do tema carregar | Tema padrao neutro (branco) nao causa flash visivel |
+| Cores do admin (dashboard) serem afetadas | Admin nao esta dentro do RestaurantProvider, logo nao e afetado |
+
+---
+
+## O que NAO esta nesta fase (futuro)
+
+- Marketplace de temas prontos
+- Dark mode toggle
+- Custom CSS
+- Upload de favicon customizado (ja funciona via logo)
+- Validacao WCAG de contraste
 
