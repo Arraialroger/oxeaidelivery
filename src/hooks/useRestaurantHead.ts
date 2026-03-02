@@ -24,7 +24,7 @@ export function useRestaurantHead(restaurant: Restaurant | null) {
     const title = `${restaurant.name} | Delivery`;
     const description = (restaurant as any).description || DEFAULT_DESCRIPTION;
     const favicon = restaurant.logo_url || DEFAULT_FAVICON;
-    const themeColor = restaurant.primary_color || DEFAULT_THEME_COLOR;
+    const themeColor = restaurant.settings?.theme?.primary || restaurant.primary_color || DEFAULT_THEME_COLOR;
     const ogImage = restaurant.hero_banner_url || restaurant.logo_url || DEFAULT_FAVICON;
 
     document.title = title;
@@ -68,8 +68,8 @@ export function useRestaurantHead(restaurant: Restaurant | null) {
       name: restaurant.name,
       short_name: restaurant.name.substring(0, 12),
       description: (restaurant as any).description || 'Faça seu pedido',
-      theme_color: restaurant.primary_color || DEFAULT_THEME_COLOR,
-      background_color: restaurant.primary_color || DEFAULT_THEME_COLOR,
+      theme_color: restaurant.settings?.theme?.primary || restaurant.primary_color || DEFAULT_THEME_COLOR,
+      background_color: restaurant.settings?.theme?.background || restaurant.primary_color || DEFAULT_THEME_COLOR,
       display: 'standalone',
       orientation: 'portrait',
       start_url: `/${restaurant.slug}/menu`,

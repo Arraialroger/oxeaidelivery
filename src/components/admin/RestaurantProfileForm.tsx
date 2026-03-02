@@ -11,7 +11,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Separator } from '@/components/ui/separator';
 import { GalleryUploader } from './GalleryUploader';
 import { ImageUploader } from './ImageUploader';
+import { ThemeEditor } from './ThemeEditor';
 import { useRestaurantProfile, UpdateProfileData } from '@/hooks/useRestaurantProfile';
+import { DEFAULT_THEME } from '@/lib/themeUtils';
+import type { RestaurantTheme } from '@/lib/themeUtils';
 import { Loader2, Save, Instagram, Store, Image } from 'lucide-react';
 
 const PAYMENT_OPTIONS = [
@@ -34,6 +37,12 @@ const formSchema = z.object({
   avg_delivery_time: z.coerce.number().min(1).max(180).optional().nullable(),
   accepted_payments: z.array(z.string()),
   gallery_urls: z.array(z.string()),
+  theme: z.object({
+    primary: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    secondary: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    background: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    foreground: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  }),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -56,6 +65,7 @@ export function RestaurantProfileForm() {
       avg_delivery_time: 40,
       accepted_payments: ['pix', 'dinheiro', 'credito', 'debito'],
       gallery_urls: [],
+      theme: DEFAULT_THEME,
     },
   });
 
@@ -74,6 +84,7 @@ export function RestaurantProfileForm() {
         avg_delivery_time: profile.avg_delivery_time || 40,
         accepted_payments: profile.accepted_payments || ['pix', 'dinheiro', 'credito', 'debito'],
         gallery_urls: profile.gallery_urls || [],
+        theme: (profile as any).settings?.theme || DEFAULT_THEME,
       });
     }
   }, [profile, form]);
@@ -92,6 +103,7 @@ export function RestaurantProfileForm() {
       avg_delivery_time: data.avg_delivery_time || null,
       accepted_payments: data.accepted_payments,
       gallery_urls: data.gallery_urls,
+      theme: data.theme as { primary: string; secondary: string; background: string; foreground: string },
     };
 
     await update(updateData);
@@ -162,6 +174,12 @@ export function RestaurantProfileForm() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Theme Editor */}
+        <ThemeEditor
+          value={(form.watch('theme') as RestaurantTheme) || DEFAULT_THEME}
+          onChange={(theme) => form.setValue('theme', theme, { shouldDirty: true })}
+        />
 
         {/* Header Info */}
         <Card>

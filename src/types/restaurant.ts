@@ -15,6 +15,13 @@ export interface Restaurant {
   updated_at: string | null;
 }
 
+export interface RestaurantTheme {
+  primary: string;
+  secondary: string;
+  background: string;
+  foreground: string;
+}
+
 export interface RestaurantSettings {
   is_open: boolean;
   schedule_mode: 'auto' | 'manual';
@@ -27,6 +34,7 @@ export interface RestaurantSettings {
   loyalty_reward_value: number;
   upsell_enabled?: boolean;
   upsell_min_cart_value?: number;
+  theme?: RestaurantTheme;
 }
 
 export const DEFAULT_SETTINGS: RestaurantSettings = {
