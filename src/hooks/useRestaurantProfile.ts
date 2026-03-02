@@ -34,6 +34,7 @@ export interface UpdateProfileData {
   accepted_payments?: string[];
   min_order?: number | null;
   avg_delivery_time?: number | null;
+  theme?: { primary: string; secondary: string; background: string; foreground: string };
 }
 
 export function useRestaurantProfile() {
@@ -77,9 +78,29 @@ export function useRestaurantProfile() {
     mutationFn: async (updateData: UpdateProfileData) => {
       if (!profile?.id) throw new Error('Perfil não encontrado');
 
+      // Separate theme from direct columns
+      const { theme, ...directFields } = updateData;
+
+      // If theme is provided, merge it into settings JSONB
+      let updatePayload: Record<string, any> = { ...directFields };
+      if (theme) {
+        // Fetch current settings to merge
+        const { data: current } = await supabase
+          .from('restaurants')
+          .select('settings')
+          .eq('id', profile.id)
+          .single();
+
+        const currentSettings = (current?.settings && typeof current.settings === 'object')
+          ? current.settings as Record<string, any>
+          : {};
+
+        updatePayload.settings = { ...currentSettings, theme };
+      }
+
       const { error } = await supabase
         .from('restaurants')
-        .update(updateData)
+        .update(updatePayload)
         .eq('id', profile.id);
 
       if (error) throw error;

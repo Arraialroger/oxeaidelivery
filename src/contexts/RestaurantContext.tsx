@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRestaurantBySlug } from '@/hooks/useRestaurant';
 import type { Restaurant, RestaurantSettings } from '@/types/restaurant';
 import { DEFAULT_SETTINGS } from '@/types/restaurant';
+import { applyTheme, removeTheme, DEFAULT_THEME } from '@/lib/themeUtils';
 
 interface RestaurantContextType {
   restaurant: Restaurant | null;
@@ -29,6 +30,14 @@ export function RestaurantProvider({ children }: { children: React.ReactNode }) 
     isError,
     notFound: isFetched && !restaurant && !!slug,
   }), [restaurant, slug, isLoading, isError, isFetched]);
+
+  // Inject dynamic theme CSS variables
+  useEffect(() => {
+    if (!restaurant) return;
+    const theme = restaurant.settings?.theme ?? DEFAULT_THEME;
+    applyTheme(theme);
+    return () => removeTheme();
+  }, [restaurant]);
 
   return (
     <RestaurantContext.Provider value={value}>
