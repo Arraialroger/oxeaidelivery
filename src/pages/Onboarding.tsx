@@ -365,6 +365,7 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
   const [success, setSuccess] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -375,6 +376,17 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   };
 
+  const mapAuthError = (msg: string): string => {
+    const lower = msg.toLowerCase();
+    if (lower.includes('invalid login')) return 'E-mail ou senha incorretos';
+    if (lower.includes('email not confirmed')) return 'Confirme seu e-mail antes de fazer login';
+    if (lower.includes('already registered') || lower.includes('user already registered')) return 'E-mail já cadastrado. Tente fazer login.';
+    if (lower.includes('email_address_invalid') || lower.includes('email address') && lower.includes('invalid')) return 'Endereço de e-mail inválido. Verifique e tente novamente.';
+    if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('request rate limit')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+    if (lower.includes('password should be at least') || lower.includes('weak_password')) return 'A senha deve ter pelo menos 6 caracteres';
+    return `Erro: ${msg}`;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -382,7 +394,7 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     setIsSubmitting(false);
     if (authError) {
-      setError(authError.message.includes('Invalid login') ? 'E-mail ou senha incorretos' : 'Erro ao fazer login');
+      setError(mapAuthError(authError.message));
     } else {
       onAuthenticated();
     }
@@ -393,6 +405,7 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
     setError('');
     if (name.length < 2) { setError('Nome deve ter pelo menos 2 caracteres'); return; }
     if (password.length < 6) { setError('Senha deve ter pelo menos 6 caracteres'); return; }
+    if (password !== confirmPassword) { setError('As senhas não coincidem'); return; }
     setIsSubmitting(true);
     const { data, error: authError } = await supabase.auth.signUp({
       email,
@@ -401,7 +414,7 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
     });
     setIsSubmitting(false);
     if (authError) {
-      setError(authError.message.includes('already registered') ? 'E-mail já cadastrado. Tente fazer login.' : 'Erro ao criar conta');
+      setError(mapAuthError(authError.message));
       return;
     }
     if (data?.user?.identities?.length === 0) {
@@ -456,6 +469,10 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input type="password" placeholder="Senha (mín. 6 caracteres)" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" disabled={isSubmitting} />
                 </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input type="password" placeholder="Confirme sua senha" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pl-10" disabled={isSubmitting} />
+                </div>
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando...</> : 'Criar conta'}
                 </Button>
@@ -483,6 +500,7 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
     </div>
   );
 }
+
 
 export default function Onboarding() {
   const navigate = useNavigate();
