@@ -1,187 +1,55 @@
 
 
-# Fase 1: Tema Dinamico por Restaurante
+# Correção dos 3 Problemas de Autenticação
 
-## Resumo
+## Problemas Identificados
 
-Implementar um sistema de cores dinamicas onde cada restaurante configura suas cores no painel admin, e o frontend aplica automaticamente via CSS variables. Zero impacto no banco (usa o JSONB `settings` existente). Fallback para tema neutro otimizado para conversao.
+### Problema 1: "E-mail já cadastrado mas não confirmado" em outro restaurante
+**Causa raiz**: A autenticação do Supabase é global. Quando o usuário criou conta no "Michael Burger", o email foi registrado no `auth.users` mas ainda não confirmado. Ao tentar criar conta no "Maiza Pizza" ou no `/onboarding` com o mesmo email, o Supabase retorna `identities: []`, e o código interpreta como "não confirmado".
 
-## O que muda para o lojista
+**Solução**: Quando detectar email já cadastrado (identities vazio), além da mensagem de erro, mostrar o botão "Reenviar e-mail de confirmação" (já existe no Auth.tsx mas falta no Onboarding.tsx). Também melhorar a mensagem para explicar que a conta é global e basta confirmar o email e fazer login.
 
-Uma nova secao "Cores / Aparencia" aparece dentro da aba **Perfil** do admin, com 4 color pickers simples:
-- **Cor primaria** (botoes, destaques, CTA)
-- **Cor secundaria** (fundo de cards, badges)
-- **Cor de fundo** (background geral)
-- **Cor de texto** (textos principais)
+### Problema 2: Botão "Reenviar e-mail de confirmação" não funciona
+**Causa raiz**: O `resendConfirmation` no `useAuth.ts` usa `supabase.auth.resend({ type: 'signup', email })`. Isso pode falhar silenciosamente se o Supabase estiver com rate limit ou se o email já foi confirmado. Além disso, no Auth.tsx o `resendError` pode estar ocorrendo mas a mensagem genérica não ajuda.
 
-Preview em tempo real ao lado dos pickers mostrando como ficam botao, card e texto.
+**Solução**: Adicionar tratamento de erro mais específico no resend, incluir feedback visual de loading no botão, e usar `mapAuthError` para traduzir erros do resend.
 
----
+### Problema 3: "Esqueci minha senha" e erro no link de recuperação + falta no Onboarding
+**Causa raiz no Auth.tsx**: O `ForgotPasswordLink` usa `window.location.origin` para o `redirectTo`. Se o domínio customizado `deliveryarraial.com.br` não está configurado como "Site URL" ou "Redirect URL" no Supabase Dashboard, o Supabase rejeita o redirect.
 
-## Arquitetura Tecnica
+**Causa raiz no Onboarding**: Simplesmente não existe o componente de "Esqueci minha senha" na aba "Entrar".
 
-### 1. Banco de Dados (zero migrations)
+**Solução**: 
+- Adicionar "Esqueci minha senha" na aba login do Onboarding
+- Melhorar mensagens de erro do reset password
+- Verificar que o redirect URL inclui o domínio correto
 
-As cores ficam dentro de `restaurants.settings` (JSONB), adicionando um objeto `theme`:
+## Arquivos a Modificar
 
-```text
-settings: {
-  ...campos_existentes,
-  theme: {
-    primary: "#E63946",
-    secondary: "#1D3557",
-    background: "#FFFFFF",
-    foreground: "#1A1A2E"
-  }
-}
-```
+| Arquivo | Mudança |
+|---------|---------|
+| `src/pages/Onboarding.tsx` | Adicionar botão "Reenviar confirmação" quando identities=0, adicionar "Esqueci minha senha" na aba login |
+| `src/pages/Auth.tsx` | Melhorar feedback do resend e do forgot password com loading state e mensagens específicas |
+| `src/hooks/useAuth.ts` | Melhorar `resendConfirmation` com tratamento de erro mais robusto |
 
-Nenhuma coluna nova. Nenhuma migration. O campo `primary_color` e `secondary_color` existentes na tabela continuam para compatibilidade (favicon, PWA), mas o tema visual usa `settings.theme`.
+## Detalhes Técnicos
 
-### 2. Tipo RestaurantSettings (src/types/restaurant.ts)
+### Onboarding.tsx - Mudanças
+1. Quando `identities.length === 0`, além do erro, mostrar botão "Reenviar e-mail de confirmação" com loading state
+2. Na aba "Entrar", adicionar componente de "Esqueci minha senha" idêntico ao do Auth.tsx (input de email + botão enviar link)
+3. Usar `supabase.auth.resend()` para o reenvio e `supabase.auth.resetPasswordForEmail()` para recuperação
 
-Adicionar interface `RestaurantTheme` e campo `theme?` ao `RestaurantSettings`. Definir `DEFAULT_THEME` neutro:
+### Auth.tsx - Mudanças
+1. Adicionar loading state no botão "Reenviar e-mail de confirmação" para feedback visual
+2. Melhorar mensagem de erro do resend com `mapAuthError` pattern
 
-```text
-DEFAULT_THEME = {
-  primary: "#E63946"    -- vermelho conversivo (CTA forte)
-  secondary: "#1D3557"  -- azul escuro (confianca)
-  background: "#FFFFFF" -- fundo limpo
-  foreground: "#1A1A2E" -- texto escuro legivel
-}
-```
+### useAuth.ts - Mudanças
+1. O `resendConfirmation` já funciona corretamente na lógica, o problema pode ser rate limiting do Supabase (limite de 1 email por 60s). Adicionar nota sobre isso na mensagem de sucesso.
 
-### 3. Injecao de CSS Variables (src/contexts/RestaurantContext.tsx)
+## Nota Importante sobre Redirect URLs
+O domínio `deliveryarraial.com.br` precisa estar configurado no Supabase Dashboard em:
+- **Authentication > URL Configuration > Site URL**: `https://deliveryarraial.com.br`  
+- **Authentication > URL Configuration > Redirect URLs**: adicionar `https://deliveryarraial.com.br/**`
 
-Dentro do `RestaurantProvider`, apos carregar o restaurante, injetar CSS variables no `document.documentElement.style`:
-
-```text
---primary: [HSL convertido de theme.primary]
---primary-foreground: [calculado automaticamente]
---background: [HSL convertido de theme.background]
---foreground: [HSL convertido de theme.foreground]
---secondary: [HSL convertido de theme.secondary]
---card: [derivado de background]
---muted: [derivado de secondary]
---border: [derivado de secondary]
---ring: [igual ao primary]
-```
-
-Isso substitui automaticamente todas as CSS variables do Tailwind definidas em `index.css`, sem precisar alterar nenhum componente existente. Todos os botoes, cards, textos e backgrounds ja usam essas variables.
-
-Logica de cleanup: ao desmontar o provider, remover as variables para nao contaminar outros restaurantes.
-
-### 4. Utilidade de Conversao HEX -> HSL (src/lib/themeUtils.ts)
-
-Criar funcao `hexToHSL(hex: string): string` que converte "#E63946" para "355 80% 56%" (formato Tailwind sem `hsl()`).
-
-Funcao `applyTheme(theme: RestaurantTheme)` que calcula todas as variables derivadas e aplica no DOM.
-
-Funcao `removeTheme()` para cleanup.
-
-Validacao: aceitar apenas hex validos (`/^#[0-9A-Fa-f]{6}$/`), rejeitar qualquer outro input (prevencao de CSS injection).
-
-### 5. Editor de Cores no Admin (src/components/admin/RestaurantProfileForm.tsx)
-
-Adicionar um novo Card "Aparencia" dentro do formulario existente, com:
-- 4 inputs `type="color"` nativos do HTML (funcionam em todos os browsers, zero dependencia)
-- Ao lado, um mini-preview com: botao primario, card com fundo secondary, texto foreground sobre background
-- O preview atualiza em tempo real conforme o usuario muda as cores
-- Botao "Restaurar Padrao" que reseta para DEFAULT_THEME
-
-As cores sao salvas no campo `settings` via `useRestaurantProfile` (ja existe a mutation de update).
-
-### 6. Hook useRestaurantProfile (update)
-
-Atualizar o hook para incluir `theme` no UpdateProfileData, salvando dentro de `settings.theme` via merge com settings existentes.
-
-### 7. useRestaurantHead (update)
-
-Atualizar para usar `settings.theme.primary` como `theme-color` do PWA (com fallback para `primary_color`).
-
----
-
-## Fluxo Completo
-
-```text
-Lojista abre Admin > Perfil > Aparencia
-  |
-  v
-Escolhe 4 cores com color picker nativo
-  |
-  v
-Preview em tempo real mostra resultado
-  |
-  v
-Clica "Salvar"
-  |
-  v
-settings.theme salvo no JSONB do restaurants
-  |
-  v
-Cliente acessa /slug/menu
-  |
-  v
-RestaurantProvider carrega restaurant
-  |
-  v
-useEffect injeta CSS variables no :root
-  |
-  v
-Tailwind aplica as cores em TODOS os componentes automaticamente
-```
-
----
-
-## Arquivos a criar/modificar
-
-| Arquivo | Acao |
-|---------|------|
-| `src/lib/themeUtils.ts` | **Criar** - hexToHSL, applyTheme, removeTheme |
-| `src/types/restaurant.ts` | **Modificar** - adicionar RestaurantTheme + DEFAULT_THEME |
-| `src/contexts/RestaurantContext.tsx` | **Modificar** - useEffect para injetar CSS variables |
-| `src/components/admin/RestaurantProfileForm.tsx` | **Modificar** - adicionar Card "Aparencia" com color pickers |
-| `src/hooks/useRestaurantProfile.ts` | **Modificar** - incluir theme no update |
-| `src/hooks/useRestaurantHead.ts` | **Modificar** - usar theme.primary para PWA |
-
----
-
-## Tema Padrao Neutro (otimizado para conversao)
-
-Quando o restaurante nao configura nada, aplica-se:
-- **Primaria**: Vermelho (#E63946) -- cor de maior conversao em delivery/food
-- **Secundaria**: Azul escuro (#1D3557) -- transmite confianca
-- **Fundo**: Branco (#FFFFFF) -- limpo, profissional
-- **Texto**: Quase preto (#1A1A2E) -- legibilidade maxima
-
-Esse tema segue os padroes de iFood, Rappi e UberEats.
-
----
-
-## Seguranca
-
-- Validacao regex de hex no frontend e no Zod schema
-- CSS variables sao injetadas via `style.setProperty()` (seguro, nao aceita CSS arbitrario)
-- Nenhum `dangerouslySetInnerHTML` ou template literal de CSS
-- Isolamento garantido: cleanup no unmount do provider
-
----
-
-## Riscos e Mitigacoes
-
-| Risco | Mitigacao |
-|-------|----------|
-| Lojista escolhe cores com baixo contraste | Mini-preview mostra resultado em tempo real |
-| Flash de tema padrao antes do tema carregar | Tema padrao neutro (branco) nao causa flash visivel |
-| Cores do admin (dashboard) serem afetadas | Admin nao esta dentro do RestaurantProvider, logo nao e afetado |
-
----
-
-## O que NAO esta nesta fase (futuro)
-
-- Marketplace de temas prontos
-- Dark mode toggle
-- Custom CSS
-- Upload de favicon customizado (ja funciona via logo)
-- Validacao WCAG de contraste
+Sem isso, o "Esqueci minha senha" continuará falhando independentemente do código. Isso será mencionado ao usuário após a implementação.
 
