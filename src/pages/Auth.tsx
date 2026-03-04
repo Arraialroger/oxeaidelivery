@@ -37,6 +37,44 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
+const mapAuthErrorMsg = (msg: string): string => {
+  const lower = msg.toLowerCase();
+  if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('429')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+  if (lower.includes('email_address_invalid') || (lower.includes('email address') && lower.includes('invalid'))) return 'Endereço de e-mail inválido.';
+  return msg;
+};
+
+function ResendConfirmationButton({ email, slug, resendConfirmation, onSuccess, onError }: {
+  email: string;
+  slug?: string;
+  resendConfirmation: (email: string, slug?: string) => Promise<{ error: any }>;
+  onSuccess: () => void;
+  onError: (msg: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const handleResend = async () => {
+    setLoading(true);
+    const { error } = await resendConfirmation(email, slug);
+    setLoading(false);
+    if (error) {
+      onError(mapAuthErrorMsg(error.message || 'Erro ao reenviar e-mail. Aguarde 60s e tente novamente.'));
+    } else {
+      onSuccess();
+    }
+  };
+
+  return (
+    <div className="mb-4">
+      <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleResend} disabled={loading}>
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+        Reenviar e-mail de confirmação
+      </Button>
+      <p className="text-xs text-muted-foreground text-center mt-1">Aguarde 60s entre cada tentativa</p>
+    </div>
+  );
+}
+
 function ForgotPasswordLink() {
   const [sent, setSent] = useState(false);
   const [email, setFpEmail] = useState('');
@@ -55,7 +93,7 @@ function ForgotPasswordLink() {
     });
     setSending(false);
     if (error) {
-      setFpError('Erro ao enviar e-mail. Tente novamente.');
+      setFpError(mapAuthErrorMsg(error.message || 'Erro ao enviar e-mail. Tente novamente.'));
     } else {
       setSent(true);
     }
@@ -284,26 +322,16 @@ export default function Auth() {
 
               {/* Resend confirmation button */}
               {showResendFor && (
-                <div className="mb-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={async () => {
-                      const { error: resendError } = await resendConfirmation(showResendFor, slug);
-                      if (resendError) {
-                        setError('Erro ao reenviar e-mail. Tente novamente em alguns minutos.');
-                      } else {
-                        setSuccessMessage('E-mail de confirmação reenviado! Verifique sua caixa de entrada.');
-                        setError('');
-                      }
-                    }}
-                  >
-                    <Mail className="mr-2 h-4 w-4" />
-                    Reenviar e-mail de confirmação
-                  </Button>
-                </div>
+                <ResendConfirmationButton
+                  email={showResendFor}
+                  slug={slug}
+                  resendConfirmation={resendConfirmation}
+                  onSuccess={() => {
+                    setSuccessMessage('E-mail de confirmação reenviado! Verifique sua caixa de entrada (pode levar até 60s).');
+                    setError('');
+                  }}
+                  onError={(msg) => setError(msg)}
+                />
               )}
 
               {/* Login Tab */}

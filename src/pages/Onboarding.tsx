@@ -368,6 +368,15 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [showResendFor, setShowResendFor] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+
+  // Forgot password state
+  const [showForgotPw, setShowForgotPw] = useState(false);
+  const [fpEmail, setFpEmail] = useState('');
+  const [fpSending, setFpSending] = useState(false);
+  const [fpError, setFpError] = useState('');
+  const [fpSent, setFpSent] = useState(false);
 
   const formatPhoneDisplay = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -381,10 +390,41 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
     if (lower.includes('invalid login')) return 'E-mail ou senha incorretos';
     if (lower.includes('email not confirmed')) return 'Confirme seu e-mail antes de fazer login';
     if (lower.includes('already registered') || lower.includes('user already registered')) return 'E-mail já cadastrado. Tente fazer login.';
-    if (lower.includes('email_address_invalid') || lower.includes('email address') && lower.includes('invalid')) return 'Endereço de e-mail inválido. Verifique e tente novamente.';
-    if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('request rate limit')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+    if (lower.includes('email_address_invalid') || (lower.includes('email address') && lower.includes('invalid'))) return 'Endereço de e-mail inválido. Verifique e tente novamente.';
+    if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('request rate limit') || lower.includes('429')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
     if (lower.includes('password should be at least') || lower.includes('weak_password')) return 'A senha deve ter pelo menos 6 caracteres';
     return `Erro: ${msg}`;
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!showResendFor) return;
+    setResendLoading(true);
+    const { error } = await supabase.auth.resend({ type: 'signup', email: showResendFor });
+    setResendLoading(false);
+    if (error) {
+      setError(mapAuthError(error.message));
+    } else {
+      setSuccess('E-mail de confirmação reenviado! Verifique sua caixa de entrada (pode levar até 60s).');
+      setError('');
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!fpEmail || !fpEmail.includes('@')) {
+      setFpError('Informe um e-mail válido');
+      return;
+    }
+    setFpSending(true);
+    setFpError('');
+    const { error } = await supabase.auth.resetPasswordForEmail(fpEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setFpSending(false);
+    if (error) {
+      setFpError(mapAuthError(error.message || 'Erro ao enviar e-mail.'));
+    } else {
+      setFpSent(true);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -403,6 +443,7 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setShowResendFor('');
     if (name.length < 2) { setError('Nome deve ter pelo menos 2 caracteres'); return; }
     if (password.length < 6) { setError('Senha deve ter pelo menos 6 caracteres'); return; }
     if (password !== confirmPassword) { setError('As senhas não coincidem'); return; }
@@ -418,13 +459,15 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
       return;
     }
     if (data?.user?.identities?.length === 0) {
-      setError('E-mail já cadastrado mas não confirmado.');
+      setError('Este e-mail já possui uma conta. Confirme seu e-mail e faça login.');
+      setShowResendFor(email);
       return;
     }
     if (data?.session) {
       onAuthenticated();
     } else {
       setSuccess('Conta criada! Verifique seu e-mail para confirmar.');
+      setShowResendFor(email);
     }
   };
 
@@ -445,7 +488,15 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
             <Alert className="border-primary/50 bg-primary/10"><AlertDescription className="text-primary">{success}</AlertDescription></Alert>
           )}
 
-          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as 'login' | 'signup'); setError(''); setSuccess(''); }}>
+          {/* Resend confirmation button */}
+          {showResendFor && (
+            <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleResendConfirmation} disabled={resendLoading}>
+              {resendLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+              Reenviar e-mail de confirmação
+            </Button>
+          )}
+
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as 'login' | 'signup'); setError(''); setSuccess(''); setShowResendFor(''); }}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signup">Criar conta</TabsTrigger>
               <TabsTrigger value="login">Entrar</TabsTrigger>
@@ -493,6 +544,38 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
                   {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Entrando...</> : 'Entrar'}
                 </Button>
               </form>
+
+              {/* Esqueci minha senha */}
+              <div className="mt-3 space-y-2">
+                {fpSent ? (
+                  <p className="text-sm text-center text-primary">E-mail enviado! Verifique sua caixa de entrada.</p>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors w-full text-center"
+                      onClick={() => setShowForgotPw(!showForgotPw)}
+                    >
+                      Esqueci minha senha
+                    </button>
+                    {showForgotPw && (
+                      <div className="space-y-2">
+                        <Input
+                          type="email"
+                          placeholder="Digite seu e-mail"
+                          value={fpEmail}
+                          onChange={(e) => setFpEmail(e.target.value)}
+                        />
+                        {fpError && <p className="text-sm text-destructive">{fpError}</p>}
+                        <Button type="button" variant="outline" className="w-full" onClick={handleForgotPassword} disabled={fpSending}>
+                          {fpSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          Enviar link de recuperação
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
