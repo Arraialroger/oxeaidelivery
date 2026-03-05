@@ -39,9 +39,16 @@ const formatPhone = (value: string) => {
 
 const mapAuthErrorMsg = (msg: string): string => {
   const lower = msg.toLowerCase();
-  if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('429')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
-  if (lower.includes('email_address_invalid') || (lower.includes('email address') && lower.includes('invalid'))) return 'Endereço de e-mail inválido.';
-  return msg;
+  if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('request rate limit') || lower.includes('429') || lower.includes('over_email_send_rate_limit')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+  if (lower.includes('email_address_invalid') || (lower.includes('email address') && lower.includes('invalid')) || lower.includes('unable to validate email')) return 'Endereço de e-mail inválido.';
+  if (lower.includes('invalid login') || lower.includes('invalid_credentials')) return 'E-mail ou senha incorretos';
+  if (lower.includes('email not confirmed')) return 'Confirme seu e-mail antes de fazer login';
+  if (lower.includes('already registered') || lower.includes('user already registered')) return 'E-mail já cadastrado. Tente fazer login.';
+  if (lower.includes('password should be at least') || lower.includes('weak_password')) return 'A senha deve ter pelo menos 6 caracteres';
+  if (lower.includes('signup_disabled')) return 'Cadastro temporariamente desabilitado.';
+  if (lower.includes('network') || lower.includes('fetch')) return 'Erro de conexão. Verifique sua internet e tente novamente.';
+  console.error('[Auth] Unmapped error:', msg);
+  return `Erro: ${msg}`;
 };
 
 function ResendConfirmationButton({ email, slug, resendConfirmation, onSuccess, onError }: {
@@ -182,13 +189,8 @@ export default function Auth() {
     setIsSubmitting(false);
 
     if (authError) {
-      if (authError.message.includes('Invalid login credentials')) {
-        setError('E-mail ou senha incorretos');
-      } else if (authError.message.includes('Email not confirmed')) {
-        setError('Confirme seu e-mail antes de fazer login');
-      } else {
-        setError('Erro ao fazer login. Tente novamente.');
-      }
+      console.error('[Auth] Login error:', authError.message, authError);
+      setError(mapAuthErrorMsg(authError.message));
     }
   };
 
@@ -226,14 +228,12 @@ export default function Auth() {
     setIsSubmitting(false);
 
     if (authError) {
-      if (authError.message.includes('User already registered')) {
-        setError('Este e-mail já está cadastrado. Tente fazer login.');
+      console.error('[Auth] Signup error:', authError.message, authError);
+      const mapped = mapAuthErrorMsg(authError.message);
+      setError(mapped);
+      if (authError.message.toLowerCase().includes('already registered')) {
         setActiveTab('login');
         setLoginEmail(signupEmail);
-      } else if (authError.message.includes('Password should be at least')) {
-        setError('A senha deve ter pelo menos 6 caracteres');
-      } else {
-        setError('Erro ao criar conta. Tente novamente.');
       }
       return;
     }
