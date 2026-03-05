@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ALLOWED_ORIGINS = [
   "https://deliveryarraial.lovable.app",
+  "https://deliveryarraial.com.br",
   "https://id-preview--0384a06e-621e-4be3-9b52-eaa7f97369ec.lovable.app",
 ];
 
