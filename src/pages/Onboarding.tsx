@@ -387,12 +387,15 @@ function OnboardingAuthGate({ onAuthenticated }: { onAuthenticated: () => void }
 
   const mapAuthError = (msg: string): string => {
     const lower = msg.toLowerCase();
-    if (lower.includes('invalid login')) return 'E-mail ou senha incorretos';
+    if (lower.includes('invalid login') || lower.includes('invalid_credentials')) return 'E-mail ou senha incorretos';
     if (lower.includes('email not confirmed')) return 'Confirme seu e-mail antes de fazer login';
     if (lower.includes('already registered') || lower.includes('user already registered')) return 'E-mail já cadastrado. Tente fazer login.';
-    if (lower.includes('email_address_invalid') || (lower.includes('email address') && lower.includes('invalid'))) return 'Endereço de e-mail inválido. Verifique e tente novamente.';
-    if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('request rate limit') || lower.includes('429')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+    if (lower.includes('email_address_invalid') || (lower.includes('email address') && lower.includes('invalid')) || lower.includes('unable to validate email')) return 'Endereço de e-mail inválido. Verifique e tente novamente.';
+    if (lower.includes('rate limit') || lower.includes('too many') || lower.includes('request rate limit') || lower.includes('429') || lower.includes('over_email_send_rate_limit')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
     if (lower.includes('password should be at least') || lower.includes('weak_password')) return 'A senha deve ter pelo menos 6 caracteres';
+    if (lower.includes('signup_disabled')) return 'Cadastro temporariamente desabilitado.';
+    if (lower.includes('network') || lower.includes('fetch')) return 'Erro de conexão. Verifique sua internet e tente novamente.';
+    console.error('[Onboarding] Unmapped auth error:', msg);
     return `Erro: ${msg}`;
   };
 
