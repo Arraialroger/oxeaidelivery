@@ -3,7 +3,7 @@ import type { Restaurant } from '@/types/restaurant';
 
 const DEFAULT_TITLE = 'Delivery';
 const DEFAULT_DESCRIPTION = 'Peça pelo app com entrega rápida';
-const DEFAULT_FAVICON = '/logo-astral.png';
+const DEFAULT_FAVICON = '/logo-arraial.png';
 const DEFAULT_THEME_COLOR = '#000000';
 
 function setMetaContent(selector: string, content: string) {
