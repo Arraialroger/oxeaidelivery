@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Store, Utensils, Plus } from "lucide-react";
+import { Loader2, Store, Plus } from "lucide-react";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { RestaurantCard } from "@/components/marketplace/RestaurantCard";
 import { CategoryFilter } from "@/components/marketplace/CategoryFilter";
@@ -34,9 +34,7 @@ export default function Index() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                <Utensils className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <img src="/logo-arraial.png" alt="Arraial Delivery" className="w-10 h-10 rounded-xl object-contain" />
               <div>
                 <h1 className="text-lg font-bold text-foreground">Arraial Delivery</h1>
                 <p className="text-xs text-muted-foreground">O delivery de Arraial d’Ajuda</p>
