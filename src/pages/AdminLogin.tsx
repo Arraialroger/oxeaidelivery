@@ -86,9 +86,9 @@ export default function AdminLogin() {
             <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
               <Lock className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle className="text-2xl text-foreground">Admin Access</CardTitle>
+            <CardTitle className="text-2xl text-foreground">Acesso de administrador</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Sign in with your admin credentials
+              Faça login com suas credenciais de administrador.
             </CardDescription>
           </CardHeader>
           <CardContent>
