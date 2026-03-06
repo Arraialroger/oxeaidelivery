@@ -35,6 +35,8 @@ export interface RestaurantSettings {
   upsell_enabled?: boolean;
   upsell_min_cart_value?: number;
   theme?: RestaurantTheme;
+  fb_pixel_id?: string;
+  gtag_id?: string;
 }
 
 export const DEFAULT_SETTINGS: RestaurantSettings = {
