@@ -8,17 +8,15 @@ import { ProductForm } from '@/components/admin/ProductForm';
 import { ProductList } from '@/components/admin/ProductList';
 import { CategoryForm } from '@/components/admin/CategoryForm';
 import { CategoryList } from '@/components/admin/CategoryList';
-import { ConfigForm } from '@/components/admin/ConfigForm';
 import { StampTransactionsList } from '@/components/admin/StampTransactionsList';
-import { RestaurantProfileForm } from '@/components/admin/RestaurantProfileForm';
 import { BusinessHoursForm } from '@/components/admin/BusinessHoursForm';
 import { DashboardPanel } from '@/components/admin/DashboardPanel';
 import { DeliveryZonesManager } from '@/components/admin/DeliveryZonesManager';
 import { CouponList } from '@/components/admin/CouponList';
 import { CouponForm } from '@/components/admin/CouponForm';
-import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Store, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag, CreditCard, Shield } from 'lucide-react';
+import { SettingsPage } from '@/components/admin/SettingsPage';
+import { Plus, Package, Layers, Settings, LogOut, Users, ChefHat, UtensilsCrossed, Gift, Clock, LayoutDashboard, MapPin, Tag, ShoppingBag, Shield } from 'lucide-react';
 import { UpsellManager } from '@/components/admin/UpsellManager';
-import { PaymentSettingsForm } from '@/components/admin/PaymentSettingsForm';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Admin() {
@@ -127,21 +125,13 @@ export default function Admin() {
               <Clock className="w-4 h-4" />
               <span className="hidden sm:inline">Horários</span>
             </TabsTrigger>
-            <TabsTrigger value="profile" className="gap-2">
-              <Store className="w-4 h-4" />
-              <span className="hidden sm:inline">Perfil</span>
-            </TabsTrigger>
             <TabsTrigger value="upsell" className="gap-2">
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline">Upsell</span>
             </TabsTrigger>
-            <TabsTrigger value="payments" className="gap-2">
-              <CreditCard className="w-4 h-4" />
-              <span className="hidden sm:inline">Pagamento</span>
-            </TabsTrigger>
-            <TabsTrigger value="config" className="gap-2">
+            <TabsTrigger value="settings" className="gap-2">
               <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Config</span>
+              <span className="hidden sm:inline">Configurações</span>
             </TabsTrigger>
           </TabsList>
 
@@ -237,34 +227,14 @@ export default function Admin() {
             <BusinessHoursForm />
           </TabsContent>
 
-          {/* Profile Tab */}
-          <TabsContent value="profile">
-            <RestaurantProfileForm />
-          </TabsContent>
-
           {/* Upsell Tab */}
           <TabsContent value="upsell">
             <UpsellManager />
           </TabsContent>
 
-
-
-
-          {/* Payment Settings Tab */}
-          <TabsContent value="payments">
-            <PaymentSettingsForm />
-          </TabsContent>
-
-          {/* Config Tab */}
-          <TabsContent value="config">
-            <Card>
-              <CardHeader>
-                <CardTitle>Configurações</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ConfigForm />
-              </CardContent>
-            </Card>
+          {/* Unified Settings Tab */}
+          <TabsContent value="settings">
+            <SettingsPage />
           </TabsContent>
         </Tabs>
       </main>
